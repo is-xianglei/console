@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useConsoleStore } from '../../stores/console'
 
 const { state } = useConsoleStore()
 const open = ref(true)
+let closeTimer: ReturnType<typeof setTimeout> | null = null
 
 const stateLabel: Record<string, string> = {
   queued: '排队',
@@ -13,22 +14,48 @@ const stateLabel: Record<string, string> = {
   think: '推理中',
   run: '执行中',
 }
+const hasTasks = computed(() => state.tasks.length > 0)
 const doneCount = computed(() => state.tasks.filter((t) => t.state === 'done').length)
 const activeCount = computed(() => state.tasks.filter((t) => t.state === 'active').length)
+const errorCount = computed(() => state.tasks.filter((t) => t.state === 'error').length)
+const allDone = computed(
+  () => hasTasks.value && doneCount.value === state.tasks.length && !errorCount.value,
+)
 const progress = computed(() =>
   state.tasks.length ? (doneCount.value / state.tasks.length) * 100 : 0,
 )
 const summary = computed(() => {
   if (!state.tasks.length) return '0 / 0 待命'
-  return `${doneCount.value} / ${state.tasks.length} ${activeCount.value ? '运行中' : '完成'}`
+  const tail = errorCount.value ? '有失败' : activeCount.value ? '运行中' : '完成'
+  return `${doneCount.value} / ${state.tasks.length} ${tail}`
 })
+
+// 有新任务出现时自动展开;全部完成后延时自动收起
+let prevHas = false
+watch(
+  () => [hasTasks.value, allDone.value] as [boolean, boolean],
+  ([has, done]) => {
+    if (closeTimer) {
+      clearTimeout(closeTimer)
+      closeTimer = null
+    }
+    if (has && !prevHas) open.value = true
+    prevHas = has
+    if (done) {
+      closeTimer = setTimeout(() => {
+        open.value = false
+      }, 2500)
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
-  <div class="task-bar" :class="{ open }">
+  <div v-if="hasTasks" class="task-bar" :class="{ open }">
     <div class="task-bar-head" @click="open = !open">
       <span class="sec-head">任务编排</span>
-      <span class="task-state" :class="activeCount ? 'active' : 'done'">{{ summary }}</span>
+      <span class="task-state" :class="errorCount ? 'error' : activeCount ? 'active' : 'done'">{{ summary }}</span>
       <div class="task-prog"><div class="task-prog-fill" :style="{ width: progress + '%' }"></div></div>
       <i class="icon icon-chevron-up task-chev"></i>
     </div>

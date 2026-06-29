@@ -67,7 +67,7 @@ export const SUBAGENT_TEMPLATES: SubAgentTemplate[] = [
   },
 ]
 
-/** 主 Agent 汇总回答(Markdown,交给 vue-stream-markdown 流式渲染) */
+/** 主 Agent 汇总回答(Markdown,由 utils/markdown 渲染) */
 export const SYNTHESIS_MARKDOWN = `综合 4 个子代理的结论:**pump-01 的根因为轴承外圈点蚀**。
 
 - 振动频谱在 \`162Hz\` 处与外圈通过频率 **BPFO** 吻合

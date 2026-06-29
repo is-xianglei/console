@@ -6,7 +6,8 @@ import ChatArea from './components/chat/ChatArea.vue'
 import AppCenter from './components/apps/AppCenter.vue'
 import RightSidebar from './components/right/RightSidebar.vue'
 
-const { state, toggleTheme, toggleLeft, toggleRight, seedConversation } = useConsoleStore()
+const { state, toggleTheme, toggleLeft, toggleRight, loadHealth, loadSessions, seedConversation } =
+  useConsoleStore()
 
 const agentCount = computed(() => state.agents.length)
 /** 右侧子代理栏是否“本应可用”(对话视图且已派发子代理) */
@@ -14,8 +15,23 @@ const rightAvailable = computed(() => state.view === 'chat' && state.agents.leng
 /** 右侧栏实际是否显示:可用 且 未被收缩 */
 const showRight = computed(() => rightAvailable.value && !state.rightCollapsed)
 
-onMounted(() => {
-  seedConversation()
+/** 命令栏健康指示:映射后端 health 到状态点样式与文案 */
+const healthDot = computed(() =>
+  state.health === 'ok' ? 'nominal' : state.health === 'unknown' ? 'idle' : 'error',
+)
+const healthText = computed(() =>
+  state.health === 'ok'
+    ? 'SYSTEM NOMINAL'
+    : state.health === 'unknown'
+      ? 'CONNECTING…'
+      : 'BACKEND OFFLINE',
+)
+
+onMounted(async () => {
+  loadHealth()
+  const ok = await loadSessions()
+  // 后端会话加载失败(离线)时,用种子对话兜底,保证界面非空
+  if (!ok) seedConversation()
 })
 </script>
 
@@ -38,7 +54,7 @@ onMounted(() => {
         <span class="cmd-sub mono">// agent console</span>
       </div>
       <div class="cmd-spacer"></div>
-      <div class="cmd-stat mono"><span class="dot nominal"></span>SYSTEM NOMINAL</div>
+      <div class="cmd-stat mono"><span class="dot" :class="healthDot"></span>{{ healthText }}</div>
       <div class="cmd-stat mono">◇ {{ agentCount }} AGENTS</div>
       <button class="cmd-btn" :title="state.theme === 'dark' ? '切到亮色' : '切到暗色'" @click="toggleTheme">
         <i :class="`icon icon-${state.theme === 'dark' ? 'sun' : 'moon'}`"></i>

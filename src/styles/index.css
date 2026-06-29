@@ -1,8 +1,16 @@
 /* ===== Hyperreal Agent Console · 全局 Token 系统 ===== */
+
 :root {
-  --font-ui: 'Instrument Sans', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
-  --font-data: 'IBM Plex Mono', monospace;
+  /* 跨端贴近 Mac 的字体栈:
+   * 西文/数字 Inter(最接近 SF Pro),中文 MiSans(最接近苹方),
+   * 再回退到各系统原生(Mac 上直接吃到 SF + 苹方)。两端统一、缺字优雅降级。
+   * 字体文件经 main.ts 导入(MiSans 用 unicode-range 按需加载分块)。 */
+  --font-sans: 'Inter', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-ui: var(--font-sans);
+  --font-body: var(--font-sans);
+  /* 等宽/数据保留 IBM Plex Mono,接近 SF Mono */
+  --font-data: 'IBM Plex Mono', 'MiSans', ui-monospace, 'SF Mono', Menlo, monospace;
 
   --bg-deep: #101010;
   --bg-panel: #1c1c1c;
@@ -220,48 +228,155 @@ button {
   }
 }
 
-/* ===== vue-stream-markdown 主题桥接 =====
- * 组件根元素 .stream-markdown 用 color: var(--foreground),
- * 但这些变量只在 .stream-markdown.dark/.light 下定义,而组件不带主题类,
- * 导致正文回退成默认深色。这里直接在 .stream-markdown 上把它需要的
- * shadcn 变量映射到 Hyperreal token,不依赖主题类,并跟随 [data-theme] 切换。 */
-.stream-markdown {
+/* ===== Markdown 渲染样式(.md,由 markdown-it 输出,完全自定义 Hyperreal 调性) ===== */
+.md {
   font-family: var(--font-body);
   font-size: 13px;
-  line-height: 1.65;
+  line-height: 1.7;
   color: var(--text-primary);
-
-  --background: var(--bg-deep);
-  --foreground: var(--text-primary);
-  --card: var(--bg-panel);
-  --card-foreground: var(--text-primary);
-  --popover: var(--bg-panel);
-  --popover-foreground: var(--text-primary);
-  --primary: var(--accent-agent);
-  --primary-foreground: var(--bg-deep);
-  --secondary: var(--bg-surface);
-  --secondary-foreground: var(--text-primary);
-  --muted: var(--bg-surface);
-  --muted-foreground: var(--text-muted);
-  --accent: var(--bg-elevated);
-  --accent-foreground: var(--text-primary);
-  --destructive: var(--status-error);
-  --input: var(--border);
-  --ring: var(--accent-agent);
+  word-break: break-word;
 }
-/* 兜底:正文文本元素强制使用主文本色,防止组件子元素的写死颜色压过桥接变量 */
-.stream-markdown :where(p, li, h1, h2, h3, h4, h5, h6, span, td, th, blockquote) {
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p {
+  margin: 0 0 10px;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 18px 0 10px;
   color: var(--text-primary);
 }
-.stream-markdown :where(code, pre) {
-  font-family: var(--font-data);
+.md h1 {
+  font-size: 19px;
 }
-.stream-markdown :where(strong) {
+.md h2 {
+  font-size: 16px;
+}
+.md h3 {
+  font-size: 14px;
+}
+.md h4 {
+  font-size: 13px;
+}
+.md strong {
   color: var(--text-primary);
+  font-weight: 600;
 }
-/* 行内代码:在暗底上用强调色,提升可读性 */
-.stream-markdown :where(:not(pre) > code) {
+.md em {
+  color: var(--text-secondary);
+}
+.md a {
   color: var(--accent-agent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-fast);
+}
+.md a:hover {
+  border-bottom-color: var(--accent-agent);
+}
+.md hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 16px 0;
+}
+/* PLACEHOLDER_MD2 */
+/* 列表 */
+.md ul,
+.md ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+.md li {
+  margin: 3px 0;
+}
+.md li::marker {
+  color: var(--text-dim);
+}
+/* 行内代码 */
+.md :not(pre) > code {
+  font-family: var(--font-data);
+  font-size: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  color: var(--accent-agent);
+}
+/* 代码块:暖灰底 + Hyperreal 圆角边框,顶部一条语言色带 */
+.md pre {
+  margin: 0 0 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+.md pre code {
+  font-family: var(--font-data);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: none;
+  padding: 0;
+  border: none;
+}
+/* highlight.js 主题会给 .hljs 设自己的底色,这里清掉,保留 Hyperreal 暖灰底 */
+.md pre code.hljs {
+  background: transparent;
+  padding: 0;
+}
+/* 引用块:青色左边框 + 暖灰底 */
+.md blockquote {
+  margin: 0 0 12px;
+  padding: 8px 14px;
+  border-left: 2px solid var(--accent-agent);
+  background: var(--bg-surface);
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+  color: var(--text-secondary);
+}
+.md blockquote > :last-child {
+  margin-bottom: 0;
+}
+/* 表格:暖灰表头 + 青色表头文字 + Hyperreal 圆角边框 */
+.md table {
+  width: 100%;
+  margin: 0 0 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  font-family: var(--font-data);
+  font-size: 12px;
+}
+.md thead {
+  background: var(--bg-elevated);
+}
+.md th {
+  padding: 9px 14px;
+  text-align: left;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent-agent);
+  border-bottom: 1px solid var(--border);
+}
+.md td {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+.md tbody tr:hover {
   background: var(--bg-surface);
 }
+
+
 
