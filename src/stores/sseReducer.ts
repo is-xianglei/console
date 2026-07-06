@@ -1,5 +1,5 @@
 import type { ChatBlock, ChatMessage, SubAgent } from '../types'
-import type { SseEvent } from '../api/types'
+import type { SseEvent, TaskResponse } from '../api/types'
 
 /** reducer 操作的可变状态切片(由 store 传入其响应式对象引用) */
 export interface SseTarget {
@@ -11,12 +11,9 @@ export interface SseTarget {
   selectAgent: (id: string | null) => void
   /** 新会话 id 回填(session_ready) */
   onSessionId?: (id: number) => void
-  /** TaskCreate/TaskUpdate 工具结果到达时回调,用于拉取最新任务列表刷新面板 */
-  onTaskEvent?: () => void
+  /** task_snapshot 到达:携带该会话全量任务,前端整体替换任务面板 */
+  onTaskSnapshot?: (tasks: TaskResponse[]) => void
 }
-
-/** 任务编排类工具名:其结果回来后应刷新任务面板 */
-const TASK_TOOLS = new Set(['TaskCreate', 'TaskUpdate'])
 
 /** 子代理唯一键:subagent 用 run_id,teammate 用 name,缺失兜底 name */
 function agentKey(ev: SseEvent): string {
@@ -63,8 +60,8 @@ function ensureAgent(t: SseTarget, ev: SseEvent): SubAgent {
 }
 
 // PLACEHOLDER_REDUCER
-/** 工具 input 摘要为 CLI 卡片的函数签名展示 */
-function fmtToolCall(name: string, input?: Record<string, unknown>): string {
+/** 工具 input 摘要为 CLI 卡片的函数签名展示。历史映射(mapMessages)复用同一格式,保证实时流与刷新后一致。 */
+export function fmtToolCall(name: string, input?: Record<string, unknown>): string {
   if (!input || !Object.keys(input).length) return `${name}()`
   const args = Object.entries(input)
     .map(([k, v]) => {
@@ -85,9 +82,6 @@ export function createSseReducer(target: SseTarget) {
   const oBlocks = new Map<number, ChatBlock>()
   // 子代理当前块映射:agentKey → (index → 'think'|'answer' 累加目标)
   const aBlocks = new Map<string, Map<number, { kind: 'think' | 'answer' }>>()
-  // orchestrator 里属于任务编排类工具(TaskCreate/TaskUpdate)的工具卡集合,
-  // 其 tool_result 到达时触发 onTaskEvent 刷新任务面板
-  const taskToolCards = new WeakSet<ChatBlock>()
 
   function handle(ev: SseEvent) {
     const role = ev.actor?.role ?? 'orchestrator'
@@ -96,6 +90,12 @@ export function createSseReducer(target: SseTarget) {
     if (ev.type === 'session_ready') {
       const sid = ev.data?.session_id ?? ev.session_id
       if (sid) target.onSessionId?.(sid)
+      return
+    }
+
+    // 任务全量快照(会话级,不带 actor):直接透传全量 tasks,面板整体替换
+    if (ev.type === 'task_snapshot') {
+      target.onTaskSnapshot?.(ev.data?.tasks ?? [])
       return
     }
 
@@ -152,10 +152,6 @@ export function createSseReducer(target: SseTarget) {
           done: false,
         }
         blocks.push(card)
-        // 标记任务编排类工具卡,便于其结果回来时刷新任务面板
-        if (ev.tool?.name && TASK_TOOLS.has(ev.tool.name)) {
-          taskToolCards.add(blocks[blocks.length - 1])
-        }
         break
       }
       case 'tool_result': {
@@ -166,10 +162,24 @@ export function createSseReducer(target: SseTarget) {
             b.done = true
             b.tag = ev.tool?.is_error ? 'ERROR' : 'RESULT'
             b.body = typeof ev.tool?.output === 'string' ? ev.tool.output : ''
-            // 任务编排工具结果就绪 → 通知 store 拉取最新任务列表
-            if (taskToolCards.has(b)) target.onTaskEvent?.()
             break
           }
+        }
+        break
+      }
+      case 'permission_request': {
+        // 工具执行前的审批请求:插一张待裁决审批卡,等待用户在卡上选择。
+        // 应答走独立端点(store.respondApproval),不回写本流。
+        const p = ev.permission
+        if (p) {
+          blocks.push({
+            kind: 'approval',
+            requestId: p.request_id,
+            toolName: p.tool_name,
+            toolInput: p.tool_input ?? {},
+            reason: p.reason ?? '该工具需要审批',
+            status: 'pending',
+          })
         }
         break
       }

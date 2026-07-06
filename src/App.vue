@@ -4,10 +4,19 @@ import { useConsoleStore } from './stores/console'
 import LeftSidebar from './components/LeftSidebar.vue'
 import ChatArea from './components/chat/ChatArea.vue'
 import AppCenter from './components/apps/AppCenter.vue'
+import SettingsView from './components/settings/SettingsView.vue'
 import RightSidebar from './components/right/RightSidebar.vue'
 
-const { state, toggleTheme, toggleLeft, toggleRight, loadHealth, loadSessions, seedConversation } =
-  useConsoleStore()
+const {
+  state,
+  toggleTheme,
+  toggleLeft,
+  toggleRight,
+  loadHealth,
+  loadSessions,
+  seedConversation,
+  setView,
+} = useConsoleStore()
 
 const agentCount = computed(() => state.agents.length)
 /** 右侧子代理栏是否“本应可用”(对话视图且已派发子代理) */
@@ -68,7 +77,14 @@ onMounted(async () => {
       >
         <i class="icon icon-panel-right"></i>
       </button>
-      <button class="cmd-btn" title="设置"><i class="icon icon-settings"></i></button>
+      <button
+        class="cmd-btn"
+        :class="{ active: state.view === 'settings' }"
+        title="设置"
+        @click="setView(state.view === 'settings' ? 'chat' : 'settings')"
+      >
+        <i class="icon icon-settings"></i>
+      </button>
     </header>
 
     <div class="workspace">
@@ -77,6 +93,7 @@ onMounted(async () => {
       </Transition>
       <ChatArea v-show="state.view === 'chat'" />
       <AppCenter v-if="state.view === 'apps'" />
+      <SettingsView v-if="state.view === 'settings'" />
       <Transition name="right-slide">
         <RightSidebar v-if="showRight" />
       </Transition>

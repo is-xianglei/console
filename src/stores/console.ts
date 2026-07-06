@@ -2,9 +2,30 @@ import { defineStore } from 'pinia'
 import { reactive } from 'vue'
 import type { ChatBlock, ChatMessage, MainView, Session, SubAgent, Task, TaskState } from '../types'
 import { SESSIONS } from '../data/seed'
-import { fetchHealth, fetchMessages, fetchSessions, fetchTasks, sendMessage } from '../api/console'
-import type { SessionMessageResponse, SessionResponse, TaskResponse } from '../api/types'
-import { createSseReducer } from './sseReducer'
+import {
+  batchDeleteSessions,
+  deleteSession,
+  deletePermissionRule,
+  fetchHealth,
+  fetchMessages,
+  fetchSessions,
+  listPermissionRules,
+  renameSession,
+  respondApproval,
+  sendMessage,
+  upsertPermissionRule,
+} from '../api/console'
+import type {
+  ApprovalDecision,
+  PermissionRule,
+  PermissionRuleCreate,
+  SessionMessageResponse,
+  SessionResponse,
+  TaskResponse,
+} from '../api/types'
+import { createSseReducer, fmtToolCall } from './sseReducer'
+import type { MsgContentBlock } from '../api/types'
+import type { SseHandlers } from '../api/sse'
 
 // ===== 工具函数 =====
 const now = () => new Date().toLocaleTimeString('zh-CN', { hour12: false })
@@ -33,34 +54,104 @@ function mapSession(s: SessionResponse): Session {
   }
 }
 
-/** 后端历史消息 → 前端 ChatMessage。
- *  user:content 为纯文本;assistant:content 为内容块数组 → think/answer/tool。 */
-function mapMessage(m: SessionMessageResponse): ChatMessage {
-  const time = formatTime(m.created_at)
-  if (m.role === 'user') {
-    const text = typeof m.content === 'string' ? m.content : ''
-    return { id: 'm-' + m.id, role: 'user', time, text }
+/** 把后端 content 归一化为内容块数组:
+ *  数组原样;单个块对象({type:...})包成单元素数组;其它(字符串/空)→ 空数组。
+ *  避免"裸对象 content"被 Array.isArray 判否而误当空消息。 */
+function normalizeBlocks(content: unknown): MsgContentBlock[] {
+  if (Array.isArray(content)) return content as MsgContentBlock[]
+  if (content && typeof content === 'object' && 'type' in content) {
+    return [content as MsgContentBlock]
   }
-  // assistant / 其它:content 为块数组
-  const blocks: ChatBlock[] = []
-  const arr = Array.isArray(m.content) ? m.content : []
-  for (const b of arr) {
-    if (b.type === 'thinking' && b.thinking) {
-      blocks.push({ kind: 'think', text: b.thinking, duration: '推理完成', collapsed: true })
-    } else if (b.type === 'text' && b.text) {
-      blocks.push({ kind: 'answer', text: b.text, streaming: false })
-    } else if (b.type === 'tool_use') {
-      const args = b.input ? JSON.stringify(b.input) : ''
-      blocks.push({
-        kind: 'tool',
-        tag: b.name === 'Agent' || b.name === 'TeamSpawn' ? 'SPAWN' : 'TOOL',
-        fn: `${b.name ?? 'tool'}(${args.length > 60 ? args.slice(0, 60) + '…' : args})`,
-        body: '',
-        done: true,
-      })
+  return []
+}
+
+/** tool_result 的 content 提取为可展示文本(字符串/Anthropic 文本块数组/对象兜底 JSON)。 */
+function toolResultText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .map((c) =>
+        c && typeof c === 'object' && 'text' in c
+          ? String((c as { text: unknown }).text ?? '')
+          : typeof c === 'string'
+            ? c
+            : '',
+      )
+      .filter(Boolean)
+      .join('\n')
+  }
+  if (content && typeof content === 'object') return JSON.stringify(content)
+  return ''
+}
+
+/** 后端历史消息列表 → 前端 ChatMessage 列表(有状态,跨消息合并)。
+ *  相对逐条 map 的关键差异,均为消除"只有标题、无正文"的空行:
+ *  - tool_result 块 / role:"tool" 独立消息:按 tool_use_id 回填到对应工具卡(与实时 SSE 一致),不再丢弃或单独成行
+ *  - content 为裸对象/字符串时先归一化,避免误判为空
+ *  - 最终过滤掉没有任何可渲染块的 ai 消息 */
+function mapMessages(list: SessionMessageResponse[]): ChatMessage[] {
+  const out: ChatMessage[] = []
+  // tool_use.id → 对应工具卡引用(引用共享:即便卡片所在消息已入列,回填仍会反映到视图)
+  const toolCards = new Map<string, Extract<ChatBlock, { kind: 'tool' }>>()
+
+  /** 把一个 tool_result 块回填到已存在的工具卡;命中返回 true */
+  function fillToolResult(b: MsgContentBlock): boolean {
+    const card = b.tool_use_id ? toolCards.get(b.tool_use_id) : undefined
+    if (!card) return false
+    card.done = true
+    card.tag = b.is_error ? 'ERROR' : 'RESULT'
+    card.body = toolResultText(b.content)
+    return true
+  }
+
+  for (const m of list) {
+    const time = formatTime(m.created_at)
+
+    if (m.role === 'user') {
+      const text = typeof m.content === 'string' ? m.content : ''
+      if (text) out.push({ id: 'm-' + m.id, role: 'user', time, text })
+      continue
     }
+
+    // role:"tool":独立的工具结果消息,并入已有工具卡,自身不单独成行(否则就是空标题行)
+    if (m.role === 'tool') {
+      for (const b of normalizeBlocks(m.content)) {
+        if (b.type === 'tool_result') fillToolResult(b)
+      }
+      continue
+    }
+
+    // assistant / 其它:内容块数组 → think/answer/tool,内联 tool_result 就地合并
+    const blocks: ChatBlock[] = []
+    for (const b of normalizeBlocks(m.content)) {
+      if (b.type === 'thinking' && b.thinking) {
+        blocks.push({ kind: 'think', text: b.thinking, duration: '推理完成', collapsed: true })
+      } else if (b.type === 'text' && b.text) {
+        blocks.push({ kind: 'answer', text: b.text, streaming: false })
+      } else if (b.type === 'tool_use') {
+        const card: Extract<ChatBlock, { kind: 'tool' }> = {
+          kind: 'tool',
+          tag: b.name === 'Agent' || b.name === 'TeamSpawn' ? 'SPAWN' : 'TOOL',
+          fn: fmtToolCall(b.name ?? 'tool', b.input),
+          body: '',
+          done: false,
+        }
+        blocks.push(card)
+        if (b.id) toolCards.set(b.id, card)
+      } else if (b.type === 'tool_result') {
+        fillToolResult(b)
+      }
+    }
+
+    if (blocks.length) out.push({ id: 'm-' + m.id, role: 'ai', time, blocks })
   }
-  return { id: 'm-' + m.id, role: 'ai', time, blocks }
+
+  // 收尾:历史中被中断、始终没等到 tool_result 的工具卡,置为完成态,避免前端一直转圈
+  for (const card of toolCards.values()) {
+    if (!card.done) card.done = true
+  }
+
+  return out
 }
 
 /** 后端任务状态 → 前端 TaskState。未知值兜底为 queued。 */
@@ -82,7 +173,14 @@ function mapTaskState(status: string): TaskState {
 
 /** 后端 TaskResponse → 前端 Task 视图模型。deleted 状态由调用方过滤。 */
 function mapTask(t: TaskResponse): Task {
-  return { id: String(t.id), name: t.subject || t.description || `任务 #${t.id}`, state: mapTaskState(t.status) }
+  return {
+    id: String(t.id),
+    name: t.subject || t.description || `任务 #${t.id}`,
+    state: mapTaskState(t.status),
+    description: t.description || undefined,
+    blockedBy: (t.blocked_by ?? []).map(Number).filter((n) => !Number.isNaN(n)),
+    owner: t.owner || undefined,
+  }
 }
 
 // ===== 状态形状 =====
@@ -102,6 +200,9 @@ interface ConsoleState {
   tasks: Task[]
   busy: boolean
   theme: 'dark' | 'light'
+  /** 权限规则(设置页):列表 + 加载态 */
+  permissionRules: PermissionRule[]
+  permissionRulesLoading: boolean
 }
 
 /**
@@ -127,6 +228,8 @@ export const useConsoleStore = defineStore('console', () => {
     tasks: [],
     busy: false,
     theme: 'dark',
+    permissionRules: [],
+    permissionRulesLoading: false,
   })
 
   // PLACEHOLDER_STORE
@@ -187,7 +290,7 @@ export const useConsoleStore = defineStore('console', () => {
     }
     try {
       const list = await fetchMessages(id)
-      state.messages = list.map(mapMessage)
+      state.messages = mapMessages(list)
     } catch {
       state.messages = []
     }
@@ -221,6 +324,53 @@ export const useConsoleStore = defineStore('console', () => {
     state.search = v
   }
 
+  /** 重命名会话:后端会话(数字 id)同步 PATCH,本地占位会话仅改内存。
+   *  关键:从 state.sessions 取回 reactive 代理再改 title,避免 Proxy 陷阱。 */
+  async function renameSessionAction(id: string, title: string) {
+    const next = title.trim()
+    const target = state.sessions.find((s) => s.id === id)
+    if (!next || !target || target.title === next) return
+    target.title = next
+    if (isBackendSession(id)) {
+      try {
+        await renameSession(id, next)
+      } catch {
+        // 失败静默:保留乐观更新,避免打断交互(后端不可用时仍可本地改名)
+      }
+    }
+  }
+
+  /** 批量删除会话:后端会话批量物理删除,本地会话仅从内存移除。
+   *  删除后若命中当前会话,回退到剩余第一条或清空对话。 */
+  async function deleteSessionsAction(ids: string[]) {
+    if (!ids.length) return
+    const backendIds = ids.filter((id) => isBackendSession(id)).map(Number)
+    if (backendIds.length) {
+      try {
+        if (backendIds.length === 1) await deleteSession(backendIds[0])
+        else await batchDeleteSessions(backendIds)
+      } catch {
+        // 后端删除失败则中止,不动前端列表,避免前后端不一致
+        return
+      }
+    }
+    const removing = new Set(ids)
+    const hitActive = removing.has(state.activeSessionId)
+    state.sessions = state.sessions.filter((s) => !removing.has(s.id))
+    if (hitActive) {
+      const nextId = state.sessions[0]?.id
+      if (nextId) {
+        selectSession(nextId)
+      } else {
+        state.activeSessionId = ''
+        state.messages = []
+        state.agents = []
+        state.tasks = []
+        state.selectedAgentId = null
+      }
+    }
+  }
+
   // ===== 右侧:子代理选择 =====
   function selectAgent(id: string) {
     state.selectedAgentId = id
@@ -239,18 +389,54 @@ export const useConsoleStore = defineStore('console', () => {
     if (prompt) dispatch(prompt)
   }
 
-  /** 拉取当前会话的最新任务编排列表,重映射后整体写回 state.tasks。
-   *  仅后端会话(数字 id)有任务;失败时静默不动旧数据,避免闪烁。 */
-  async function refreshTasks(sessionId?: number | string) {
-    const id = sessionId ?? state.activeSessionId
-    if (!/^\d+$/.test(String(id))) return
-    try {
-      const list = await fetchTasks(id)
-      state.tasks = list
-        .filter((t) => t.status !== 'deleted')
-        .map(mapTask)
-    } catch {
-      // 查询失败时保留现有任务,不打断流式过程
+  /** 为一条 AI 消息构造 SSE 归约器(dispatch 与 respondApproval 共用)。 */
+  function buildReducer(ai: ChatMessage) {
+    return createSseReducer({
+      ai,
+      agents: state.agents,
+      selectAgent: (id) => {
+        state.selectedAgentId = id
+      },
+      onSessionId: (sid) => {
+        const idStr = String(sid)
+        // 新建会话:把本地占位会话替换成后端真实 id
+        if (state.activeSessionId !== idStr) {
+          const cur = state.sessions.find((s) => s.id === state.activeSessionId)
+          if (cur && !/^\d+$/.test(cur.id)) {
+            cur.id = idStr
+          }
+          state.activeSessionId = idStr
+        }
+      },
+      // 任务全量快照:随 SSE 流实时到达,直接整体替换任务面板
+      onTaskSnapshot: (tasks) => {
+        state.tasks = tasks.filter((t) => t.status !== 'deleted').map(mapTask)
+      },
+    })
+  }
+
+  /** 为一条 AI 消息构造 SSE 回调(错误块 + 收尾停流式;dispatch 与 respondApproval 共用)。 */
+  function streamHandlers(ai: ChatMessage): SseHandlers {
+    const reducer = buildReducer(ai)
+    return {
+      onEvent: (ev) => reducer.handle(ev),
+      onError: (err) => {
+        ai.blocks!.push({
+          kind: 'tool',
+          tag: 'ERROR',
+          fn: '连接错误',
+          body: err.message,
+          done: true,
+        })
+        state.busy = false
+      },
+      onDone: () => {
+        // 收尾:未结束的回答块停止流式光标
+        for (const b of ai.blocks!) {
+          if (b.kind === 'answer') b.streaming = false
+        }
+        state.busy = false
+      },
     }
   }
 
@@ -274,57 +460,88 @@ export const useConsoleStore = defineStore('console', () => {
     // 关键:取回 reactive 代理(而非上面的原始字面量),否则 reducer 改它不触发视图更新
     const ai = state.messages[state.messages.length - 1]
 
-    // 创建 SSE 归约器:把事件写进 ai.blocks 与 state.agents(均为 reactive 代理)
-    const reducer = createSseReducer({
-      ai,
-      agents: state.agents,
-      selectAgent: (id) => {
-        state.selectedAgentId = id
-      },
-      onSessionId: (sid) => {
-        const idStr = String(sid)
-        // 新建会话:把本地占位会话替换成后端真实 id
-        if (state.activeSessionId !== idStr) {
-          const cur = state.sessions.find((s) => s.id === state.activeSessionId)
-          if (cur && !/^\d+$/.test(cur.id)) {
-            cur.id = idStr
-          }
-          state.activeSessionId = idStr
-        }
-      },
-      // TaskCreate/TaskUpdate 的工具结果到达时,拉一次最新任务列表刷新面板
-      onTaskEvent: () => {
-        void refreshTasks()
-      },
-    })
-
     const sessionId = /^\d+$/.test(state.activeSessionId)
       ? Number(state.activeSessionId)
       : undefined
 
-    sendMessage(
-      { session_id: sessionId, content },
-      {
-        onEvent: (ev) => reducer.handle(ev),
-        onError: (err) => {
-          ai.blocks!.push({
-            kind: 'tool',
-            tag: 'ERROR',
-            fn: '连接错误',
-            body: err.message,
-            done: true,
-          })
-          state.busy = false
-        },
-        onDone: () => {
-          // 收尾:未结束的回答块停止流式光标
-          for (const b of ai.blocks!) {
-            if (b.kind === 'answer') b.streaming = false
-          }
-          state.busy = false
-        },
-      },
-    )
+    sendMessage({ session_id: sessionId, content }, streamHandlers(ai))
+  }
+
+  /**
+   * 对某审批卡作出裁决并恢复执行。
+   * - 把该 approval 块标记为已裁决(status),按钮随之隐藏;
+   * - 新建一条 AI 消息承接恢复流(后端 resume 会重发 turn_start,视作新回合);
+   * - POST /sessions/{id}/approvals 消费恢复流。
+   */
+  function respondApprovalAction(
+    requestId: string,
+    decision: ApprovalDecision,
+    updatedInput?: Record<string, unknown>,
+  ) {
+    if (state.busy) return
+    const sessionId = /^\d+$/.test(state.activeSessionId)
+      ? Number(state.activeSessionId)
+      : undefined
+    if (sessionId === undefined) return
+
+    // 在既有消息里定位该 approval 块并置为已裁决(隐藏按钮、显示结果)。
+    let matched = false
+    for (const m of state.messages) {
+      if (!m.blocks) continue
+      for (const b of m.blocks) {
+        if (b.kind === 'approval' && b.requestId === requestId && b.status === 'pending') {
+          b.status = decision
+          matched = true
+          break
+        }
+      }
+      if (matched) break
+    }
+    if (!matched) return
+
+    state.busy = true
+    // 恢复流承接到一条新 AI 消息(后端 resume 会重发 turn_start / tool_result / 后续文本)。
+    state.messages.push({ id: uid('m'), role: 'ai', time: now(), blocks: [] })
+    const ai = state.messages[state.messages.length - 1]
+
+    respondApproval(sessionId, requestId, decision, streamHandlers(ai), {
+      updatedInput,
+      alwaysScope: 'session',
+    })
+  }
+
+  // ===== 设置页:权限规则管理 =====
+  /** 拉取权限规则列表(可按作用域过滤);失败置空不抛出 */
+  async function loadPermissionRules(scope?: string) {
+    state.permissionRulesLoading = true
+    try {
+      state.permissionRules = await listPermissionRules(scope ? { scope } : undefined)
+    } catch {
+      state.permissionRules = []
+    } finally {
+      state.permissionRulesLoading = false
+    }
+  }
+
+  /** 新增/更新一条权限规则,成功后刷新列表。返回是否成功。 */
+  async function savePermissionRule(payload: PermissionRuleCreate): Promise<boolean> {
+    try {
+      await upsertPermissionRule(payload)
+      await loadPermissionRules()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** 删除一条权限规则,成功后从列表移除。 */
+  async function removePermissionRule(ruleId: number) {
+    try {
+      await deletePermissionRule(ruleId)
+      state.permissionRules = state.permissionRules.filter((r) => r.id !== ruleId)
+    } catch {
+      // 失败静默:保留列表,避免前后端不一致
+    }
   }
 
   // PLACEHOLDER_STORE4
@@ -368,10 +585,15 @@ export const useConsoleStore = defineStore('console', () => {
     selectSession,
     newSession,
     setSearch,
+    renameSession: renameSessionAction,
+    deleteSessions: deleteSessionsAction,
     selectAgent,
     toggleTheme,
     dispatch,
-    refreshTasks,
+    respondApproval: respondApprovalAction,
+    loadPermissionRules,
+    savePermissionRule,
+    removePermissionRule,
     seedConversation,
   }
 })

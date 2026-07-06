@@ -1,29 +1,25 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useConsoleStore } from '../../stores/console'
+import { useStickToBottom } from '../../composables/useStickToBottom'
 import ThinkingBlock from './ThinkingBlock.vue'
 import ToolCallCard from './ToolCallCard.vue'
+import ApprovalCard from './ApprovalCard.vue'
 import AnswerBlock from './AnswerBlock.vue'
 import TaskBar from './TaskBar.vue'
 import Composer from './Composer.vue'
 
 const { state } = useConsoleStore()
 const scroller = ref<HTMLElement | null>(null)
+const inner = ref<HTMLElement | null>(null)
 
 const activeSession = computed(() =>
   state.sessions.find((s) => s.id === state.activeSessionId),
 )
 
-// 消息或子代理流变化时自动滚到底
-watch(
-  () => [state.messages.length, JSON.stringify(state.messages.map((m) => m.blocks?.length ?? 0))],
-  async () => {
-    await nextTick()
-    const el = scroller.value
-    if (el) el.scrollTop = el.scrollHeight
-  },
-  { deep: true },
-)
+// 内容高度变化时自动吸底(覆盖流式文本累加、新增块等所有情况);
+// 用户上滚查看历史时暂停跟随,滚回底部自动恢复
+useStickToBottom(scroller, inner)
 </script>
 
 <template>
@@ -37,7 +33,7 @@ watch(
     </div>
 
     <div ref="scroller" class="conv-scroll">
-      <div class="conv-inner">
+      <div ref="inner" class="conv-inner">
         <div
           v-for="m in state.messages"
           :key="m.id"
@@ -52,8 +48,8 @@ watch(
             </div>
           </template>
 
-          <!-- AI 消息 -->
-          <template v-else>
+          <!-- AI 消息:blocks 为空且非当前流式占位时不渲染(兜底,避免只有标题的空行) -->
+          <template v-else-if="m.blocks?.length || state.busy">
             <div class="msg-byline">
               <span class="byline-ic ai"><i class="icon icon-hexagon"></i></span>
               <span class="byline-name">Hyperreal Agent</span>
@@ -73,6 +69,14 @@ watch(
                   :fn="b.fn"
                   :body="b.body"
                   :done="b.done"
+                />
+                <ApprovalCard
+                  v-else-if="b.kind === 'approval'"
+                  :request-id="b.requestId"
+                  :tool-name="b.toolName"
+                  :tool-input="b.toolInput"
+                  :reason="b.reason"
+                  :status="b.status"
                 />
                 <AnswerBlock
                   v-else-if="b.kind === 'answer'"

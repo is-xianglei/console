@@ -69,6 +69,11 @@ export interface SendMessageRequest {
   content: string
 }
 
+/** DELETE /api/sessions/{id} 与 POST /api/sessions/batch-delete → data */
+export interface SessionDeleteResult {
+  deleted: number
+}
+
 // ===== 会话任务(任务编排面板) =====
 
 /** GET /api/tasks?session_id= → data[] 单项。对齐后端 TaskResponse。 */
@@ -107,14 +112,23 @@ export interface SseEvent {
     | 'block_stop'
     | 'tool_use'
     | 'tool_result'
+    | 'permission_request'
     | 'error'
+    | 'task_snapshot'
     | string
   sequence: number
   session_id: number
   ts?: number
   actor?: SseActor
-  /** session_ready 专有 */
-  data?: { session_id: number; title: string; status: string }
+  /** RuntimeEvent(不带 actor)的负载:session_ready 与 task_snapshot 各取所需。
+   *  task_snapshot.tasks 为该会话全量任务,前端整体替换任务面板(对齐 AG-UI 的 STATE_SNAPSHOT)。 */
+  data?: {
+    session_id: number
+    title?: string
+    status?: string
+    reason?: 'baseline' | 'created' | 'updated' | string
+    tasks?: TaskResponse[]
+  }
   block?: { index: number; block_type?: 'thinking' | 'text' | 'tool_use' | string }
   /** *_delta 文本增量 */
   text?: string
@@ -125,6 +139,16 @@ export interface SseEvent {
     output?: string
     is_error?: boolean
   }
+  /** permission_request:工具执行前的审批请求(Human-in-the-Loop)。
+   *  应答走独立 REST 端点 POST /sessions/{id}/approvals,不回写本流。 */
+  permission?: {
+    request_id: string
+    tool_id: string
+    tool_name: string
+    tool_input?: Record<string, unknown>
+    behavior?: string
+    reason?: string
+  }
   stop_reason?: string
   usage?: {
     input_tokens: number
@@ -133,5 +157,50 @@ export interface SseEvent {
     cache_read_input_tokens: number
   }
   error?: { code: string; message: string; retriable: boolean; fatal: boolean }
+}
+
+// ===== 权限审批 =====
+
+/** 审批裁决:允许一次 / 始终允许 / 拒绝 */
+export type ApprovalDecision = 'allow_once' | 'always_allow' | 'deny'
+
+/** POST /api/sessions/{id}/approvals 请求体 */
+export interface SessionApprovalRequest {
+  request_id: string
+  decision: ApprovalDecision
+  updated_input?: Record<string, unknown>
+  always_scope?: 'session' | 'global'
+}
+
+/** 权限规则作用域 */
+export type PermissionScope = 'global' | 'session'
+/** 权限判定行为 */
+export type PermissionBehavior = 'allow' | 'ask' | 'deny'
+
+/** GET /api/permissions → data[] 单项 */
+export interface PermissionRule {
+  id: number
+  scope: PermissionScope | string
+  session_id: number | null
+  tool_name: string
+  behavior: PermissionBehavior | string
+  matcher: Record<string, unknown> | null
+  source: string
+  created_at: string
+  updated_at: string
+}
+
+/** POST /api/permissions 请求体 */
+export interface PermissionRuleCreate {
+  scope: PermissionScope
+  session_id?: number | null
+  tool_name: string
+  behavior: PermissionBehavior
+  matcher?: Record<string, unknown> | null
+}
+
+/** DELETE /api/permissions/{id} → data */
+export interface PermissionRuleDeleteResult {
+  deleted: number
 }
 

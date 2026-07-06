@@ -1,8 +1,22 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import type { SubAgent } from '../../types'
+import { useStickToBottom } from '../../composables/useStickToBottom'
 import ToolCallCard from '../chat/ToolCallCard.vue'
 
-defineProps<{ agent: SubAgent | null }>()
+const props = defineProps<{ agent: SubAgent | null }>()
+
+const scroller = ref<HTMLElement | null>(null)
+const stream = ref<HTMLElement | null>(null)
+
+// 子代理事件流增长时自动吸底(覆盖流式文本累加);上滚可暂停跟随
+const { scrollToBottom } = useStickToBottom(scroller, stream)
+
+// 切换查看的子代理时,重置到底部看最新事件
+watch(
+  () => props.agent?.id,
+  () => scrollToBottom(),
+)
 
 const statusLabel: Record<string, string> = {
   queued: '排队',
@@ -14,7 +28,7 @@ const statusLabel: Record<string, string> = {
 </script>
 
 <template>
-  <div class="agent-detail">
+  <div ref="scroller" class="agent-detail">
     <!-- 空状态 -->
     <div v-if="!agent" class="detail-empty">
       <svg class="hx" viewBox="0 0 20 22" fill="none">
@@ -49,7 +63,7 @@ const statusLabel: Record<string, string> = {
         </div>
       </div>
 
-      <div class="detail-stream">
+      <div ref="stream" class="detail-stream">
         <div v-for="(s, i) in agent.stream" :key="i" class="stream-item">
           <template v-if="s.kind === 'tool'">
             <div class="stream-lbl tool"><i class="icon icon-terminal"></i>工具调用</div>

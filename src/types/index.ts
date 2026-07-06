@@ -17,7 +17,7 @@ export interface Session {
 }
 
 /** 主内容区视图 */
-export type MainView = 'chat' | 'apps'
+export type MainView = 'chat' | 'apps' | 'settings'
 
 /** 应用中心条目 */
 export interface AppTile {
@@ -56,13 +56,30 @@ export interface Task {
   id: string
   name: string
   state: TaskState
+  /** 任务描述(可选,悬浮/展开时展示) */
+  description?: string
+  /** 阻塞当前任务的任务 id 列表(依赖关系),空表示无阻塞 */
+  blockedBy?: number[]
+  /** 任务负责人:agent 或某个 teammate 名,用于多代理并行时区分谁在执行 */
+  owner?: string
 }
+
+/** 工具审批卡的裁决态:pending 等待用户裁决;其余为已裁决结果 */
+export type ApprovalStatus = 'pending' | 'allow_once' | 'always_allow' | 'deny'
 
 /** 中间对话区的消息块 */
 export type ChatBlock =
   | { kind: 'think'; text: string; duration: string; collapsed: boolean }
   | { kind: 'tool'; tag: CliTag; fn: string; body: string; done: boolean }
   | { kind: 'answer'; text: string; streaming: boolean }
+  | {
+      kind: 'approval'
+      requestId: string
+      toolName: string
+      toolInput: Record<string, unknown>
+      reason: string
+      status: ApprovalStatus
+    }
 
 export interface ChatMessage {
   id: string
