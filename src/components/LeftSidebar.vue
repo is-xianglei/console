@@ -24,12 +24,6 @@ const editingText = ref('')
 // ===== 单条删除确认态 =====
 const pendingDeleteId = ref<string | null>(null)
 
-// ===== 应用分组折叠态 =====
-const appCollapsed = ref<Record<string, boolean>>({})
-function toggleAppGroup(key: string) {
-  appCollapsed.value[key] = !appCollapsed.value[key]
-}
-
 const allSelected = computed(
   () => filtered.value.length > 0 && filtered.value.every((s) => selected.value.has(s.id)),
 )
@@ -132,68 +126,7 @@ async function confirmDelete(id: string) {
     </div>
 
     <div class="left-scroll">
-      <!-- 应用列表 -->
       <div class="list-label">
-        <span class="sec-head">应用列表</span>
-      </div>
-
-      <button
-        class="app-group-label"
-        :class="{ collapsed: appCollapsed['app1'] }"
-        @click="toggleAppGroup('app1')"
-      >
-        <i class="icon icon-chevron-right app-caret"></i>
-        <span class="sec-head">应用一</span>
-      </button>
-
-      <div v-show="!appCollapsed['app1']" class="sess-item sess-item--app">
-        <div class="sess-row">
-          <i class="icon icon-layout-grid sess-glyph"></i>
-          <span class="sess-title">列表 1</span>
-        </div>
-      </div>
-      <div v-show="!appCollapsed['app1']" class="sess-item sess-item--app">
-        <div class="sess-row">
-          <i class="icon icon-layout-grid sess-glyph"></i>
-          <span class="sess-title">列表 2</span>
-        </div>
-      </div>
-      <div v-show="!appCollapsed['app1']" class="sess-item sess-item--app">
-        <div class="sess-row">
-          <i class="icon icon-layout-grid sess-glyph"></i>
-          <span class="sess-title">列表 3</span>
-        </div>
-      </div>
-
-      <button
-        class="app-group-label"
-        :class="{ collapsed: appCollapsed['app2'] }"
-        @click="toggleAppGroup('app2')"
-      >
-        <i class="icon icon-chevron-right app-caret"></i>
-        <span class="sec-head">应用二</span>
-      </button>
-
-      <div v-show="!appCollapsed['app2']" class="sess-item sess-item--app">
-        <div class="sess-row">
-          <i class="icon icon-layout-grid sess-glyph"></i>
-          <span class="sess-title">列表 1</span>
-        </div>
-      </div>
-      <div v-show="!appCollapsed['app2']" class="sess-item sess-item--app">
-        <div class="sess-row">
-          <i class="icon icon-layout-grid sess-glyph"></i>
-          <span class="sess-title">列表 2</span>
-        </div>
-      </div>
-      <div v-show="!appCollapsed['app2']" class="sess-item sess-item--app">
-        <div class="sess-row">
-          <i class="icon icon-layout-grid sess-glyph"></i>
-          <span class="sess-title">列表 3</span>
-        </div>
-      </div>
-
-      <div class="list-label app-section">
         <span class="sec-head">会话列表</span>
         <div class="label-right">
           <span class="sec-head mono">{{ filtered.length }}</span>
@@ -383,38 +316,6 @@ async function confirmDelete(id: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-.app-section {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
-}
-.app-group-label {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 8px 5px 10px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  transition: color var(--dur-fast);
-}
-.app-group-label:hover .sec-head {
-  color: var(--text-secondary);
-}
-.app-caret {
-  font-size: 12px;
-  color: var(--text-dim);
-  transition: transform var(--dur-fast);
-  transform: rotate(90deg);
-}
-.app-group-label.collapsed .app-caret {
-  transform: rotate(0deg);
-}
-.sess-item--app {
-  margin-left: 12px;
 }
 .sess-item {
   display: flex;
