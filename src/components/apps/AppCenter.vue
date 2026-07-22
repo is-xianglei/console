@@ -40,9 +40,6 @@ const filtered = computed(() =>
   }),
 )
 
-function tint(color: string, pct = 14) {
-  return `color-mix(in srgb, ${color} ${pct}%, transparent)`
-}
 </script>
 
 <template>
@@ -74,7 +71,6 @@ function tint(color: string, pct = 14) {
         <section
           class="hero"
           :class="{ disabled: state.busy }"
-          :style="{ '--hero-accent': '#a78bfa' }"
           role="button"
           :tabindex="state.busy ? -1 : 0"
           :aria-disabled="state.busy"
@@ -121,7 +117,7 @@ function tint(color: string, pct = 14) {
             :disabled="state.busy"
             @click="handleLaunchApp(`@${a.name} `)"
           >
-            <span class="app-row-ic" :style="{ background: tint(a.color), color: a.color }">
+            <span class="app-row-ic">
               <i :class="`icon icon-${a.icon}`"></i>
             </span>
             <span class="app-row-text">
@@ -227,22 +223,18 @@ function tint(color: string, pct = 14) {
   gap: 20px;
   padding: 24px;
   border: 1px solid var(--border);
-  border-left: 2px solid var(--hero-accent);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--hero-accent) 12%, var(--bg-panel)),
-    var(--bg-panel) 60%
-  );
+  border-left: 2px solid var(--accent-agent);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
   cursor: pointer;
   transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
 .hero:hover {
-  border-color: var(--hero-accent);
-  box-shadow: 0 0 24px color-mix(in srgb, var(--hero-accent) 22%, transparent);
+  border-color: var(--accent-agent);
+  box-shadow: 0 0 24px var(--accent-agent-glow);
 }
 .hero:focus-visible {
-  outline: 2px solid var(--hero-accent);
+  outline: 2px solid var(--accent-agent);
   outline-offset: 2px;
 }
 .hero.disabled {
@@ -271,8 +263,8 @@ function tint(color: string, pct = 14) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--hero-accent) 18%, transparent);
-  color: var(--hero-accent);
+  background: var(--accent-agent-dim);
+  color: var(--accent-agent);
 }
 .hero-ic i {
   font-size: 18px;
@@ -280,7 +272,7 @@ function tint(color: string, pct = 14) {
 .hero-tag {
   font-size: 11px;
   font-weight: 600;
-  color: var(--hero-accent);
+  color: var(--accent-agent);
 }
 .hero-title {
   font-family: var(--font-ui);
@@ -399,6 +391,8 @@ function tint(color: string, pct = 14) {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--accent-agent-dim);
+  color: var(--accent-agent);
 }
 .app-row-ic i {
   font-size: 19px;

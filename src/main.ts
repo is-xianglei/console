@@ -1,13 +1,12 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
-// 字体:Inter(西文,400/500/700)+ MiSans(中文,unicode-range 按需加载分块)
-import '@fontsource/inter/400.css'
-import '@fontsource/inter/500.css'
-import '@fontsource/inter/700.css'
+// 本地 MiSans：按 unicode-range 分片加载，保留常规、中等和粗体字重。
 import './assets/fonts/misans/MiSans-Regular.min.css'
 import './assets/fonts/misans/MiSans-Medium.min.css'
 import './assets/fonts/misans/MiSans-Bold.min.css'
+// 使用本地构建依赖，兼容现有的 `icon icon-*` 类名。
+import 'lucide-static/font/lucide.css'
 // highlight.js 代码高亮主题(暗色)
 import 'highlight.js/styles/github-dark.css'
 import './styles/index.css'

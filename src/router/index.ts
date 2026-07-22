@@ -43,6 +43,12 @@ const router = createRouter({
           meta: { requiresAuth: true },
         },
         {
+          path: 'platform/:module(build|governance|organization)/:resource?',
+          name: 'platform-resource',
+          component: () => import('../components/platform/ResourceWorkbench.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('../components/settings/SettingsView.vue'),

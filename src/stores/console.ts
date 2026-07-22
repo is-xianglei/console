@@ -1,33 +1,27 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
-import type { ChatBlock, ChatMessage, Session, SubAgent, Task, TaskState } from '../types'
+import type { ChatBlock, ChatMessage, Session, SubAgent, Task, TaskState, WorkbenchMode } from '../types'
 import { SESSIONS } from '../data/seed'
+import { getWorkbenchApp } from '../data/appRegistry'
 import {
   batchDeleteSessions,
   deleteSession,
-  deletePermissionRule,
   fetchHealth,
   fetchMessages,
   fetchSessions,
-  listPermissionRules,
   renameSession,
   respondApproval,
   sendMessage,
-  upsertPermissionRule,
 } from '../api/console'
-import { deleteSkill, fetchSkillDetail, listSkills, uploadSkill } from '../api/skill'
 import type {
   ApprovalDecision,
-  PermissionRule,
-  PermissionRuleCreate,
   SessionMessageResponse,
   SessionResponse,
-  SkillDetailResponse,
-  SkillResponse,
   TaskResponse,
 } from '../api/types'
-import { ApiError } from '../api/client'
 import { createSseReducer, fmtToolCall } from './sseReducer'
+import { usePermissionsStore } from './permissions'
+import { useSkillsStore } from './skills'
 import type { MsgContentBlock } from '../api/types'
 import type { SseHandlers } from '../api/sse'
 
@@ -50,11 +44,18 @@ function formatTime(iso: string): string {
 
 /** 后端 SessionResponse → 前端 Session 视图模型 */
 function mapSession(s: SessionResponse): Session {
+  const metadataAppId = s.metadata.app_id ?? s.metadata.appId
+  const appId = typeof metadataAppId === 'string'
+    ? metadataAppId.trim() || undefined
+    : typeof metadataAppId === 'number'
+      ? String(metadataAppId)
+      : undefined
   return {
     id: String(s.id),
     title: s.title || '未命名会话',
     time: formatTime(s.last_active_at),
     count: 0,
+    appId,
   }
 }
 
@@ -196,6 +197,10 @@ interface ConsoleState {
   sessionsLoading: boolean
   sessions: Session[]
   activeSessionId: string
+  /** 当前打开的制造应用；普通对话时为空 */
+  activeAppId: string | null
+  /** 中央工作台展示对话、应用，或两者分屏 */
+  workbenchMode: WorkbenchMode
   search: string
   messages: ChatMessage[]
   agents: SubAgent[]
@@ -203,19 +208,6 @@ interface ConsoleState {
   tasks: Task[]
   busy: boolean
   theme: 'dark' | 'light'
-  /** 权限规则(设置页):列表 + 加载态 */
-  permissionRules: PermissionRule[]
-  permissionRulesLoading: boolean
-  /** 技能库(技能页):列表 + 加载态 */
-  skills: SkillResponse[]
-  skillsLoading: boolean
-  /** 当前选中 skill 的详情(含正文/资源);未选中为 null */
-  skillDetail: SkillDetailResponse | null
-  skillDetailLoading: boolean
-  /** 当前选中的 skill 名称(列表高亮用) */
-  selectedSkillName: string
-  /** 上传中标志 */
-  skillUploading: boolean
 }
 
 /**
@@ -226,6 +218,8 @@ interface ConsoleState {
  * 渲染层(组件)无需改动。
  */
 export const useConsoleStore = defineStore('console', () => {
+  const permissionsStore = usePermissionsStore()
+  const skillsStore = useSkillsStore()
   let activeStreamAbort: (() => void) | null = null
   let dataGeneration = 0
 
@@ -236,6 +230,8 @@ export const useConsoleStore = defineStore('console', () => {
     sessionsLoading: false,
     sessions: [...SESSIONS],
     activeSessionId: SESSIONS[0].id,
+    activeAppId: SESSIONS[0].appId ?? null,
+    workbenchMode: SESSIONS[0].appId ? 'split' : 'chat',
     search: '',
     messages: [],
     agents: [],
@@ -243,14 +239,6 @@ export const useConsoleStore = defineStore('console', () => {
     tasks: [],
     busy: false,
     theme: 'dark',
-    permissionRules: [],
-    permissionRulesLoading: false,
-    skills: [],
-    skillsLoading: false,
-    skillDetail: null,
-    skillDetailLoading: false,
-    selectedSkillName: '',
-    skillUploading: false,
   })
 
   // PLACEHOLDER_STORE
@@ -287,6 +275,9 @@ export const useConsoleStore = defineStore('console', () => {
         ? state.sessions.find((session) => session.id === preferredSessionId)?.id
         : undefined
       state.activeSessionId = preferred ?? state.sessions[0]?.id ?? ''
+      const activeSession = state.sessions.find((session) => session.id === state.activeSessionId)
+      state.activeAppId = activeSession?.appId ?? null
+      state.workbenchMode = getWorkbenchApp(state.activeAppId) ? 'split' : 'chat'
       state.messages = []
       state.agents = []
       state.tasks = []
@@ -336,51 +327,48 @@ export const useConsoleStore = defineStore('console', () => {
     state.sessionsLoading = false
     state.sessions = []
     state.activeSessionId = ''
+    state.activeAppId = null
+    state.workbenchMode = 'chat'
     state.search = ''
     state.messages = []
     state.agents = []
     state.selectedAgentId = null
     state.tasks = []
     state.busy = false
-    state.permissionRules = []
-    state.permissionRulesLoading = false
-    state.skills = []
-    state.skillsLoading = false
-    state.skillDetail = null
-    state.skillDetailLoading = false
-    state.selectedSkillName = ''
-    state.skillUploading = false
+    permissionsStore.resetPermissions()
+    skillsStore.resetSkills()
   }
 
   /** 清理旧身份数据后,完整加载当前工作区数据。 */
   async function reloadConsole(preferredSessionId?: string): Promise<boolean> {
     resetConsole()
-    const [, sessionsLoaded] = await Promise.all([
-      loadHealth(),
-      loadSessions(preferredSessionId),
-      loadPermissionRules(),
-      loadSkills(),
-    ])
+    const [, sessionsLoaded] = await Promise.all([loadHealth(), loadSessions(preferredSessionId)])
     return sessionsLoaded
   }
 
   // ===== 左侧:会话 =====
   function selectSession(id: string) {
     state.activeSessionId = id
+    const session = state.sessions.find((item) => item.id === id)
+    state.activeAppId = session?.appId ?? null
+    state.workbenchMode = getWorkbenchApp(state.activeAppId) ? 'split' : 'chat'
     state.agents = []
     state.tasks = []
     state.selectedAgentId = null
     loadMessages(id)
   }
-  function newSession() {
+  function newSession(appId?: Session['appId']) {
     const s: Session = {
       id: uid('sess'),
       title: '新会话 ' + now().slice(0, 5),
       time: '刚刚',
       count: 0,
+      appId,
     }
     state.sessions.unshift(s)
     state.activeSessionId = s.id
+    state.activeAppId = appId ?? null
+    state.workbenchMode = getWorkbenchApp(appId) ? 'split' : 'chat'
     state.messages = []
     state.agents = []
     state.tasks = []
@@ -388,6 +376,25 @@ export const useConsoleStore = defineStore('console', () => {
   }
   function setSearch(v: string) {
     state.search = v
+  }
+
+  /** 从左侧应用节点进入运行工作台；优先恢复该应用最近一条会话。 */
+  function openApp(appId: string) {
+    state.activeAppId = appId
+    state.workbenchMode = 'split'
+    const appSession = state.sessions.find((session) => session.appId === appId)
+    if (!appSession || appSession.id !== state.activeSessionId) {
+      state.activeSessionId = appSession?.id ?? ''
+      state.messages = []
+      state.agents = []
+      state.tasks = []
+      state.selectedAgentId = null
+      if (appSession) void loadMessages(appSession.id)
+    }
+  }
+
+  function setWorkbenchMode(mode: WorkbenchMode) {
+    state.workbenchMode = getWorkbenchApp(state.activeAppId) ? mode : 'chat'
   }
 
   /** 重命名会话:后端会话(数字 id)同步 PATCH,本地占位会话仅改内存。
@@ -471,6 +478,15 @@ export const useConsoleStore = defineStore('console', () => {
           const cur = state.sessions.find((s) => s.id === state.activeSessionId)
           if (cur && !/^\d+$/.test(cur.id)) {
             cur.id = idStr
+          } else if (!cur) {
+            const latestPrompt = [...state.messages].reverse().find((message) => message.role === 'user')?.text?.trim()
+            state.sessions.unshift({
+              id: idStr,
+              title: latestPrompt ? latestPrompt.slice(0, 28) : `新会话 ${now().slice(0, 5)}`,
+              time: '刚刚',
+              count: 0,
+              appId: state.activeAppId ?? undefined,
+            })
           }
           state.activeSessionId = idStr
         }
@@ -584,128 +600,14 @@ export const useConsoleStore = defineStore('console', () => {
     })
   }
 
-  // ===== 设置页:权限规则管理 =====
-  /** 拉取权限规则列表(可按作用域过滤);失败置空不抛出 */
-  async function loadPermissionRules(scope?: string) {
-    const generation = dataGeneration
-    state.permissionRulesLoading = true
-    try {
-      const rules = await listPermissionRules(scope ? { scope } : undefined)
-      if (generation === dataGeneration) state.permissionRules = rules
-    } catch {
-      if (generation === dataGeneration) state.permissionRules = []
-    } finally {
-      if (generation === dataGeneration) state.permissionRulesLoading = false
-    }
-  }
-
-  /** 新增/更新一条权限规则,成功后刷新列表。返回是否成功。 */
-  async function savePermissionRule(payload: PermissionRuleCreate): Promise<boolean> {
-    const generation = dataGeneration
-    try {
-      await upsertPermissionRule(payload)
-      if (generation !== dataGeneration) return false
-      await loadPermissionRules()
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  /** 删除一条权限规则,成功后从列表移除。 */
-  async function removePermissionRule(ruleId: number) {
-    const generation = dataGeneration
-    try {
-      await deletePermissionRule(ruleId)
-      if (generation === dataGeneration) {
-        state.permissionRules = state.permissionRules.filter((r) => r.id !== ruleId)
-      }
-    } catch {
-      // 失败静默:保留列表,避免前后端不一致
-    }
-  }
-
-  // ===== 技能页:技能库管理 =====
-  /** 拉取 skill 列表;失败置空不抛出(后端离线时保持界面可用) */
-  async function loadSkills() {
-    const generation = dataGeneration
-    state.skillsLoading = true
-    try {
-      const skills = await listSkills()
-      if (generation === dataGeneration) state.skills = skills
-    } catch {
-      if (generation === dataGeneration) state.skills = []
-    } finally {
-      if (generation === dataGeneration) state.skillsLoading = false
-    }
-  }
-
-  /** 选中并加载某个 skill 的详情;失败清空详情不阻断 */
-  async function selectSkill(name: string) {
-    const generation = dataGeneration
-    state.selectedSkillName = name
-    state.skillDetail = null
-    state.skillDetailLoading = true
-    try {
-      const detail = await fetchSkillDetail(name)
-      if (generation === dataGeneration && state.selectedSkillName === name) {
-        state.skillDetail = detail
-      }
-    } catch {
-      if (generation === dataGeneration && state.selectedSkillName === name) {
-        state.skillDetail = null
-      }
-    } finally {
-      if (generation === dataGeneration && state.selectedSkillName === name) {
-        state.skillDetailLoading = false
-      }
-    }
-  }
-
-  /**
-   * 上传一个 skill 包(zip)。成功刷新列表并自动选中该 skill,返回 null;
-   * 失败返回可展示的错误信息(后端校验类错误如命名不符、缺 SKILL.md 等)。
-   */
-  async function uploadSkillAction(file: File): Promise<string | null> {
-    if (state.skillUploading) return null
-    const generation = dataGeneration
-    state.skillUploading = true
-    try {
-      const created = await uploadSkill(file)
-      if (generation !== dataGeneration) return null
-      await loadSkills()
-      await selectSkill(created.name)
-      return null
-    } catch (e) {
-      if (e instanceof ApiError) return e.message
-      return '上传失败:未知错误'
-    } finally {
-      if (generation === dataGeneration) state.skillUploading = false
-    }
-  }
-
-  /** 软删除一个 skill,成功后从列表移除;若删的是当前选中项则清空详情。 */
-  async function removeSkillAction(name: string) {
-    const generation = dataGeneration
-    try {
-      await deleteSkill(name)
-      if (generation !== dataGeneration) return
-      state.skills = state.skills.filter((s) => s.name !== name)
-      if (state.selectedSkillName === name) {
-        state.selectedSkillName = ''
-        state.skillDetail = null
-      }
-    } catch {
-      // 失败静默:保留列表,避免前后端不一致
-    }
-  }
-
   // PLACEHOLDER_STORE4
   /** 首屏种子对话 */
   function seedConversation() {
     if (!state.sessions.length) {
       state.sessions = [...SESSIONS]
       state.activeSessionId = SESSIONS[0]?.id ?? ''
+      state.activeAppId = SESSIONS[0]?.appId ?? null
+      state.workbenchMode = getWorkbenchApp(state.activeAppId) ? 'split' : 'chat'
     }
     if (state.messages.length) return
     state.messages.push({
@@ -745,6 +647,8 @@ export const useConsoleStore = defineStore('console', () => {
     launchApp,
     selectSession,
     newSession,
+    openApp,
+    setWorkbenchMode,
     setSearch,
     renameSession: renameSessionAction,
     deleteSessions: deleteSessionsAction,
@@ -752,13 +656,6 @@ export const useConsoleStore = defineStore('console', () => {
     toggleTheme,
     dispatch,
     respondApproval: respondApprovalAction,
-    loadPermissionRules,
-    savePermissionRule,
-    removePermissionRule,
-    loadSkills,
-    selectSkill,
-    uploadSkill: uploadSkillAction,
-    removeSkill: removeSkillAction,
     seedConversation,
   }
 })

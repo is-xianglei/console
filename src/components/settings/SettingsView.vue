@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useConsoleStore } from '../../stores/console'
+import { usePermissionsStore } from '../../stores/permissions'
 import type { PermissionBehavior } from '../../api/types'
 
-const { state, loadPermissionRules, savePermissionRule, removePermissionRule } = useConsoleStore()
+const { state, loadPermissionRules, savePermissionRule, removePermissionRule } = usePermissionsStore()
 
 // 新增规则表单
 const newTool = ref('')

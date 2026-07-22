@@ -95,4 +95,15 @@ const selected = computed(
   text-align: center;
   line-height: 1.7;
 }
+@media (max-width: 760px) {
+  .right-bar {
+    position: fixed;
+    z-index: 16;
+    right: 0;
+    top: 48px;
+    bottom: 50px;
+    width: min(340px, 92vw);
+    border-left-color: var(--border-visible);
+  }
+}
 </style>

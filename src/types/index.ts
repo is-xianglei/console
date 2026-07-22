@@ -8,12 +8,18 @@ export type RunStatus = 'queued' | 'think' | 'run' | 'done' | 'error'
 export type TaskState = 'queued' | 'active' | 'done' | 'error'
 
 /** 会话列表项 */
+export type SessionAppId = string
+
+/** 应用工作台的中央视图模式 */
+export type WorkbenchMode = 'chat' | 'split' | 'app'
+
 export interface Session {
   id: string
   title: string
   time: string
   count: number
   badge?: string
+  appId?: SessionAppId
 }
 
 /** 应用中心条目 */

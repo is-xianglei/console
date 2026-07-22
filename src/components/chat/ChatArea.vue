@@ -1,212 +1,148 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, watch } from 'vue'
 import { useConsoleStore } from '../../stores/console'
-import { useStickToBottom } from '../../composables/useStickToBottom'
-import ThinkingBlock from './ThinkingBlock.vue'
-import ToolCallCard from './ToolCallCard.vue'
-import ApprovalCard from './ApprovalCard.vue'
-import AnswerBlock from './AnswerBlock.vue'
-import TaskBar from './TaskBar.vue'
-import Composer from './Composer.vue'
+import { useRuntimePaneResize } from '../../composables/useRuntimePaneResize'
+import { getWorkbenchApp } from '../../data/appRegistry'
+import type { WorkbenchMode } from '../../types'
+import AppRuntimePanel from '../apps/runtime/AppRuntimePanel.vue'
+import ConversationPane from './ConversationPane.vue'
+import WorkbenchHeader from './WorkbenchHeader.vue'
 
-const { state } = useConsoleStore()
-const scroller = ref<HTMLElement | null>(null)
-const inner = ref<HTMLElement | null>(null)
+const { state, setWorkbenchMode } = useConsoleStore()
+const {
+  workArea,
+  resizing,
+  splitAvailable,
+  runtimeMinWidth,
+  runtimeMaxWidth,
+  runtimePaneWidth,
+  splitStyle,
+  startResize,
+  stopResize,
+  resetWidth,
+  resizeWithKeyboard,
+} = useRuntimePaneResize()
 
 const activeSession = computed(() =>
-  state.sessions.find((s) => s.id === state.activeSessionId),
+  state.sessions.find((session) => session.id === state.activeSessionId),
 )
+const activeApp = computed(() => getWorkbenchApp(state.activeAppId))
+const effectiveMode = computed<WorkbenchMode>(() => {
+  if (!activeApp.value) return 'chat'
+  return !splitAvailable.value && state.workbenchMode === 'split' ? 'app' : state.workbenchMode
+})
+const workAreaStyle = computed(() => effectiveMode.value === 'split' ? splitStyle.value : undefined)
 
-// 内容高度变化时自动吸底(覆盖流式文本累加、新增块等所有情况);
-// 用户上滚查看历史时暂停跟随,滚回底部自动恢复
-useStickToBottom(scroller, inner)
+function setWorkArea(element: unknown) {
+  workArea.value = element instanceof HTMLElement ? element : null
+}
+
+watch(effectiveMode, (mode) => {
+  if (mode !== 'split') stopResize()
+})
 </script>
 
 <template>
-  <main class="center">
-    <div class="conv-head">
-      <span class="conv-title">{{ activeSession?.title ?? '新会话' }}</span>
-      <span class="conv-id mono">#{{ activeSession?.id ?? '—' }}</span>
-      <div class="conv-model">
-        <span class="dot think"></span> Fable-5 · MYTHOS
+  <main class="center" :class="`mode-${effectiveMode}`">
+    <WorkbenchHeader
+      :active-app="activeApp"
+      :active-session="activeSession"
+      :mode="effectiveMode"
+      :split-available="splitAvailable"
+      @select-mode="setWorkbenchMode"
+    />
+
+    <div :ref="setWorkArea" class="work-area" :style="workAreaStyle">
+      <ConversationPane
+        v-show="effectiveMode !== 'app'"
+        :active-app="activeApp"
+        :split="effectiveMode === 'split'"
+        :aria-hidden="effectiveMode === 'app'"
+        :inert="effectiveMode === 'app'"
+      />
+
+      <div
+        v-if="activeApp && effectiveMode === 'split'"
+        class="split-resizer"
+        :class="{ resizing }"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整应用区域宽度"
+        :aria-valuemin="runtimeMinWidth"
+        :aria-valuemax="runtimeMaxWidth"
+        :aria-valuenow="Math.round(runtimePaneWidth)"
+        tabindex="0"
+        title="拖动调整应用区域宽度，双击恢复默认"
+        @pointerdown="startResize"
+        @keydown="resizeWithKeyboard"
+        @dblclick="resetWidth"
+      ></div>
+
+      <div
+        v-if="activeApp"
+        v-show="effectiveMode !== 'chat'"
+        :key="activeApp.id"
+        class="runtime-pane"
+        :aria-hidden="effectiveMode === 'chat'"
+        :inert="effectiveMode === 'chat'"
+      >
+        <AppRuntimePanel :app="activeApp" />
       </div>
     </div>
-
-    <div ref="scroller" class="conv-scroll">
-      <div ref="inner" class="conv-inner">
-        <div
-          v-for="m in state.messages"
-          :key="m.id"
-          class="msg"
-          :class="m.role === 'user' ? 'msg-user' : 'msg-ai'"
-        >
-          <!-- 用户消息 -->
-          <template v-if="m.role === 'user'">
-            <div class="bubble-user">{{ m.text }}</div>
-            <div class="msg-byline">
-              <span class="byline-time mono">{{ m.time }}</span>
-            </div>
-          </template>
-
-          <!-- AI 消息:blocks 为空且非当前流式占位时不渲染(兜底,避免只有标题的空行) -->
-          <template v-else-if="m.blocks?.length || state.busy">
-            <div class="msg-byline">
-              <span class="byline-ic ai"><i class="icon icon-hexagon"></i></span>
-              <span class="byline-name">Hyperreal Agent</span>
-              <span class="byline-time mono">{{ m.time }}</span>
-            </div>
-            <div class="ai-blocks">
-              <template v-for="(b, i) in m.blocks" :key="i">
-                <ThinkingBlock
-                  v-if="b.kind === 'think'"
-                  :text="b.text"
-                  :duration="b.duration"
-                  :collapsed="b.collapsed"
-                />
-                <ToolCallCard
-                  v-else-if="b.kind === 'tool'"
-                  :tag="b.tag"
-                  :fn="b.fn"
-                  :body="b.body"
-                  :done="b.done"
-                />
-                <ApprovalCard
-                  v-else-if="b.kind === 'approval'"
-                  :request-id="b.requestId"
-                  :tool-name="b.toolName"
-                  :tool-input="b.toolInput"
-                  :reason="b.reason"
-                  :status="b.status"
-                />
-                <AnswerBlock
-                  v-else-if="b.kind === 'answer'"
-                  :text="b.text"
-                  :streaming="b.streaming"
-                />
-              </template>
-            </div>
-          </template>
-        </div>
-      </div>
-    </div>
-
-    <TaskBar />
-    <Composer />
   </main>
 </template>
 
 <style scoped>
 .center {
   flex: 1;
-  display: flex;
-  flex-direction: column;
   min-width: 0;
   background: var(--bg-deep);
-}
-.conv-head {
-  height: 42px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 18px;
+  flex-direction: column;
 }
-.conv-title {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.conv-id {
-  font-size: 10px;
-  color: var(--text-dim);
-}
-.conv-model {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-data);
-  font-size: 10px;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  padding: 3px 9px;
-  border-radius: var(--radius-pill);
-}
-.conv-scroll {
+.work-area {
   flex: 1;
-  overflow-y: auto;
-  padding: 24px 0 12px;
-}
-.conv-inner {
-  max-width: var(--content-max);
-  margin: 0 auto;
-  padding: 0 40px;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
-  flex-direction: column;
-  gap: 22px;
 }
-/* PLACEHOLDER_CHATSTYLE2 */
-.msg {
+.runtime-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  animation: entry-appear 250ms var(--ease-out);
 }
-.msg-user {
-  align-items: flex-end;
+.mode-split .runtime-pane {
+  width: var(--runtime-pane-width);
+  flex: 0 0 var(--runtime-pane-width);
 }
-.ai-blocks {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.split-resizer {
+  position: relative;
+  width: 10px;
+  flex: 0 0 10px;
+  align-self: stretch;
+  border: 0;
+  outline: 0;
+  background: var(--bg-deep);
+  cursor: col-resize;
+  touch-action: none;
 }
-.bubble-user {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  border-bottom-right-radius: var(--radius-sm);
-  padding: 11px 14px;
-  max-width: 80%;
-  font-family: var(--font-body);
-  font-size: 13px;
-  color: var(--text-primary);
-  line-height: 1.55;
+.split-resizer::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border-visible);
+  content: '';
+  transform: translateX(-50%);
+  transition: background var(--dur-fast), box-shadow var(--dur-fast);
 }
-.msg-byline {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.split-resizer:hover::before,
+.split-resizer:focus-visible::before,
+.split-resizer.resizing::before {
+  background: var(--accent-agent);
+  box-shadow: 0 0 10px var(--accent-agent-glow);
 }
-.byline-ic {
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.byline-ic.ai {
-  background: var(--accent-agent-dim);
-  color: var(--accent-agent);
-}
-.byline-ic i {
-  font-size: 12px;
-}
-.byline-name {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.byline-time {
-  font-size: 9px;
-  color: var(--text-dim);
-  margin-left: auto;
-}
+.split-resizer:focus-visible { box-shadow: none; }
 </style>

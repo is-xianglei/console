@@ -22,9 +22,10 @@ export const FEATURED_APP = {
 }
 
 export const SESSIONS: Session[] = [
-  { id: 'sess-a93f', title: '设备异常根因分析', time: '14:22', count: 18, badge: '2' },
-  { id: 'sess-7c10', title: '泵站能耗优化方案', time: '昨天', count: 9 },
-  { id: 'sess-3b88', title: '传感器漂移校准复盘', time: '周一', count: 24 },
+  { id: 'sess-a93f', title: '设备异常根因分析', time: '14:22', count: 18, badge: '2', appId: 'health' },
+  { id: 'sess-7c10', title: '泵站能耗优化方案', time: '昨天', count: 9, appId: 'energy' },
+  { id: 'sess-3b88', title: '传感器漂移校准复盘', time: '周一', count: 24, appId: 'quality' },
+  { id: 'sess-general', title: '制造平台能力规划', time: '周一', count: 12 },
 ]
 
 /** 一次任务派发的子代理编排模板(设备根因分析诊断流) */
