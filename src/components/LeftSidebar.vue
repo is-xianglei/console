@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useConsoleStore } from '../stores/console'
 import type { Session } from '../types'
 
-const { state, selectSession, newSession, setSearch, setView, renameSession, deleteSessions } =
+const router = useRouter()
+const route = useRoute()
+const { state, selectSession, newSession, setSearch, renameSession, deleteSessions } =
   useConsoleStore()
 
 const filtered = computed(() =>
@@ -34,7 +37,28 @@ const allSelected = computed(
 function onItemClick(s: Session) {
   if (editingId.value === s.id) return
   if (selectMode.value) toggleSelect(s.id)
-  else selectSession(s.id)
+  else {
+    selectSession(s.id)
+    void router.push({ name: 'chat', params: { sessionId: s.id } })
+  }
+}
+
+/** 新建会话后进入聊天页,保证从应用、技能或设置页发起时能看到新会话 */
+function onNewSession() {
+  newSession()
+  void router.push({
+    name: 'chat',
+    params: state.activeSessionId ? { sessionId: state.activeSessionId } : {},
+  })
+}
+
+/** 删除当前会话后替换 URL,避免后退时重新落到已不存在的会话 */
+function replaceActiveChatRoute() {
+  if (route.name !== 'chat') return
+  void router.replace({
+    name: 'chat',
+    params: state.activeSessionId ? { sessionId: state.activeSessionId } : {},
+  })
 }
 
 // ===== 多选 =====
@@ -57,7 +81,9 @@ function toggleSelectAll() {
   else selected.value = new Set(filtered.value.map((s) => s.id))
 }
 async function confirmBatchDelete() {
+  const removedActive = state.activeSessionId !== null && selected.value.has(state.activeSessionId)
   await deleteSessions([...selected.value])
+  if (removedActive) replaceActiveChatRoute()
   selected.value = new Set()
   confirmBatch.value = false
   selectMode.value = false
@@ -93,7 +119,9 @@ function cancelDelete() {
   pendingDeleteId.value = null
 }
 async function confirmDelete(id: string) {
+  const removedActive = state.activeSessionId === id
   await deleteSessions([id])
+  if (removedActive) replaceActiveChatRoute()
   pendingDeleteId.value = null
 }
 </script>
@@ -113,14 +141,22 @@ async function confirmDelete(id: string) {
       <nav class="left-nav">
         <button
           class="nav-item"
-          :class="{ active: state.view === 'apps' }"
-          @click="setView('apps')"
+          :class="{ active: route.name === 'apps' }"
+          @click="router.push('/apps')"
         >
           <i class="icon icon-layout-grid"></i>
           <span class="nav-label">应用中心</span>
         </button>
+        <button
+          class="nav-item"
+          :class="{ active: route.name === 'skills' }"
+          @click="router.push('/skills')"
+        >
+          <i class="icon icon-sparkles"></i>
+          <span class="nav-label">技能库</span>
+        </button>
       </nav>
-      <button class="new-btn" @click="newSession">
+      <button class="new-btn" @click="onNewSession">
         <i class="icon icon-plus"></i> 新建会话
       </button>
     </div>
@@ -170,12 +206,18 @@ async function confirmDelete(id: string) {
         v-for="s in filtered"
         :key="s.id"
         class="sess-item"
+        role="button"
+        tabindex="0"
+        :aria-label="selectMode ? `${selected.has(s.id) ? '取消选择' : '选择'}会话 ${s.title}` : `打开会话 ${s.title}`"
+        :aria-pressed="selectMode ? selected.has(s.id) : undefined"
         :class="{
-          active: s.id === state.activeSessionId && state.view === 'chat' && !selectMode,
+          active: s.id === state.activeSessionId && route.name === 'chat' && !selectMode,
           selected: selectMode && selected.has(s.id),
           editing: editingId === s.id,
         }"
         @click="onItemClick(s)"
+        @keydown.enter.self.prevent="onItemClick(s)"
+        @keydown.space.self.prevent="onItemClick(s)"
       >
         <div class="sess-row">
           <i
@@ -566,9 +608,11 @@ async function confirmDelete(id: string) {
 }
 .left-nav {
   display: flex;
+  gap: 8px;
 }
 .nav-item {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;

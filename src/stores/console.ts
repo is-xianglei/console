@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
-import type { ChatBlock, ChatMessage, MainView, Session, SubAgent, Task, TaskState } from '../types'
+import type { ChatBlock, ChatMessage, Session, SubAgent, Task, TaskState } from '../types'
 import { SESSIONS } from '../data/seed'
 import {
   batchDeleteSessions,
@@ -15,14 +15,18 @@ import {
   sendMessage,
   upsertPermissionRule,
 } from '../api/console'
+import { deleteSkill, fetchSkillDetail, listSkills, uploadSkill } from '../api/skill'
 import type {
   ApprovalDecision,
   PermissionRule,
   PermissionRuleCreate,
   SessionMessageResponse,
   SessionResponse,
+  SkillDetailResponse,
+  SkillResponse,
   TaskResponse,
 } from '../api/types'
+import { ApiError } from '../api/client'
 import { createSseReducer, fmtToolCall } from './sseReducer'
 import type { MsgContentBlock } from '../api/types'
 import type { SseHandlers } from '../api/sse'
@@ -185,7 +189,6 @@ function mapTask(t: TaskResponse): Task {
 
 // ===== 状态形状 =====
 interface ConsoleState {
-  view: MainView
   leftCollapsed: boolean
   rightCollapsed: boolean
   /** 后端健康状态:unknown=未探测/探测失败,其余为后端返回的 status(如 ok) */
@@ -203,6 +206,16 @@ interface ConsoleState {
   /** 权限规则(设置页):列表 + 加载态 */
   permissionRules: PermissionRule[]
   permissionRulesLoading: boolean
+  /** 技能库(技能页):列表 + 加载态 */
+  skills: SkillResponse[]
+  skillsLoading: boolean
+  /** 当前选中 skill 的详情(含正文/资源);未选中为 null */
+  skillDetail: SkillDetailResponse | null
+  skillDetailLoading: boolean
+  /** 当前选中的 skill 名称(列表高亮用) */
+  selectedSkillName: string
+  /** 上传中标志 */
+  skillUploading: boolean
 }
 
 /**
@@ -213,8 +226,10 @@ interface ConsoleState {
  * 渲染层(组件)无需改动。
  */
 export const useConsoleStore = defineStore('console', () => {
+  let activeStreamAbort: (() => void) | null = null
+  let dataGeneration = 0
+
   const state = reactive<ConsoleState>({
-    view: 'chat',
     leftCollapsed: false,
     rightCollapsed: false,
     health: 'unknown',
@@ -230,14 +245,15 @@ export const useConsoleStore = defineStore('console', () => {
     theme: 'dark',
     permissionRules: [],
     permissionRulesLoading: false,
+    skills: [],
+    skillsLoading: false,
+    skillDetail: null,
+    skillDetailLoading: false,
+    selectedSkillName: '',
+    skillUploading: false,
   })
 
   // PLACEHOLDER_STORE
-  // ===== 视图切换 =====
-  function setView(v: MainView) {
-    state.view = v
-  }
-
   // ===== 侧栏收缩 =====
   function toggleLeft() {
     state.leftCollapsed = !state.leftCollapsed
@@ -249,31 +265,39 @@ export const useConsoleStore = defineStore('console', () => {
   // ===== 后端接入:健康检查 & 会话列表 =====
   /** 拉取后端健康状态;失败时置 'error',不抛出(避免打断启动) */
   async function loadHealth() {
+    const generation = dataGeneration
     try {
       const h = await fetchHealth()
-      state.health = h.status
+      if (generation === dataGeneration) state.health = h.status
     } catch {
-      state.health = 'error'
+      if (generation === dataGeneration) state.health = 'error'
     }
   }
 
-  /** 拉取真实会话列表;成功返回 true。失败保留种子数据兜底并返回 false */
-  async function loadSessions(): Promise<boolean> {
+  /** 拉取真实会话列表;可优先恢复 URL 指定会话,成功返回 true。 */
+  async function loadSessions(preferredSessionId?: string): Promise<boolean> {
+    const generation = dataGeneration
     state.sessionsLoading = true
     try {
       const list = await fetchSessions()
-      if (list.length) {
-        state.sessions = list.map(mapSession)
-        // 默认选中第一条并加载其历史消息
-        state.activeSessionId = state.sessions[0].id
-        await loadMessages(state.activeSessionId)
-      }
+      if (generation !== dataGeneration) return false
+
+      state.sessions = list.map(mapSession)
+      const preferred = preferredSessionId
+        ? state.sessions.find((session) => session.id === preferredSessionId)?.id
+        : undefined
+      state.activeSessionId = preferred ?? state.sessions[0]?.id ?? ''
+      state.messages = []
+      state.agents = []
+      state.tasks = []
+      state.selectedAgentId = null
+      if (state.activeSessionId) await loadMessages(state.activeSessionId)
       return true
     } catch {
-      // 后端不可用时静默保留种子数据,保证界面可用
+      // 失败时保留当前列表;reloadConsole 会先清理,因此不会泄漏旧工作区数据。
       return false
     } finally {
-      state.sessionsLoading = false
+      if (generation === dataGeneration) state.sessionsLoading = false
     }
   }
 
@@ -284,22 +308,65 @@ export const useConsoleStore = defineStore('console', () => {
 
   /** 加载某会话的历史消息(仅后端会话);失败时清空消息不阻断 */
   async function loadMessages(id: string) {
+    const generation = dataGeneration
     if (!isBackendSession(id)) {
-      state.messages = []
+      if (id === state.activeSessionId) state.messages = []
       return
     }
     try {
       const list = await fetchMessages(id)
-      state.messages = mapMessages(list)
+      if (generation === dataGeneration && id === state.activeSessionId) {
+        state.messages = mapMessages(list)
+      }
     } catch {
-      state.messages = []
+      if (generation === dataGeneration && id === state.activeSessionId) state.messages = []
     }
+  }
+
+  /**
+   * 清空与用户/工作区绑定的全部数据,并终止仍在回填状态的 SSE。
+   * 主题和侧栏布局属于本地界面偏好,切换身份时保留。
+   */
+  function resetConsole() {
+    dataGeneration += 1
+    activeStreamAbort?.()
+    activeStreamAbort = null
+
+    state.health = 'unknown'
+    state.sessionsLoading = false
+    state.sessions = []
+    state.activeSessionId = ''
+    state.search = ''
+    state.messages = []
+    state.agents = []
+    state.selectedAgentId = null
+    state.tasks = []
+    state.busy = false
+    state.permissionRules = []
+    state.permissionRulesLoading = false
+    state.skills = []
+    state.skillsLoading = false
+    state.skillDetail = null
+    state.skillDetailLoading = false
+    state.selectedSkillName = ''
+    state.skillUploading = false
+  }
+
+  /** 清理旧身份数据后,完整加载当前工作区数据。 */
+  async function reloadConsole(preferredSessionId?: string): Promise<boolean> {
+    resetConsole()
+    const [, sessionsLoaded] = await Promise.all([
+      loadHealth(),
+      loadSessions(preferredSessionId),
+      loadPermissionRules(),
+      loadSkills(),
+    ])
+    return sessionsLoaded
   }
 
   // ===== 左侧:会话 =====
   function selectSession(id: string) {
     state.activeSessionId = id
-    state.view = 'chat'
     state.agents = []
     state.tasks = []
     state.selectedAgentId = null
@@ -318,7 +385,6 @@ export const useConsoleStore = defineStore('console', () => {
     state.agents = []
     state.tasks = []
     state.selectedAgentId = null
-    state.view = 'chat'
   }
   function setSearch(v: string) {
     state.search = v
@@ -344,6 +410,7 @@ export const useConsoleStore = defineStore('console', () => {
    *  删除后若命中当前会话,回退到剩余第一条或清空对话。 */
   async function deleteSessionsAction(ids: string[]) {
     if (!ids.length) return
+    const generation = dataGeneration
     const backendIds = ids.filter((id) => isBackendSession(id)).map(Number)
     if (backendIds.length) {
       try {
@@ -354,6 +421,7 @@ export const useConsoleStore = defineStore('console', () => {
         return
       }
     }
+    if (generation !== dataGeneration) return
     const removing = new Set(ids)
     const hitActive = removing.has(state.activeSessionId)
     state.sessions = state.sessions.filter((s) => !removing.has(s.id))
@@ -384,9 +452,8 @@ export const useConsoleStore = defineStore('console', () => {
 
   // ===== 编排引擎(真实 SSE) =====
   /** 从应用中心启动一个应用:切回对话视图,可选预填一段提示词并派发 */
-  function launchApp(prompt?: string) {
-    state.view = 'chat'
-    if (prompt) dispatch(prompt)
+  function launchApp(prompt?: string): boolean {
+    return prompt ? dispatch(prompt) : false
   }
 
   /** 为一条 AI 消息构造 SSE 归约器(dispatch 与 respondApproval 共用)。 */
@@ -418,9 +485,13 @@ export const useConsoleStore = defineStore('console', () => {
   /** 为一条 AI 消息构造 SSE 回调(错误块 + 收尾停流式;dispatch 与 respondApproval 共用)。 */
   function streamHandlers(ai: ChatMessage): SseHandlers {
     const reducer = buildReducer(ai)
+    const generation = dataGeneration
     return {
-      onEvent: (ev) => reducer.handle(ev),
+      onEvent: (ev) => {
+        if (generation === dataGeneration) reducer.handle(ev)
+      },
       onError: (err) => {
+        if (generation !== dataGeneration) return
         ai.blocks!.push({
           kind: 'tool',
           tag: 'ERROR',
@@ -429,23 +500,25 @@ export const useConsoleStore = defineStore('console', () => {
           done: true,
         })
         state.busy = false
+        activeStreamAbort = null
       },
       onDone: () => {
+        if (generation !== dataGeneration) return
         // 收尾:未结束的回答块停止流式光标
         for (const b of ai.blocks!) {
           if (b.kind === 'answer') b.streaming = false
         }
         state.busy = false
+        activeStreamAbort = null
       },
     }
   }
 
   /** 派发一次任务:POST /api/sessions/messages,消费 SSE 流增量更新对话与右栏 */
-  function dispatch(text: string) {
+  function dispatch(text: string): boolean {
     const content = text.trim()
-    if (state.busy || !content) return
+    if (state.busy || !content) return false
     state.busy = true
-    state.view = 'chat'
 
     // 用户消息上屏
     state.messages.push({ id: uid('m'), role: 'user', time: now(), text: content })
@@ -464,7 +537,8 @@ export const useConsoleStore = defineStore('console', () => {
       ? Number(state.activeSessionId)
       : undefined
 
-    sendMessage({ session_id: sessionId, content }, streamHandlers(ai))
+    activeStreamAbort = sendMessage({ session_id: sessionId, content }, streamHandlers(ai))
+    return true
   }
 
   /**
@@ -504,7 +578,7 @@ export const useConsoleStore = defineStore('console', () => {
     state.messages.push({ id: uid('m'), role: 'ai', time: now(), blocks: [] })
     const ai = state.messages[state.messages.length - 1]
 
-    respondApproval(sessionId, requestId, decision, streamHandlers(ai), {
+    activeStreamAbort = respondApproval(sessionId, requestId, decision, streamHandlers(ai), {
       updatedInput,
       alwaysScope: 'session',
     })
@@ -513,20 +587,24 @@ export const useConsoleStore = defineStore('console', () => {
   // ===== 设置页:权限规则管理 =====
   /** 拉取权限规则列表(可按作用域过滤);失败置空不抛出 */
   async function loadPermissionRules(scope?: string) {
+    const generation = dataGeneration
     state.permissionRulesLoading = true
     try {
-      state.permissionRules = await listPermissionRules(scope ? { scope } : undefined)
+      const rules = await listPermissionRules(scope ? { scope } : undefined)
+      if (generation === dataGeneration) state.permissionRules = rules
     } catch {
-      state.permissionRules = []
+      if (generation === dataGeneration) state.permissionRules = []
     } finally {
-      state.permissionRulesLoading = false
+      if (generation === dataGeneration) state.permissionRulesLoading = false
     }
   }
 
   /** 新增/更新一条权限规则,成功后刷新列表。返回是否成功。 */
   async function savePermissionRule(payload: PermissionRuleCreate): Promise<boolean> {
+    const generation = dataGeneration
     try {
       await upsertPermissionRule(payload)
+      if (generation !== dataGeneration) return false
       await loadPermissionRules()
       return true
     } catch {
@@ -536,9 +614,87 @@ export const useConsoleStore = defineStore('console', () => {
 
   /** 删除一条权限规则,成功后从列表移除。 */
   async function removePermissionRule(ruleId: number) {
+    const generation = dataGeneration
     try {
       await deletePermissionRule(ruleId)
-      state.permissionRules = state.permissionRules.filter((r) => r.id !== ruleId)
+      if (generation === dataGeneration) {
+        state.permissionRules = state.permissionRules.filter((r) => r.id !== ruleId)
+      }
+    } catch {
+      // 失败静默:保留列表,避免前后端不一致
+    }
+  }
+
+  // ===== 技能页:技能库管理 =====
+  /** 拉取 skill 列表;失败置空不抛出(后端离线时保持界面可用) */
+  async function loadSkills() {
+    const generation = dataGeneration
+    state.skillsLoading = true
+    try {
+      const skills = await listSkills()
+      if (generation === dataGeneration) state.skills = skills
+    } catch {
+      if (generation === dataGeneration) state.skills = []
+    } finally {
+      if (generation === dataGeneration) state.skillsLoading = false
+    }
+  }
+
+  /** 选中并加载某个 skill 的详情;失败清空详情不阻断 */
+  async function selectSkill(name: string) {
+    const generation = dataGeneration
+    state.selectedSkillName = name
+    state.skillDetail = null
+    state.skillDetailLoading = true
+    try {
+      const detail = await fetchSkillDetail(name)
+      if (generation === dataGeneration && state.selectedSkillName === name) {
+        state.skillDetail = detail
+      }
+    } catch {
+      if (generation === dataGeneration && state.selectedSkillName === name) {
+        state.skillDetail = null
+      }
+    } finally {
+      if (generation === dataGeneration && state.selectedSkillName === name) {
+        state.skillDetailLoading = false
+      }
+    }
+  }
+
+  /**
+   * 上传一个 skill 包(zip)。成功刷新列表并自动选中该 skill,返回 null;
+   * 失败返回可展示的错误信息(后端校验类错误如命名不符、缺 SKILL.md 等)。
+   */
+  async function uploadSkillAction(file: File): Promise<string | null> {
+    if (state.skillUploading) return null
+    const generation = dataGeneration
+    state.skillUploading = true
+    try {
+      const created = await uploadSkill(file)
+      if (generation !== dataGeneration) return null
+      await loadSkills()
+      await selectSkill(created.name)
+      return null
+    } catch (e) {
+      if (e instanceof ApiError) return e.message
+      return '上传失败:未知错误'
+    } finally {
+      if (generation === dataGeneration) state.skillUploading = false
+    }
+  }
+
+  /** 软删除一个 skill,成功后从列表移除;若删的是当前选中项则清空详情。 */
+  async function removeSkillAction(name: string) {
+    const generation = dataGeneration
+    try {
+      await deleteSkill(name)
+      if (generation !== dataGeneration) return
+      state.skills = state.skills.filter((s) => s.name !== name)
+      if (state.selectedSkillName === name) {
+        state.selectedSkillName = ''
+        state.skillDetail = null
+      }
     } catch {
       // 失败静默:保留列表,避免前后端不一致
     }
@@ -547,6 +703,10 @@ export const useConsoleStore = defineStore('console', () => {
   // PLACEHOLDER_STORE4
   /** 首屏种子对话 */
   function seedConversation() {
+    if (!state.sessions.length) {
+      state.sessions = [...SESSIONS]
+      state.activeSessionId = SESSIONS[0]?.id ?? ''
+    }
     if (state.messages.length) return
     state.messages.push({
       id: uid('m'),
@@ -576,11 +736,12 @@ export const useConsoleStore = defineStore('console', () => {
 
   return {
     state,
-    setView,
     toggleLeft,
     toggleRight,
     loadHealth,
     loadSessions,
+    resetConsole,
+    reloadConsole,
     launchApp,
     selectSession,
     newSession,
@@ -594,6 +755,10 @@ export const useConsoleStore = defineStore('console', () => {
     loadPermissionRules,
     savePermissionRule,
     removePermissionRule,
+    loadSkills,
+    selectSkill,
+    uploadSkill: uploadSkillAction,
+    removeSkill: removeSkillAction,
     seedConversation,
   }
 })

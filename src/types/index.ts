@@ -16,9 +16,6 @@ export interface Session {
   badge?: string
 }
 
-/** 主内容区视图 */
-export type MainView = 'chat' | 'apps' | 'settings'
-
 /** 应用中心条目 */
 export interface AppTile {
   name: string

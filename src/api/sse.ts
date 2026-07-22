@@ -21,10 +21,13 @@ class FatalError extends Error {}
  */
 export function streamPost(path: string, body: unknown, handlers: SseHandlers): () => void {
   const ctrl = new AbortController()
+  const token = localStorage.getItem('auth_token')
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
 
   fetchEventSource(BASE + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
     signal: ctrl.signal,
     openWhenHidden: true,

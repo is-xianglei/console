@@ -204,3 +204,51 @@ export interface PermissionRuleDeleteResult {
   deleted: number
 }
 
+// ===== 技能库(Skill 管理) =====
+// 后端契约:/api/skills(无鉴权)。上传/预检为 multipart(字段名 file,zip ≤8MB),
+// 统一走 ApiResponse 信封。当前后端未暴露启用/禁用接口,status 为只读展示。
+
+/** GET /api/skills → data[] 单项;POST /api/skills 上传返回同结构(精简视图) */
+export interface SkillResponse {
+  id: number
+  /** 名称(kebab-case),同名覆盖更新与工具路由的键 */
+  name: string
+  description: string
+  version: string | null
+  /** enabled / disabled;发现层只列 enabled */
+  status: string
+  /** 作用域,本期恒为 global */
+  scope: string
+  created_at: string
+  updated_at: string
+}
+
+/** 详情里的资源清单元素(MinIO 实时重建,非 DB 字段) */
+export interface SkillResourceItem {
+  /** 相对 skill 根的路径,如 references/cli.md */
+  relative_path: string
+  size: number
+  mime: string
+}
+
+/** GET /api/skills/{name} → data。继承精简视图,附完整 frontmatter、资源清单与正文。 */
+export interface SkillDetailResponse extends SkillResponse {
+  frontmatter: Record<string, unknown>
+  resources: SkillResourceItem[]
+  /** SKILL.md 正文(已剥离 frontmatter) */
+  body: string
+}
+
+/** POST /api/skills/validate → data(即使校验不通过也返回 HTTP 200,以 ok 区分) */
+export interface SkillValidateResult {
+  ok: boolean
+  name: string | null
+  description: string | null
+  errors: string[]
+}
+
+/** DELETE /api/skills/{name} → data */
+export interface SkillDeleteResult {
+  deleted: boolean
+}
+

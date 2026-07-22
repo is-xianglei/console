@@ -1,9 +1,26 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useConsoleStore } from '../../stores/console'
 import { APPS, FEATURED_APP } from '../../data/seed'
 
-const { launchApp } = useConsoleStore()
+const router = useRouter()
+const { state, launchApp } = useConsoleStore()
+const launchFeedback = ref('')
+
+async function handleLaunchApp(prompt?: string) {
+  if (state.busy) {
+    launchFeedback.value = '当前任务仍在执行，请等待完成后再派发新应用。'
+    return
+  }
+  if (prompt && launchApp(prompt)) {
+    launchFeedback.value = ''
+    await router.push({
+      name: 'chat',
+      params: state.activeSessionId ? { sessionId: state.activeSessionId } : {},
+    })
+  }
+}
 
 const search = ref('')
 const activeCat = ref('全部')
@@ -40,15 +57,30 @@ function tint(color: string, pct = 14) {
           </div>
           <div class="ac-search">
             <i class="icon icon-search"></i>
-            <input v-model="search" class="ac-search-input" placeholder="搜索应用…" />
+            <input
+              v-model="search"
+              class="ac-search-input"
+              aria-label="搜索应用"
+              placeholder="搜索应用…"
+            />
           </div>
         </header>
+
+        <p v-if="state.busy || launchFeedback" class="launch-status" role="status" aria-live="polite">
+          {{ launchFeedback || '当前任务正在执行，应用派发暂不可用。' }}
+        </p>
 
         <!-- 推荐卡 -->
         <section
           class="hero"
+          :class="{ disabled: state.busy }"
           :style="{ '--hero-accent': '#a78bfa' }"
-          @click="launchApp(FEATURED_APP.prompt)"
+          role="button"
+          :tabindex="state.busy ? -1 : 0"
+          :aria-disabled="state.busy"
+          @click="handleLaunchApp(FEATURED_APP.prompt)"
+          @keydown.enter.self.prevent="handleLaunchApp(FEATURED_APP.prompt)"
+          @keydown.space.self.prevent="handleLaunchApp(FEATURED_APP.prompt)"
         >
           <div class="hero-left">
             <div class="hero-app">
@@ -57,9 +89,9 @@ function tint(color: string, pct = 14) {
             </div>
             <h2 class="hero-title">{{ FEATURED_APP.title }}</h2>
             <p class="hero-desc">{{ FEATURED_APP.desc }}</p>
-            <button class="hero-btn" @click.stop="launchApp(FEATURED_APP.prompt)">
+            <span class="hero-btn" aria-hidden="true">
               立即派发 <i class="icon icon-arrow-right"></i>
-            </button>
+            </span>
           </div>
           <div class="hero-right">
             <span class="hero-prompt mono">{{ FEATURED_APP.prompt }}</span>
@@ -73,6 +105,7 @@ function tint(color: string, pct = 14) {
             :key="c"
             class="cat-tab"
             :class="{ active: c === activeCat }"
+            :aria-pressed="c === activeCat"
             @click="activeCat = c"
           >
             {{ c }}
@@ -85,7 +118,8 @@ function tint(color: string, pct = 14) {
             v-for="a in filtered"
             :key="a.tag"
             class="app-row"
-            @click="launchApp(`@${a.name} `)"
+            :disabled="state.busy"
+            @click="handleLaunchApp(`@${a.name} `)"
           >
             <span class="app-row-ic" :style="{ background: tint(a.color), color: a.color }">
               <i :class="`icon icon-${a.icon}`"></i>
@@ -176,6 +210,16 @@ function tint(color: string, pct = 14) {
   border-color: var(--accent-agent);
   box-shadow: 0 0 0 2px var(--accent-agent-dim);
 }
+.launch-status {
+  margin: -12px 0 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border-visible);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+}
 /* PLACEHOLDER_AC_STYLE2 */
 .hero {
   display: flex;
@@ -196,6 +240,18 @@ function tint(color: string, pct = 14) {
 .hero:hover {
   border-color: var(--hero-accent);
   box-shadow: 0 0 24px color-mix(in srgb, var(--hero-accent) 22%, transparent);
+}
+.hero:focus-visible {
+  outline: 2px solid var(--hero-accent);
+  outline-offset: 2px;
+}
+.hero.disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+.hero.disabled:hover {
+  border-color: var(--border);
+  box-shadow: none;
 }
 .hero-left {
   flex: 1;
@@ -258,9 +314,13 @@ function tint(color: string, pct = 14) {
   cursor: pointer;
   transition: background var(--dur-fast), box-shadow var(--dur-fast);
 }
-.hero-btn:hover {
+.hero:hover:not(.disabled) .hero-btn {
   background: var(--accent-agent-hover);
   box-shadow: 0 0 18px var(--accent-agent-glow);
+}
+.app-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 .hero-btn i {
   font-size: 14px;
@@ -327,7 +387,7 @@ function tint(color: string, pct = 14) {
   text-align: left;
   transition: background var(--dur-fast), border-color var(--dur-fast);
 }
-.app-row:hover {
+.app-row:hover:not(:disabled) {
   background: var(--bg-surface);
   border-color: var(--border-visible);
 }
