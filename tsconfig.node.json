@@ -4,6 +4,9 @@
     "target": "es2023",
     "lib": ["ES2023"],
     "types": ["node"],
+    "paths": {
+      "#build/ui": ["./node_modules/.nuxt-ui/ui"]
+    },
     "skipLibCheck": true,
 
     /* Bundler mode */

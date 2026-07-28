@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, watch } from 'vue'
+import { zh_cn } from '@nuxt/ui/locale'
 import { useRouter } from 'vue-router'
 import { useConsoleStore } from './stores/console'
 import { useAuthStore } from './stores/auth'
@@ -95,5 +96,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <router-view />
+  <UApp :locale="zh_cn">
+    <router-view />
+  </UApp>
 </template>

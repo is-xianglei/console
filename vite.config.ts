@@ -1,5 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import ui from '@nuxt/ui/vite'
+import { fileURLToPath, URL } from 'node:url'
 
 function lucideWoff2Only(): Plugin {
   return {
@@ -23,7 +25,30 @@ function lucideWoff2Only(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [lucideWoff2Only(), vue()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  plugins: [
+    lucideWoff2Only(),
+    vue(),
+    ui({
+      colorMode: false,
+      theme: {
+        defaultVariants: {
+          size: 'sm',
+        },
+      },
+      ui: {
+        colors: {
+          primary: 'hyper',
+          secondary: 'hyper',
+          neutral: 'zinc',
+        },
+      },
+    }),
+  ],
   server: {
     proxy: {
       // 前后端统一 /api 前缀，无需 rewrite；SSE 默认透传不缓冲

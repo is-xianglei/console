@@ -1,0 +1,109 @@
+.authContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-deep);
+  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+}
+
+.authCard {
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 32px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.authHeader {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.authHex {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto 16px;
+  color: var(--accent-agent);
+}
+
+.authTitle {
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.authSubtitle {
+  color: var(--text-dim);
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.authForm {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.authInput {
+  width: 100%;
+}
+
+.authInput :global(input),
+.authForm :global(button[type='submit']) {
+  min-height: 40px;
+}
+
+.authField :global([data-slot='label']) {
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.authAlert {
+  margin-bottom: 20px;
+}
+
+.formFooter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  gap: 6px;
+}
+
+.formFooterText {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.formFooter :global(button) {
+  height: auto;
+  padding: 0;
+}
+
+@media (max-height: 700px) {
+  .authContainer {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .authCard {
+    padding: 32px 24px;
+  }
+}

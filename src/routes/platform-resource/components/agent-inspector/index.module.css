@@ -1,0 +1,305 @@
+.ag-primary-button,
+.ag-secondary-button {
+  min-height: 36px;
+  padding: 0 13px;
+  border-radius: var(--radius-control);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast);
+}
+
+.ag-primary-button {
+  border: 1px solid var(--accent-agent);
+  background: var(--accent-agent);
+  color: var(--ui-text-inverted);
+}
+
+.ag-primary-button:hover {
+  border-color: var(--accent-agent-hover);
+  background: var(--accent-agent-hover);
+}
+
+.ag-secondary-button {
+  border: 1px solid var(--border-visible);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.ag-secondary-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.ag-primary-button:disabled,
+.ag-secondary-button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.ag-agent-glyph {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  color: var(--accent-agent);
+}
+
+.ag-agent-glyph {
+  width: 34px;
+  height: 34px;
+  color: var(--text-muted);
+}
+
+.ag-lifecycle {
+  width: fit-content;
+  min-height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.ag-lifecycle:global(.published) { color: var(--status-success); }
+.ag-lifecycle:global(.review) { color: var(--status-warning); }
+
+.ag-inspector-head {
+  min-height: 82px;
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ag-inspector-head > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.ag-inspector-head small,
+.ag-inspector-head em {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-inspector-head strong {
+  margin: 2px 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-inspector-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.ag-detail-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  color: var(--text-dim);
+  font-size: 9px;
+}
+
+.ag-detail-description {
+  margin-top: 14px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.ag-detail-section {
+  margin-top: 20px;
+}
+
+.ag-detail-section h3 {
+  margin-bottom: 9px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.ag-detail-section dl {
+  border-top: 1px solid var(--border);
+}
+
+.ag-detail-section dl div {
+  min-height: 34px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.ag-detail-section dt {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.ag-detail-section dd {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-align: right;
+}
+
+.ag-detail-bindings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ag-detail-bindings span {
+  min-height: 25px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+}
+
+.ag-detail-bindings em {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.ag-prompt-preview {
+  max-height: 104px;
+  padding: 10px;
+  border-left: 2px solid var(--accent-agent);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.ag-runtime-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.ag-runtime-metrics > div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  display: flex;
+  flex-direction: column;
+}
+
+.ag-runtime-metrics strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: var(--font-data);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-runtime-metrics span {
+  color: var(--text-dim);
+  font-size: 9px;
+}
+
+.ag-inspector-actions {
+  min-height: 58px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+:global(.ag-inspector-drawer) {
+  font-family: 'MiSans', sans-serif;
+}
+
+.ag-primary-button,
+.ag-secondary-button {
+  box-shadow: none !important;
+}
+
+:global(.ag-inspector-content),
+:global(.ag-inspector-header),
+:global(.ag-inspector-body),
+:global(.ag-inspector-footer) {
+  background: var(--bg-surface);
+}
+
+:global(.ag-inspector-content) {
+  width: min(100vw, 360px);
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+:global(.ag-inspector-header) {
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+:global(.ag-inspector-header) .ag-inspector-head {
+  min-height: 54px;
+  padding: 0;
+  border: 0;
+}
+
+:global(.ag-inspector-header) .ag-inspector-head > button {
+  margin-left: auto;
+}
+
+:global(.ag-inspector-body) {
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+:global(.ag-inspector-footer) {
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+:global(.ag-inspector-footer) .ag-inspector-actions {
+  border-top: 0;
+}
+
+@media (max-width: 760px) {
+
+  :global(.ag-inspector-content) {
+    width: 100vw;
+  }
+}

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, computed } from 'vue'
-import type { UserResponse, WorkspaceResponse } from '../api/auth'
+import type { UserResponse, WorkspaceResponse } from '../interfaces/auth/model'
 import {
   login as apiLogin,
   register as apiRegister,
@@ -8,7 +8,7 @@ import {
   switchWorkspace as apiSwitch,
   getCurrentUser,
   getUserWorkspaces,
-} from '../api/auth'
+} from '../http/auth'
 
 const TOKEN_KEY = 'auth_token'
 const REFRESH_KEY = 'auth_refresh_token'

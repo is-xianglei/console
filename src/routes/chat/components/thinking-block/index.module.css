@@ -1,0 +1,57 @@
+.think-block {
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--status-think);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--status-think) 4%, transparent);
+  overflow: hidden;
+}
+.think-head {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.think-head:hover {
+  background: color-mix(in srgb, var(--status-think) 7%, transparent);
+}
+.think-head i.lead {
+  font-size: 13px;
+  color: var(--status-think);
+}
+.think-lbl {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--status-think);
+}
+.think-dur {
+  font-size: 9px;
+  color: var(--text-dim);
+}
+.think-chev {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--text-dim);
+  transition: transform var(--dur-fast);
+}
+.think-block.collapsed .think-chev {
+  transform: rotate(-90deg);
+}
+.think-body {
+  padding: 0 14px 12px 14px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-style: italic;
+}

@@ -1,5 +1,40 @@
-# Vue 3 + TypeScript + Vite
+# Hyperreal Console
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+基于 Vue 3、TypeScript、Vite、Pinia、Vue Router、Nuxt UI 与 Tailwind CSS 4 构建的制造业智能体控制台。
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## 本地开发
+
+```bash
+npm install
+npm run dev
+```
+
+默认开发地址由 Vite 输出。开发环境将 `/api` 请求代理到 `http://127.0.0.1:8000`。
+
+## 质量检查
+
+```bash
+npm run lint
+npm run build
+```
+
+`build` 会先执行 Vue 与 TypeScript 类型检查，再生成生产构建。
+
+## 目录约定
+
+```text
+src/
+├── assets/       # 字体、图片与全局主题资源
+├── components/   # 跨页面复用组件
+├── constants/    # 业务常量与静态配置
+├── hooks/        # Vue 组合式函数
+├── http/         # HTTP 与 SSE 请求封装
+├── interfaces/   # 领域模型与接口 DTO
+├── routes/       # 路由配置、页面与页面专属组件
+├── stores/       # Pinia 业务状态
+├── utils/        # 无状态通用工具
+├── App.vue       # 应用根组件
+└── main.ts       # 应用入口
+```
+
+详细开发规范见 [`.agents/rules`](./.agents/rules/README.md)。

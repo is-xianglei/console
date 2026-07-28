@@ -1,0 +1,20 @@
+.conv-head { min-height: 58px; flex-shrink: 0; padding: 7px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.conv-context { min-width: 0; flex: 1; }
+.conv-path { display: block; margin-bottom: 2px; color: var(--text-dim); font-size: 9px; }
+.conv-title-line { display: flex; align-items: center; gap: 7px; }
+.conv-title { color: var(--text-primary); font-family: var(--font-ui); font-size: 13px; font-weight: 600; }
+.session-context { display: block; margin-top: 1px; overflow: hidden; color: var(--text-dim); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.scope-badge,.status-badge { min-height: 20px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 3px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; font-size: 9px; white-space: nowrap; }
+.scope-badge { border-color: color-mix(in srgb, var(--accent-agent) 25%, transparent); color: var(--accent-agent); }
+.view-switch { border: 1px solid var(--border); background: var(--bg-elevated); }
+.view-switch :global([data-slot='trigger']) { min-width: 42px; font-size: 9px; font-weight: 600; }
+.view-switch :global([data-slot='label']) { position: relative; z-index: 1; }
+.view-switch :global([data-slot='trigger'][data-state='inactive']:hover),
+.view-switch :global([data-slot='trigger'][data-state='inactive']:focus-visible),
+.view-switch :global([data-slot='trigger'][data-state='inactive']:hover [data-slot='label']),
+.view-switch :global([data-slot='trigger'][data-state='inactive']:focus-visible [data-slot='label']) { color: var(--text-primary) !important; }
+.view-switch :global([data-slot='trigger'][data-state='active']),
+.view-switch :global([data-slot='trigger'][data-state='active'] [data-slot='label']) { color: var(--bg-deep) !important; }
+.conv-id { color: var(--text-dim); font-size: 10px; }
+.conv-model { margin-left: auto; padding: 3px 9px; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--bg-surface); color: var(--text-muted); display: flex; align-items: center; gap: 6px; font-family: var(--font-data); font-size: 10px; }
+.mode-announcer { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

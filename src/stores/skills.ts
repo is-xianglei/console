@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
-import { deleteSkill, fetchSkillDetail, listSkills, uploadSkill } from '../api/skill'
-import type { SkillDetailResponse, SkillResponse } from '../api/types'
-import { ApiError } from '../api/client'
+import { ApiError } from '../http'
+import { createSkill, deleteSkill, getSkillDetail, getSkillList } from '../http/skill'
+import type { SkillDetailResponse, SkillResponse } from '../interfaces/skill/model'
 
 interface SkillsState {
   skills: SkillResponse[]
@@ -41,7 +41,7 @@ export const useSkillsStore = defineStore('skills', () => {
     const generation = dataGeneration
     state.skillsLoading = true
     try {
-      const skills = await listSkills()
+      const skills = await getSkillList()
       if (generation === dataGeneration) state.skills = skills
     } catch {
       if (generation === dataGeneration) state.skills = []
@@ -57,7 +57,7 @@ export const useSkillsStore = defineStore('skills', () => {
     state.skillDetail = null
     state.skillDetailLoading = true
     try {
-      const detail = await fetchSkillDetail(name)
+      const detail = await getSkillDetail(name)
       if (generation === dataGeneration && state.selectedSkillName === name) {
         state.skillDetail = detail
       }
@@ -78,7 +78,7 @@ export const useSkillsStore = defineStore('skills', () => {
     const generation = dataGeneration
     state.skillUploading = true
     try {
-      const created = await uploadSkill(file)
+      const created = await createSkill(file)
       if (generation !== dataGeneration) return null
       await loadSkills()
       await selectSkill(created.name)

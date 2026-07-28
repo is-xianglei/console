@@ -1,0 +1,74 @@
+.formPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.feedback {
+  border-radius: var(--radius-control);
+}
+
+.empty {
+  padding: 40px;
+}
+
+.workspaceList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.workspaceItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+
+.workspaceItem:hover {
+  border-color: var(--border-visible);
+  background: var(--bg-elevated);
+}
+
+.workspaceInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.workspaceName {
+  margin-bottom: 4px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.workspaceMeta {
+  color: var(--text-dim);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.secondary {
+  height: 32px;
+  border-radius: var(--radius-control);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .workspaceItem {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .secondary {
+    width: 100%;
+  }
+}

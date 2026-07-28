@@ -1,0 +1,84 @@
+.cli-card {
+  font-family: var(--font-data);
+  font-size: 11px;
+  line-height: 1.5;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+  overflow: hidden;
+  animation: entry-appear 180ms ease-out;
+}
+.cli-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+.cli-tag {
+  font-family: var(--font-data);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+}
+.cli-tag.tool,
+.cli-tag.spawn {
+  color: var(--status-info);
+  background: color-mix(in srgb, var(--status-info) 12%, transparent);
+}
+.cli-tag.result,
+.cli-tag.done {
+  color: var(--status-success);
+  background: color-mix(in srgb, var(--status-success) 12%, transparent);
+}
+.cli-tag.error {
+  color: var(--status-error);
+  background: color-mix(in srgb, var(--status-error) 12%, transparent);
+}
+.cli-tag.warn {
+  color: var(--status-warning);
+  background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+}
+.cli-tag.start,
+.cli-tag.think {
+  color: var(--accent-agent);
+  background: var(--accent-agent-dim);
+}
+.cli-fn {
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cli-state {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.cli-state .ok {
+  color: var(--status-success);
+}
+.cli-spin {
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--border-strong);
+  border-top-color: var(--status-info);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.cli-body {
+  padding: 9px 12px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  font-size: 10.5px;
+  line-height: 1.6;
+}

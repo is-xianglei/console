@@ -1,29 +1,35 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
-import type { ChatBlock, ChatMessage, Session, SubAgent, Task, TaskState, WorkbenchMode } from '../types'
-import { SESSIONS } from '../data/seed'
-import { getWorkbenchApp } from '../data/appRegistry'
+import { getWorkbenchApp } from '../constants/app-registry'
+import { SESSIONS } from '../constants/seed'
 import {
-  batchDeleteSessions,
   deleteSession,
-  fetchHealth,
-  fetchMessages,
-  fetchSessions,
-  renameSession,
+  deleteSessionList,
+  getHealthDetail,
+  getSessionList,
+  getSessionMessageList,
   respondApproval,
   sendMessage,
-} from '../api/console'
+  updateSession,
+} from '../http/console'
+import type { SseHandlers } from '../interfaces/console/api'
 import type {
   ApprovalDecision,
+  ChatBlock,
+  ChatMessage,
+  MsgContentBlock,
+  Session,
   SessionMessageResponse,
   SessionResponse,
+  SubAgent,
+  Task,
   TaskResponse,
-} from '../api/types'
-import { createSseReducer, fmtToolCall } from './sseReducer'
+  TaskState,
+  WorkbenchMode,
+} from '../interfaces/console/model'
+import { createSseReducer, fmtToolCall } from '@/utils/sse-reducer'
 import { usePermissionsStore } from './permissions'
 import { useSkillsStore } from './skills'
-import type { MsgContentBlock } from '../api/types'
-import type { SseHandlers } from '../api/sse'
 
 // ===== 工具函数 =====
 const now = () => new Date().toLocaleTimeString('zh-CN', { hour12: false })
@@ -241,7 +247,6 @@ export const useConsoleStore = defineStore('console', () => {
     theme: 'dark',
   })
 
-  // PLACEHOLDER_STORE
   // ===== 侧栏收缩 =====
   function toggleLeft() {
     state.leftCollapsed = !state.leftCollapsed
@@ -255,7 +260,7 @@ export const useConsoleStore = defineStore('console', () => {
   async function loadHealth() {
     const generation = dataGeneration
     try {
-      const h = await fetchHealth()
+      const h = await getHealthDetail()
       if (generation === dataGeneration) state.health = h.status
     } catch {
       if (generation === dataGeneration) state.health = 'error'
@@ -267,7 +272,7 @@ export const useConsoleStore = defineStore('console', () => {
     const generation = dataGeneration
     state.sessionsLoading = true
     try {
-      const list = await fetchSessions()
+      const list = await getSessionList()
       if (generation !== dataGeneration) return false
 
       state.sessions = list.map(mapSession)
@@ -305,7 +310,7 @@ export const useConsoleStore = defineStore('console', () => {
       return
     }
     try {
-      const list = await fetchMessages(id)
+      const list = await getSessionMessageList(id)
       if (generation === dataGeneration && id === state.activeSessionId) {
         state.messages = mapMessages(list)
       }
@@ -406,7 +411,7 @@ export const useConsoleStore = defineStore('console', () => {
     target.title = next
     if (isBackendSession(id)) {
       try {
-        await renameSession(id, next)
+        await updateSession(id, next)
       } catch {
         // 失败静默:保留乐观更新,避免打断交互(后端不可用时仍可本地改名)
       }
@@ -422,7 +427,7 @@ export const useConsoleStore = defineStore('console', () => {
     if (backendIds.length) {
       try {
         if (backendIds.length === 1) await deleteSession(backendIds[0])
-        else await batchDeleteSessions(backendIds)
+        else await deleteSessionList(backendIds)
       } catch {
         // 后端删除失败则中止,不动前端列表,避免前后端不一致
         return
@@ -455,6 +460,7 @@ export const useConsoleStore = defineStore('console', () => {
   function toggleTheme() {
     state.theme = state.theme === 'dark' ? 'light' : 'dark'
     document.documentElement.setAttribute('data-theme', state.theme)
+    document.documentElement.classList.toggle('dark', state.theme === 'dark')
   }
 
   // ===== 编排引擎(真实 SSE) =====
@@ -600,7 +606,6 @@ export const useConsoleStore = defineStore('console', () => {
     })
   }
 
-  // PLACEHOLDER_STORE4
   /** 首屏种子对话 */
   function seedConversation() {
     if (!state.sessions.length) {

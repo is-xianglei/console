@@ -1,0 +1,90 @@
+.activity-rail {
+  width: 48px;
+  flex: 0 0 48px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  position: relative;
+  z-index: 4;
+}
+.rail-item {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  position: relative;
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.rail-item:hover {
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+}
+.rail-item:active {
+  transform: scale(0.95);
+}
+.rail-item.active {
+  color: var(--accent-agent);
+  background: var(--accent-agent-dim);
+}
+.rail-indicator {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 16px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent-agent);
+  box-shadow: 0 0 8px var(--accent-agent-glow);
+  pointer-events: none;
+  will-change: transform;
+}
+.rail-indicator.ready {
+  transition: transform var(--dur-med) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+.rail-item i {
+  font-size: 17px;
+}
+.rail-spacer {
+  flex: 1;
+}
+@media (max-width: 760px) {
+  .activity-rail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+    border-right: 0;
+    border-top: 1px solid var(--border);
+    flex-direction: row;
+    justify-content: space-around;
+    padding: 5px 8px calc(5px + env(safe-area-inset-bottom));
+    z-index: 30;
+  }
+  .rail-spacer {
+    display: none;
+  }
+  .rail-indicator {
+    width: 16px;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-item,
+  .rail-indicator.ready {
+    transition-duration: 1ms;
+  }
+}

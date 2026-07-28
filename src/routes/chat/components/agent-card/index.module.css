@@ -1,0 +1,104 @@
+.agent-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+.agent-card:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-visible);
+}
+.agent-card.active {
+  background: var(--bg-elevated);
+  border-color: var(--accent-agent);
+}
+.agent-card.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 20px;
+  background: var(--accent-agent);
+  border-radius: 0 2px 2px 0;
+}
+.agent-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agent-ic {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--accent-agent-dim);
+  color: var(--accent-agent);
+}
+.agent-ic i {
+  font-size: 13px;
+}
+.agent-name {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-pid {
+  font-size: 9px;
+  color: var(--text-dim);
+}
+.agent-card-bot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agent-status-txt {
+  font-family: var(--font-data);
+  font-size: 9px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.agent-mini-prog {
+  flex: 1;
+  height: 3px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.agent-card.active .agent-mini-prog {
+  background: var(--bg-surface);
+}
+.agent-mini-fill {
+  height: 100%;
+  display: block;
+  background: var(--accent-agent);
+  border-radius: var(--radius-pill);
+  transition: width var(--dur-med);
+}
+.agent-mini-fill.think {
+  background: var(--status-think);
+}
+.agent-mini-fill.done {
+  background: var(--status-success);
+}

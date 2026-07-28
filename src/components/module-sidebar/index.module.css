@@ -1,0 +1,117 @@
+.module-sidebar {
+  width: var(--left-bar-w);
+  flex: 0 0 var(--left-bar-w);
+  min-width: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.module-head {
+  padding: 12px 14px 8px;
+}
+.module-kicker {
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 0;
+}
+.module-head h2 {
+  margin-top: 3px;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.module-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 8px;
+}
+.nav-section + .nav-section {
+  margin-top: 18px;
+}
+.nav-label {
+  padding: 0 8px 6px;
+  color: var(--text-dim);
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.module-item {
+  width: 100%;
+  height: 34px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.module-item:hover {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+.module-item.active {
+  background: var(--accent-agent-dim);
+  color: var(--accent-agent);
+}
+.module-item i {
+  width: 15px;
+  font-size: 14px;
+}
+.module-item span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 550;
+}
+.item-count {
+  margin-left: auto;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+.module-empty {
+  padding: 20px 8px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+.module-foot {
+  height: 38px;
+  padding: 0 14px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 9px;
+}
+.module-foot :global(.mono) {
+  margin-left: auto;
+}
+@media (max-width: 1180px) {
+  .module-sidebar {
+    width: 250px;
+    flex-basis: 250px;
+  }
+}
+@media (max-width: 760px) {
+  .module-sidebar {
+    position: static;
+    width: 100%;
+    height: 100%;
+    flex-basis: auto;
+    display: flex;
+    border-right-color: var(--border-visible);
+  }
+}

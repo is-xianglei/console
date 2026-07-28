@@ -1,0 +1,136 @@
+.agent-detail {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.detail-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+}
+.detail-empty .hx {
+  width: 64px;
+  height: 64px;
+  color: var(--accent-agent);
+  opacity: 0.2;
+  animation: glow-breathe 3s ease-in-out infinite;
+}
+.detail-empty p {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-dim);
+  max-width: 200px;
+  line-height: 1.6;
+}
+.detail-head {
+  padding: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.detail-title-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.agent-ic {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-agent-dim);
+  color: var(--accent-agent);
+}
+.agent-ic i {
+  font-size: 13px;
+}
+.detail-title {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.detail-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.detail-tile {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding: 7px 9px;
+}
+.detail-tile-l {
+  font-family: var(--font-data);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.detail-tile-v {
+  font-family: var(--font-data);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+.detail-tile-v.accent {
+  color: var(--accent-agent);
+}
+.detail-stream {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.stream-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: entry-appear 200ms ease-out;
+}
+.stream-lbl {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.stream-lbl i {
+  font-size: 12px;
+}
+.stream-lbl.think {
+  color: var(--status-think);
+}
+.stream-lbl.answer {
+  color: var(--accent-agent);
+}
+.stream-lbl.tool {
+  color: var(--status-info);
+}
+.stream-txt {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding-left: 19px;
+}
+.stream-txt.think {
+  font-style: italic;
+}
+.stream-cli {
+  padding-left: 19px;
+}

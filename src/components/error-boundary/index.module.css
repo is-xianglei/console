@@ -1,0 +1,8 @@
+.errorBoundary {
+  display: grid;
+  width: min(100%, 560px);
+  margin: auto;
+  padding: 24px;
+  gap: 16px;
+  color: var(--ui-text);
+}

@@ -2,10 +2,11 @@ import { defineStore } from 'pinia'
 import { reactive } from 'vue'
 import {
   deletePermissionRule,
-  listPermissionRules,
-  upsertPermissionRule,
-} from '../api/console'
-import type { PermissionRule, PermissionRuleCreate } from '../api/types'
+  getPermissionRuleList,
+  updatePermissionRule,
+} from '../http/permission'
+import type { PermissionRuleCreate } from '../interfaces/permission/api'
+import type { PermissionRule } from '../interfaces/permission/model'
 
 interface PermissionsState {
   permissionRules: PermissionRule[]
@@ -32,7 +33,7 @@ export const usePermissionsStore = defineStore('permissions', () => {
     const generation = dataGeneration
     state.permissionRulesLoading = true
     try {
-      const rules = await listPermissionRules(scope ? { scope } : undefined)
+      const rules = await getPermissionRuleList(scope ? { scope } : undefined)
       if (generation === dataGeneration) state.permissionRules = rules
     } catch {
       if (generation === dataGeneration) state.permissionRules = []
@@ -45,7 +46,7 @@ export const usePermissionsStore = defineStore('permissions', () => {
   async function savePermissionRule(payload: PermissionRuleCreate): Promise<boolean> {
     const generation = dataGeneration
     try {
-      await upsertPermissionRule(payload)
+      await updatePermissionRule(payload)
       if (generation !== dataGeneration) return false
       await loadPermissionRules()
       return true
