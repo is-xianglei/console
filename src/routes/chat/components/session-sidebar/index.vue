@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
+import type { DropdownMenuItem } from '@nuxt/ui'
+import { useToast } from '@nuxt/ui/composables'
 import { useRoute, useRouter } from 'vue-router'
 import WorkspaceSelector from '@/components/workspace-selector/index.vue'
 import { WORKBENCH_APPS } from '@/constants'
@@ -11,7 +13,9 @@ defineOptions({ name: 'SessionSidebar' })
 const emit = defineEmits<{ navigate: [] }>()
 const router = useRouter()
 const route = useRoute()
-const { state, selectSession, newSession, openApp, renameSession, deleteSessions } = useConsoleStore()
+const toast = useToast()
+const consoleStore = useConsoleStore()
+const { state, selectSession, newSession, openApp, renameSession, deleteSessions } = consoleStore
 
 const selectMode = ref(false)
 const selected = ref<Set<string>>(new Set())
@@ -22,6 +26,19 @@ const collapsedApps = ref<Set<string>>(new Set(['quality', 'schedule', 'energy']
 const deleteConfirmOpen = ref(false)
 const pendingDeleteIds = ref<string[]>([])
 const deleting = ref(false)
+const sharingSession = ref<Session | null>(null)
+const sharing = ref(false)
+const shareForm = reactive({
+  visibility: 'private' as 'private' | 'workspace' | 'public',
+  users: '',
+  departments: '',
+  groups: '',
+})
+const visibilityItems = [
+  { value: 'private', label: '仅自己' },
+  { value: 'workspace', label: '当前工作区' },
+  { value: 'public', label: '公开' },
+]
 
 const generalSessions = computed(() => state.sessions.filter((session) => !session.appId))
 const knownAppIds = new Set<string>(WORKBENCH_APPS.map((app) => app.id))
@@ -126,6 +143,70 @@ function requestDelete(ids: string[]) {
   if (!ids.length) return
   pendingDeleteIds.value = ids
   deleteConfirmOpen.value = true
+}
+
+function openShare(session: Session) {
+  sharingSession.value = session
+  shareForm.visibility = session.visibility ?? 'private'
+  shareForm.users = ''
+  shareForm.departments = ''
+  shareForm.groups = ''
+}
+
+function parseIdList(value: string): number[] {
+  return [...new Set(value.split(',')
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isInteger(item) && item > 0))]
+}
+
+async function confirmShare() {
+  const session = sharingSession.value
+  if (!session || sharing.value) return
+  sharing.value = true
+  const ok = await consoleStore.shareSession(session.id, {
+    visibility: shareForm.visibility,
+    share_with: {
+      users: parseIdList(shareForm.users),
+      departments: parseIdList(shareForm.departments),
+      groups: parseIdList(shareForm.groups),
+    },
+  })
+  sharing.value = false
+  if (ok) {
+    sharingSession.value = null
+    toast.add({ title: '会话共享范围已更新', color: 'success', icon: 'i-lucide-share-2' })
+  } else {
+    toast.add({ title: '共享设置失败', color: 'error', icon: 'i-lucide-circle-alert' })
+  }
+}
+
+async function confirmArchive(session: Session) {
+  const wasActive = session.id === state.activeSessionId
+  const ok = await consoleStore.archiveSession(session.id)
+  if (!ok) {
+    toast.add({ title: '归档失败', color: 'error', icon: 'i-lucide-circle-alert' })
+    return
+  }
+  if (wasActive) replaceActiveChatRoute()
+  toast.add({ title: '会话已归档', color: 'success', icon: 'i-lucide-archive' })
+}
+
+function sessionMenuItems(session: Session): DropdownMenuItem[] {
+  const backendSession = /^\d+$/.test(session.id)
+  return [
+    {
+      label: '共享设置',
+      icon: 'i-lucide-share-2',
+      disabled: !backendSession,
+      onSelect: () => openShare(session),
+    },
+    {
+      label: '归档会话',
+      icon: 'i-lucide-archive',
+      disabled: !backendSession,
+      onSelect: () => { void confirmArchive(session) },
+    },
+  ]
 }
 
 async function startRename(session: Session) {
@@ -268,6 +349,9 @@ async function confirmDelete() {
                 <span :class="$style['item-text']" :title="session.title">{{ session.title }}</span>
               </UButton>
               <div v-if="!selectMode && editingId !== session.id" :class="$style['session-actions']">
+                <UDropdownMenu :items="sessionMenuItems(session)">
+                  <UButton color="neutral" variant="ghost" square title="更多操作" @click.stop><i class="icon icon-ellipsis"></i></UButton>
+                </UDropdownMenu>
                 <UButton color="neutral" variant="ghost" square title="重命名" @click.stop="startRename(session)"><i class="icon icon-pencil"></i></UButton>
                 <UButton color="error" variant="ghost" square title="删除" @click.stop="requestDelete([session.id])"><i class="icon icon-trash-2"></i></UButton>
               </div>
@@ -319,6 +403,9 @@ async function confirmDelete() {
             <span :class="$style['item-text']" :title="session.title">{{ session.title }}</span>
           </UButton>
           <div v-if="!selectMode && editingId !== session.id" :class="$style['session-actions']">
+            <UDropdownMenu :items="sessionMenuItems(session)">
+              <UButton color="neutral" variant="ghost" square title="更多操作" @click.stop><i class="icon icon-ellipsis"></i></UButton>
+            </UDropdownMenu>
             <UButton color="neutral" variant="ghost" square title="重命名" @click.stop="startRename(session)"><i class="icon icon-pencil"></i></UButton>
             <UButton color="error" variant="ghost" square title="删除" @click.stop="requestDelete([session.id])"><i class="icon icon-trash-2"></i></UButton>
           </div>
@@ -341,6 +428,34 @@ async function confirmDelete() {
       <template #footer>
         <UButton color="neutral" variant="outline" @click="deleteConfirmOpen = false">取消</UButton>
         <UButton color="error" :loading="deleting" @click="confirmDelete">确认删除</UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="Boolean(sharingSession)"
+      title="共享会话"
+      :description="sharingSession ? `设置「${sharingSession.title}」的可见范围。` : ''"
+      @update:open="(open) => { if (!open) sharingSession = null }"
+    >
+      <template #body>
+        <UForm :state="shareForm" :class="$style['share-form']" @submit="confirmShare">
+          <UFormField label="可见性" name="visibility">
+            <USelect v-model="shareForm.visibility" :items="visibilityItems" value-key="value" class="w-full" />
+          </UFormField>
+          <UFormField label="用户 ID" name="users" hint="多个 ID 用逗号分隔">
+            <UInput v-model="shareForm.users" class="w-full" placeholder="12, 18" />
+          </UFormField>
+          <UFormField label="部门 ID" name="departments" hint="多个 ID 用逗号分隔">
+            <UInput v-model="shareForm.departments" class="w-full" placeholder="3, 7" />
+          </UFormField>
+          <UFormField label="群组 ID" name="groups" hint="多个 ID 用逗号分隔">
+            <UInput v-model="shareForm.groups" class="w-full" placeholder="5, 9" />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton color="neutral" variant="outline" label="取消" @click="sharingSession = null" />
+        <UButton label="保存共享" icon="i-lucide-share-2" :loading="sharing" @click="confirmShare" />
       </template>
     </UModal>
   </aside>

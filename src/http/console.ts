@@ -1,8 +1,15 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
-import type { SessionDeleteResult, SendMessageRequest, SseHandlers } from '../interfaces/console/api'
 import type {
-  ApprovalDecision,
-  HealthData,
+  InteractionResolutionRequest,
+  PendingInteractionResponse,
+  RuntimeSuspensionResponse,
+  SessionDeleteResult,
+  ShareSessionRequest,
+  ShareSessionResponse,
+  SendMessageRequest,
+  SseHandlers,
+} from '../interfaces/console/api'
+import type {
   SessionMessageResponse,
   SessionResponse,
   SseEvent,
@@ -54,11 +61,6 @@ function streamPost(path: string, body: unknown, handlers: SseHandlers): () => v
   return () => controller.abort()
 }
 
-/** GET /api/health — 健康检查 */
-export function getHealthDetail(): Promise<HealthData> {
-  return request<HealthData>('/health')
-}
-
 /** GET /api/sessions — 查询会话列表 */
 export function getSessionList(): Promise<SessionResponse[]> {
   return request<SessionResponse[]>('/sessions')
@@ -79,6 +81,22 @@ export function updateSession(
   return request<SessionResponse>(`/sessions/${sessionId}`, {
     method: 'PATCH',
     body: JSON.stringify({ title }),
+  })
+}
+
+/** POST /api/sessions/{id}/archive — 归档会话。 */
+export function archiveSession(sessionId: number | string): Promise<SessionResponse> {
+  return request<SessionResponse>(`/sessions/${sessionId}/archive`, { method: 'POST' })
+}
+
+/** POST /api/sessions/{id}/share — 覆盖会话的完整共享范围。 */
+export function shareSession(
+  sessionId: number | string,
+  payload: ShareSessionRequest,
+): Promise<ShareSessionResponse> {
+  return request<ShareSessionResponse>(`/sessions/${sessionId}/share`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
   })
 }
 
@@ -104,25 +122,37 @@ export function sendMessage(req: SendMessageRequest, handlers: SseHandlers): () 
   return streamPost('/sessions/messages', req, handlers)
 }
 
+/** 查询会话当前待处理的人工交互，页面重建时可恢复交互卡。 */
+export function getPendingInteraction(
+  sessionId: number | string,
+): Promise<PendingInteractionResponse | null> {
+  return request<PendingInteractionResponse | null>(`/interactions/sessions/${sessionId}/pending`)
+}
+
 /**
- * POST /api/sessions/{id}/approvals — 对挂起的工具审批作出裁决并恢复执行(SSE 流式响应)。
- * 与 sendMessage 同构:返回 abort 函数,恢复后的执行事件从这条新流继续推。
+ * 响应人工交互并建立新的恢复 SSE 流。
+ * 旧流在 interaction_request 后会正常关闭，后续事件只从本流继续推送。
  */
-export function respondApproval(
+export function respondInteraction(
   sessionId: number | string,
   requestId: string,
-  decision: ApprovalDecision,
+  payload: InteractionResolutionRequest,
   handlers: SseHandlers,
-  opts?: { updatedInput?: Record<string, unknown>; alwaysScope?: 'session' | 'global' },
 ): () => void {
   return streamPost(
-    `/sessions/${sessionId}/approvals`,
-    {
-      request_id: requestId,
-      decision,
-      updated_input: opts?.updatedInput,
-      always_scope: opts?.alwaysScope ?? 'session',
-    },
+    `/interactions/sessions/${sessionId}/requests/${encodeURIComponent(requestId)}/resolve`,
+    payload,
     handlers,
+  )
+}
+
+/** 取消会话暂停点以及其中尚未处理的交互请求。 */
+export function cancelInteraction(
+  sessionId: number | string,
+  suspensionId: string,
+): Promise<RuntimeSuspensionResponse> {
+  return request<RuntimeSuspensionResponse>(
+    `/interactions/sessions/${sessionId}/suspensions/${encodeURIComponent(suspensionId)}/cancel`,
+    { method: 'POST' },
   )
 }

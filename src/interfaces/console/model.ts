@@ -1,10 +1,5 @@
 import type { SessionAppId } from '../app/model'
 
-/** 健康检查结果。 */
-export interface HealthData {
-  status: string
-}
-
 /** 后端会话摘要。 */
 export interface SessionResponse {
   id: number
@@ -12,10 +7,32 @@ export interface SessionResponse {
   status: string
   model_name: string | null
   system_prompt: string | null
+  user_id: number | null
+  workspace_id: number | null
+  visibility: SessionVisibility
+  shared_with: number[]
+  shared_with_departments: number[]
+  shared_with_groups: number[]
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
   last_active_at: string
+}
+
+export type SessionVisibility = 'private' | 'workspace' | 'public'
+
+export interface SessionShareTargets {
+  users?: number[]
+  departments?: number[]
+  groups?: number[]
+}
+
+export interface SessionShareResult {
+  session_id: number
+  visibility: SessionVisibility
+  users: number[]
+  departments: number[]
+  groups: number[]
 }
 
 /** 助手消息中持久化的内容块。 */
@@ -35,6 +52,7 @@ export interface MsgContentBlock {
 export interface SessionMessageResponse {
   id: number
   session_id: number
+  turn_id?: string | null
   role: 'user' | 'assistant' | 'tool' | string
   content: string | MsgContentBlock[]
   token_estimate: number
@@ -63,6 +81,61 @@ export interface SseActor {
   team?: { id: number; is_lead: boolean }
 }
 
+export type InteractionKind =
+  | 'tool_approval'
+  | 'user_question'
+  | 'enter_plan_mode'
+  | 'exit_plan_mode'
+
+export interface InteractionQuestionOption {
+  label: string
+  description: string
+  preview?: string | null
+}
+
+export interface InteractionQuestion {
+  question: string
+  header: string
+  options: InteractionQuestionOption[]
+  multiSelect?: boolean
+}
+
+export interface ToolApprovalRequestPayload {
+  tool: { id: string; name: string; input: Record<string, unknown> }
+  reason: string
+  allowed_decisions: ApprovalDecision[]
+  can_update_input: boolean
+}
+
+export interface UserQuestionRequestPayload {
+  questions: InteractionQuestion[]
+  metadata?: { source?: string | null } | null
+}
+
+export interface EnterPlanModeRequestPayload {
+  message: string
+}
+
+export interface ExitPlanModeRequestPayload {
+  plan_id: string
+  plan: string
+  plan_version: number
+  allowedPrompts: Array<Record<string, unknown>>
+}
+
+interface SseInteractionBase {
+  request_id: string
+  suspension_id: string
+  schema_version: number
+}
+
+/** SSE 中需要用户处理的通用交互请求。 */
+export type SseInteraction =
+  | (SseInteractionBase & { kind: 'tool_approval'; request_payload: ToolApprovalRequestPayload })
+  | (SseInteractionBase & { kind: 'user_question'; request_payload: UserQuestionRequestPayload })
+  | (SseInteractionBase & { kind: 'enter_plan_mode'; request_payload: EnterPlanModeRequestPayload })
+  | (SseInteractionBase & { kind: 'exit_plan_mode'; request_payload: ExitPlanModeRequestPayload })
+
 /** SSE 统一事件信封。 */
 export interface SseEvent {
   type:
@@ -76,6 +149,7 @@ export interface SseEvent {
     | 'tool_use'
     | 'tool_result'
     | 'permission_request'
+    | 'interaction_request'
     | 'error'
     | 'task_snapshot'
     | string
@@ -107,6 +181,7 @@ export interface SseEvent {
     behavior?: string
     reason?: string
   }
+  interaction?: SseInteraction
   stop_reason?: string
   usage?: {
     input_tokens: number
@@ -132,6 +207,8 @@ export interface Session {
   count: number
   badge?: string
   appId?: SessionAppId
+  status?: string
+  visibility?: SessionVisibility
 }
 
 export type CliTag =
@@ -172,6 +249,7 @@ export interface Task {
 }
 
 export type ApprovalStatus = 'pending' | ApprovalDecision
+export type InteractionStatus = 'pending' | 'resolved' | 'cancelled'
 
 /** 中间对话区的消息块。 */
 export type ChatBlock =
@@ -185,6 +263,12 @@ export type ChatBlock =
       toolInput: Record<string, unknown>
       reason: string
       status: ApprovalStatus
+    }
+  | {
+      kind: 'interaction'
+      interaction: SseInteraction
+      status: InteractionStatus
+      responseLabel?: string
     }
 
 /** 控制台对话消息。 */

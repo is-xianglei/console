@@ -3,16 +3,24 @@ import { reactive } from 'vue'
 import { getWorkbenchApp } from '../constants/app-registry'
 import { SESSIONS } from '../constants/seed'
 import {
+  archiveSession,
+  cancelInteraction,
   deleteSession,
   deleteSessionList,
-  getHealthDetail,
+  getPendingInteraction,
   getSessionList,
   getSessionMessageList,
-  respondApproval,
+  respondInteraction,
   sendMessage,
+  shareSession,
   updateSession,
 } from '../http/console'
-import type { SseHandlers } from '../interfaces/console/api'
+import type {
+  InteractionRequestResponse,
+  InteractionResolutionRequest,
+  ShareSessionRequest,
+  SseHandlers,
+} from '../interfaces/console/api'
 import type {
   ApprovalDecision,
   ChatBlock,
@@ -21,6 +29,7 @@ import type {
   Session,
   SessionMessageResponse,
   SessionResponse,
+  SseInteraction,
   SubAgent,
   Task,
   TaskResponse,
@@ -30,6 +39,7 @@ import type {
 import { createSseReducer, fmtToolCall } from '@/utils/sse-reducer'
 import { usePermissionsStore } from './permissions'
 import { useSkillsStore } from './skills'
+import { useMemoriesStore } from './memories'
 
 // ===== 工具函数 =====
 const now = () => new Date().toLocaleTimeString('zh-CN', { hour12: false })
@@ -62,6 +72,27 @@ function mapSession(s: SessionResponse): Session {
     time: formatTime(s.last_active_at),
     count: 0,
     appId,
+    status: s.status,
+    visibility: s.visibility,
+  }
+}
+
+/** REST 恢复得到的待处理请求转换为与实时 SSE 相同的交互信封。 */
+function mapPendingInteraction(request: InteractionRequestResponse): SseInteraction {
+  const common = {
+    request_id: request.id,
+    suspension_id: request.suspension_id,
+    schema_version: request.schema_version,
+  }
+  switch (request.kind) {
+    case 'tool_approval':
+      return { ...common, kind: request.kind, request_payload: request.request_payload }
+    case 'user_question':
+      return { ...common, kind: request.kind, request_payload: request.request_payload }
+    case 'enter_plan_mode':
+      return { ...common, kind: request.kind, request_payload: request.request_payload }
+    case 'exit_plan_mode':
+      return { ...common, kind: request.kind, request_payload: request.request_payload }
   }
 }
 
@@ -226,6 +257,7 @@ interface ConsoleState {
 export const useConsoleStore = defineStore('console', () => {
   const permissionsStore = usePermissionsStore()
   const skillsStore = useSkillsStore()
+  const memoriesStore = useMemoriesStore()
   let activeStreamAbort: (() => void) | null = null
   let dataGeneration = 0
 
@@ -255,18 +287,7 @@ export const useConsoleStore = defineStore('console', () => {
     state.rightCollapsed = !state.rightCollapsed
   }
 
-  // ===== 后端接入:健康检查 & 会话列表 =====
-  /** 拉取后端健康状态;失败时置 'error',不抛出(避免打断启动) */
-  async function loadHealth() {
-    const generation = dataGeneration
-    try {
-      const h = await getHealthDetail()
-      if (generation === dataGeneration) state.health = h.status
-    } catch {
-      if (generation === dataGeneration) state.health = 'error'
-    }
-  }
-
+  // ===== 后端接入:会话列表 =====
   /** 拉取真实会话列表;可优先恢复 URL 指定会话,成功返回 true。 */
   async function loadSessions(preferredSessionId?: string): Promise<boolean> {
     const generation = dataGeneration
@@ -302,21 +323,49 @@ export const useConsoleStore = defineStore('console', () => {
     return /^\d+$/.test(id)
   }
 
-  /** 加载某会话的历史消息(仅后端会话);失败时清空消息不阻断 */
+  /**
+   * 加载某会话的历史消息和待处理交互。
+   * 两个请求独立降级：交互查询失败不得清掉已经成功加载的消息历史。
+   */
   async function loadMessages(id: string) {
     const generation = dataGeneration
     if (!isBackendSession(id)) {
       if (id === state.activeSessionId) state.messages = []
       return
     }
-    try {
-      const list = await getSessionMessageList(id)
-      if (generation === dataGeneration && id === state.activeSessionId) {
-        state.messages = mapMessages(list)
-      }
-    } catch {
-      if (generation === dataGeneration && id === state.activeSessionId) state.messages = []
+    const [historyResult, pendingResult] = await Promise.allSettled([
+      getSessionMessageList(id),
+      getPendingInteraction(id),
+    ])
+    if (generation !== dataGeneration || id !== state.activeSessionId) return
+
+    if (historyResult.status === 'rejected') {
+      state.messages = []
+      state.health = 'error'
+      return
     }
+
+    state.messages = mapMessages(historyResult.value)
+    if (pendingResult.status === 'rejected') {
+      state.health = 'degraded'
+      return
+    }
+
+    const pending = pendingResult.value
+    const pendingRequests = pending?.requests.filter((request) => request.status === 'pending') ?? []
+    if (pendingRequests.length) {
+      state.messages.push({
+        id: `interaction-${pending!.suspension.id}`,
+        role: 'ai',
+        time: formatTime(pending!.suspension.created_at),
+        blocks: pendingRequests.map((request) => ({
+          kind: 'interaction',
+          interaction: mapPendingInteraction(request),
+          status: 'pending',
+        })),
+      })
+    }
+    state.health = 'ok'
   }
 
   /**
@@ -342,12 +391,18 @@ export const useConsoleStore = defineStore('console', () => {
     state.busy = false
     permissionsStore.resetPermissions()
     skillsStore.resetSkills()
+    memoriesStore.resetMemories()
   }
 
   /** 清理旧身份数据后,完整加载当前工作区数据。 */
   async function reloadConsole(preferredSessionId?: string): Promise<boolean> {
     resetConsole()
-    const [, sessionsLoaded] = await Promise.all([loadHealth(), loadSessions(preferredSessionId)])
+    const generation = dataGeneration
+    const sessionsLoaded = await loadSessions(preferredSessionId)
+    if (generation === dataGeneration) {
+      if (!sessionsLoaded) state.health = 'error'
+      else if (state.health === 'unknown') state.health = 'ok'
+    }
     return sessionsLoaded
   }
 
@@ -448,6 +503,31 @@ export const useConsoleStore = defineStore('console', () => {
         state.tasks = []
         state.selectedAgentId = null
       }
+    }
+  }
+
+  /** 归档后端会话并从当前列表移除。 */
+  async function archiveSessionAction(id: string): Promise<boolean> {
+    if (!isBackendSession(id)) return false
+    try {
+      await archiveSession(id)
+      await loadSessions()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** 覆盖后端会话共享范围，并同步本地可见性。 */
+  async function shareSessionAction(id: string, payload: ShareSessionRequest): Promise<boolean> {
+    if (!isBackendSession(id)) return false
+    try {
+      const result = await shareSession(id, payload)
+      const target = state.sessions.find((session) => session.id === id)
+      if (target) target.visibility = result.visibility
+      return true
+    } catch {
+      return false
     }
   }
 
@@ -563,16 +643,11 @@ export const useConsoleStore = defineStore('console', () => {
     return true
   }
 
-  /**
-   * 对某审批卡作出裁决并恢复执行。
-   * - 把该 approval 块标记为已裁决(status),按钮随之隐藏;
-   * - 新建一条 AI 消息承接恢复流(后端 resume 会重发 turn_start,视作新回合);
-   * - POST /sessions/{id}/approvals 消费恢复流。
-   */
-  function respondApprovalAction(
+  /** 响应通用人工交互并用新 SSE 流承接恢复后的执行。 */
+  function respondInteractionAction(
     requestId: string,
-    decision: ApprovalDecision,
-    updatedInput?: Record<string, unknown>,
+    payload: InteractionResolutionRequest,
+    responseLabel: string,
   ) {
     if (state.busy) return
     const sessionId = /^\d+$/.test(state.activeSessionId)
@@ -580,13 +655,18 @@ export const useConsoleStore = defineStore('console', () => {
       : undefined
     if (sessionId === undefined) return
 
-    // 在既有消息里定位该 approval 块并置为已裁决(隐藏按钮、显示结果)。
+    // 先更新卡片状态；若建流失败，错误会紧接着渲染在新 AI 消息中。
     let matched = false
     for (const m of state.messages) {
       if (!m.blocks) continue
       for (const b of m.blocks) {
-        if (b.kind === 'approval' && b.requestId === requestId && b.status === 'pending') {
-          b.status = decision
+        if (
+          b.kind === 'interaction' &&
+          b.interaction.request_id === requestId &&
+          b.status === 'pending'
+        ) {
+          b.status = 'resolved'
+          b.responseLabel = responseLabel
           matched = true
           break
         }
@@ -600,10 +680,64 @@ export const useConsoleStore = defineStore('console', () => {
     state.messages.push({ id: uid('m'), role: 'ai', time: now(), blocks: [] })
     const ai = state.messages[state.messages.length - 1]
 
-    activeStreamAbort = respondApproval(sessionId, requestId, decision, streamHandlers(ai), {
-      updatedInput,
-      alwaysScope: 'session',
-    })
+    activeStreamAbort = respondInteraction(sessionId, requestId, payload, streamHandlers(ai))
+  }
+
+  /** 兼容旧 permission_request 卡片，并统一改走新版 interaction 恢复端点。 */
+  function respondApprovalAction(
+    requestId: string,
+    decision: ApprovalDecision,
+    updatedInput?: Record<string, unknown>,
+  ) {
+    const legacy = state.messages
+      .flatMap((message) => message.blocks ?? [])
+      .find((block) => block.kind === 'approval' && block.requestId === requestId)
+    if (!legacy || legacy.kind !== 'approval' || legacy.status !== 'pending') return
+    legacy.status = decision
+    const responseLabel = decision === 'deny'
+      ? '已拒绝该工具调用'
+      : decision === 'always_allow'
+        ? '已允许并记住本会话规则'
+        : '已允许本次执行'
+    const sessionId = /^\d+$/.test(state.activeSessionId) ? Number(state.activeSessionId) : undefined
+    if (sessionId === undefined || state.busy) return
+    state.busy = true
+    state.messages.push({ id: uid('m'), role: 'ai', time: now(), blocks: [] })
+    const ai = state.messages[state.messages.length - 1]
+    activeStreamAbort = respondInteraction(
+      sessionId,
+      requestId,
+      {
+        kind: 'tool_approval',
+        response_payload: {
+          decision,
+          updated_input: updatedInput,
+          always_scope: 'session',
+        },
+      },
+      streamHandlers(ai),
+    )
+    void responseLabel
+  }
+
+  /** 取消交互所在暂停点，不再恢复本轮执行。 */
+  async function cancelInteractionAction(requestId: string, suspensionId: string): Promise<boolean> {
+    const sessionId = /^\d+$/.test(state.activeSessionId) ? Number(state.activeSessionId) : undefined
+    if (sessionId === undefined || state.busy) return false
+    try {
+      await cancelInteraction(sessionId, suspensionId)
+      for (const message of state.messages) {
+        for (const block of message.blocks ?? []) {
+          if (block.kind === 'interaction' && block.interaction.request_id === requestId) {
+            block.status = 'cancelled'
+            block.responseLabel = '已取消本次运行'
+          }
+        }
+      }
+      return true
+    } catch {
+      return false
+    }
   }
 
   /** 首屏种子对话 */
@@ -645,7 +779,6 @@ export const useConsoleStore = defineStore('console', () => {
     state,
     toggleLeft,
     toggleRight,
-    loadHealth,
     loadSessions,
     resetConsole,
     reloadConsole,
@@ -657,10 +790,14 @@ export const useConsoleStore = defineStore('console', () => {
     setSearch,
     renameSession: renameSessionAction,
     deleteSessions: deleteSessionsAction,
+    archiveSession: archiveSessionAction,
+    shareSession: shareSessionAction,
     selectAgent,
     toggleTheme,
     dispatch,
+    respondInteraction: respondInteractionAction,
     respondApproval: respondApprovalAction,
+    cancelInteraction: cancelInteractionAction,
     seedConversation,
   }
 })

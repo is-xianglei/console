@@ -5,6 +5,7 @@ import { useToast } from '@nuxt/ui/composables'
 import { useRoute, useRouter } from 'vue-router'
 import AgentResource from './components/agent-resource/index.vue'
 import BuildResourceManager from './components/build-resource-manager/index.vue'
+import OrganizationResource from './components/organization-resource/index.vue'
 import {
   PLATFORM_MODULES,
   RESOURCE_PAGES,
@@ -75,6 +76,7 @@ const filteredRows = computed(() => {
 })
 const selectedRow = computed(() => filteredRows.value.find((row) => row.id === selectedId.value) ?? filteredRows.value[0] ?? null)
 const moduleTitle = computed(() => PLATFORM_MODULES[moduleKey.value].title)
+const organizationResource = computed(() => page.value.key as 'departments' | 'groups' | 'people')
 const statusLabel: Record<ResourceRow['status'], string> = { nominal: '正常', warning: '需关注', error: '高风险', idle: '未启用' }
 const statusColor: Record<ResourceRow['status'], 'success' | 'warning' | 'error' | 'neutral'> = {
   nominal: 'success',
@@ -244,6 +246,11 @@ onBeforeUnmount(() => {
 <template>
   <AgentResource v-if="moduleKey === 'build' && page.key === 'agents'" />
   <BuildResourceManager v-else-if="moduleKey === 'build'" :page="page" />
+  <OrganizationResource
+    v-else-if="moduleKey === 'organization' && ['departments', 'groups', 'people'].includes(page.key)"
+    :resource="organizationResource"
+    :page="page"
+  />
   <main v-else :class="$style['resource-page']">
     <header :class="$style['resource-header']">
       <div :class="$style['resource-heading']">

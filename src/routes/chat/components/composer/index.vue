@@ -30,26 +30,28 @@ function onKey(e: KeyboardEvent) {
           :rows="1"
           autoresize
           :maxrows="6"
-          placeholder="向 Agent 描述任务,回车派发…"
+          variant="none"
+          aria-label="描述任务或提出问题"
+          placeholder="描述任务或提出问题…"
           @keydown="onKey"
         />
         <div :class="$style['composer-bar']">
           <div :class="$style['bar-tools']">
-            <UButton color="neutral" variant="outline" square :class="$style['tool-btn']" title="添加附件(占位)" disabled>
-              <i class="icon icon-plus"></i>
-            </UButton>
-            <UButton color="neutral" variant="outline" :class="$style['model-chip']" title="切换模型(占位)" disabled>
-              <i class="icon icon-hexagon"></i>
+            <span :class="$style['model-chip']" aria-label="当前模型 Fable-5">
+              <UIcon name="i-lucide-hexagon" aria-hidden="true" />
               <span>Fable-5</span>
-            </UButton>
+            </span>
           </div>
           <div :class="$style['bar-actions']">
-            <span :class="$style['bar-hint']">
-              <kbd>Enter</kbd> 发送 · <kbd>⇧↵</kbd> 换行 · 实时派发右栏
-            </span>
-            <UButton square :class="$style['run-btn']" :loading="state.busy" :disabled="!text.trim()" aria-label="发送消息" @click="send">
-              <i class="icon icon-arrow-up"></i>
-            </UButton>
+            <UButton
+              icon="i-lucide-arrow-up"
+              square
+              :class="$style['run-btn']"
+              :loading="state.busy"
+              :disabled="!text.trim()"
+              aria-label="发送消息"
+              @click="send"
+            />
           </div>
         </div>
       </div>

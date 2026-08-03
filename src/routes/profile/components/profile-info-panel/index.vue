@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FormError } from '@nuxt/ui'
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { updateUser } from '@/http/auth'
+import { updateCurrentUser } from '@/http/user'
 import { useAuthStore } from '@/stores/auth'
 
 defineOptions({ name: 'ProfileInfoPanel' })
@@ -44,7 +44,7 @@ async function onSubmit() {
   if (successTimer) clearTimeout(successTimer)
 
   try {
-    await updateUser({
+    await updateCurrentUser({
       full_name: form.value.fullName || undefined,
       avatar_url: form.value.avatarUrl || undefined,
       phone: form.value.phone || undefined,

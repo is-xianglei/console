@@ -1,4 +1,4 @@
-import type { UserInfo } from './model'
+import type { UserInfo } from '../user/model'
 
 /** 用户注册请求。 */
 export interface RegisterRequest {
@@ -27,18 +27,4 @@ export interface TokenResponse {
   access_token: string
   refresh_token: string
   token_type: string
-}
-
-/** 当前用户资料更新请求。 */
-export interface UpdateUserRequest {
-  full_name?: string
-  avatar_url?: string
-  phone?: string
-  preferences?: Record<string, unknown>
-}
-
-/** 当前用户密码修改请求。 */
-export interface ChangePasswordRequest {
-  old_password: string
-  new_password: string
 }

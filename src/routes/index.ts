@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import AppsLoader from './apps/Loader.vue'
 import ChatLoader from './chat/Loader.vue'
 import LoginLoader from './login/Loader.vue'
+import MemoriesLoader from './memories/Loader.vue'
 import PlatformResourceLoader from './platform-resource/Loader.vue'
 import ProfileLoader from './profile/Loader.vue'
 import RegisterLoader from './register/Loader.vue'
@@ -47,6 +48,12 @@ const router = createRouter({
           path: 'skills',
           name: 'skills',
           component: SkillsLoader,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'memories',
+          name: 'memories',
+          component: MemoriesLoader,
           meta: { requiresAuth: true },
         },
         {

@@ -187,6 +187,16 @@ export function createSseReducer(target: SseTarget) {
         }
         break
       }
+      case 'interaction_request': {
+        if (ev.interaction) {
+          blocks.push({
+            kind: 'interaction',
+            interaction: ev.interaction,
+            status: 'pending',
+          })
+        }
+        break
+      }
       case 'error': {
         blocks.push({
           kind: 'tool',

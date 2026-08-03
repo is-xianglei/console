@@ -1,24 +1,25 @@
 import { defineStore } from 'pinia'
 import { reactive, computed } from 'vue'
-import type { UserResponse, WorkspaceResponse } from '../interfaces/auth/model'
+import type { UserInfo, UserResponse } from '../interfaces/user/model'
+import type { WorkspaceResponse } from '../interfaces/workspace/model'
 import {
   login as apiLogin,
   register as apiRegister,
   refreshToken as apiRefresh,
   switchWorkspace as apiSwitch,
-  getCurrentUser,
-  getUserWorkspaces,
 } from '../http/auth'
+import { getCurrentUser, getCurrentUserWorkspaceList } from '../http/user'
 
 const TOKEN_KEY = 'auth_token'
 const REFRESH_KEY = 'auth_refresh_token'
 const REFRESH_THRESHOLD = 5 * 60 * 1000 // Token 过期前 5 分钟刷新
 
 interface AuthState {
-  user: UserResponse | null
+  user: UserInfo | UserResponse | null
   accessToken: string | null
   refreshToken: string | null
   workspaces: WorkspaceResponse[]
+  workspaceSwitching: boolean
   loading: boolean
   initialized: boolean
 }
@@ -29,6 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken: localStorage.getItem(TOKEN_KEY),
     refreshToken: localStorage.getItem(REFRESH_KEY),
     workspaces: [],
+    workspaceSwitching: false,
     loading: false,
     initialized: false,
   })
@@ -39,7 +41,26 @@ export const useAuthStore = defineStore('auth', () => {
 
   // ===== 计算属性 =====
   const isAuthenticated = computed(() => !!state.accessToken && !!state.user)
-  const currentWorkspace = computed(() => state.workspaces[0] || null)
+  const currentWorkspaceId = computed<number | null>(() => {
+    const token = state.accessToken
+    if (!token) return null
+    try {
+      const payload = token.split('.')[1]
+      if (!payload) return null
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+      const normalized = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
+      const claims = JSON.parse(atob(normalized)) as Record<string, unknown>
+      const id = Number(claims.workspace_id ?? claims.workspaceId)
+      return Number.isInteger(id) && id > 0 ? id : null
+    } catch {
+      return null
+    }
+  })
+  const currentWorkspace = computed(() => (
+    state.workspaces.find((workspace) => workspace.id === currentWorkspaceId.value)
+    ?? state.workspaces[0]
+    ?? null
+  ))
 
   // ===== Token 管理 =====
   function setTokens(access: string, refresh: string) {
@@ -74,7 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
     state.loading = true
     try {
       const res = await apiLogin({ email, password })
-      state.user = res.user as unknown as UserResponse
+      state.user = res.user
       setTokens(res.access_token, res.refresh_token)
       state.initialized = true
       await loadWorkspaces()
@@ -93,7 +114,7 @@ export const useAuthStore = defineStore('auth', () => {
     state.loading = true
     try {
       const res = await apiRegister(payload)
-      state.user = res.user as unknown as UserResponse
+      state.user = res.user
       setTokens(res.access_token, res.refresh_token)
       state.initialized = true
       await loadWorkspaces()
@@ -110,7 +131,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** 刷新 Token */
   async function refresh(): Promise<boolean> {
-    if (!state.refreshToken) return false
+    if (!state.refreshToken || state.workspaceSwitching) return false
     try {
       const res = await apiRefresh(state.refreshToken)
       setTokens(res.access_token, res.refresh_token)
@@ -134,18 +155,26 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /** 加载用户工作区列表 */
-  async function loadWorkspaces(): Promise<void> {
+  async function loadWorkspaces(): Promise<boolean> {
     try {
-      state.workspaces = await getUserWorkspaces()
+      state.workspaces = await getCurrentUserWorkspaceList()
+      return true
     } catch {
       state.workspaces = []
+      return false
     }
   }
 
   /** 切换工作区 */
   async function switchWorkspace(workspaceId: number): Promise<void> {
-    const res = await apiSwitch(workspaceId)
-    setTokens(res.access_token, res.refresh_token)
+    if (state.workspaceSwitching) throw new Error('工作区正在切换，请稍后重试')
+    state.workspaceSwitching = true
+    try {
+      const res = await apiSwitch(workspaceId)
+      setTokens(res.access_token, res.refresh_token)
+    } finally {
+      state.workspaceSwitching = false
+    }
   }
 
   /** 初始化：从 localStorage 恢复登录状态 */
@@ -184,6 +213,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     state,
     isAuthenticated,
+    currentWorkspaceId,
     currentWorkspace,
     login,
     register,

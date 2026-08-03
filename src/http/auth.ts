@@ -1,13 +1,10 @@
 import type {
   AuthResponse,
-  ChangePasswordRequest,
   LoginRequest,
   RegisterRequest,
   TokenResponse,
-  UpdateUserRequest,
 } from '../interfaces/auth/api'
-import type { UserResponse, WorkspaceResponse } from '../interfaces/auth/model'
-import { authRequest, request } from './index'
+import { authRequest } from './index'
 
 // ===== 认证相关 API =====
 
@@ -41,32 +38,4 @@ export async function switchWorkspace(workspaceId: number): Promise<TokenRespons
     method: 'POST',
     body: JSON.stringify({ workspace_id: workspaceId }),
   })
-}
-
-// ===== 用户相关 API =====
-
-/** 获取当前用户信息 */
-export async function getCurrentUser(): Promise<UserResponse> {
-  return request<UserResponse>('/users/me')
-}
-
-/** 更新当前用户信息 */
-export async function updateUser(payload: UpdateUserRequest): Promise<UserResponse> {
-  return request<UserResponse>('/users/me', {
-    method: 'PATCH',
-    body: JSON.stringify(payload),
-  })
-}
-
-/** 修改当前用户密码 */
-export async function changePassword(payload: ChangePasswordRequest): Promise<UserResponse> {
-  return request<UserResponse>('/users/me/change-password', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  })
-}
-
-/** 获取当前用户的工作区列表 */
-export async function getUserWorkspaces(): Promise<WorkspaceResponse[]> {
-  return request<WorkspaceResponse[]>('/users/me/workspaces')
 }

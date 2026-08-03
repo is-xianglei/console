@@ -4,9 +4,19 @@ import { zh_cn } from '@nuxt/ui/locale'
 import { useRouter } from 'vue-router'
 import { useConsoleStore } from './stores/console'
 import { useAuthStore } from './stores/auth'
+import { useDepartmentsStore } from './stores/departments'
+import { useGroupsStore } from './stores/groups'
+import { useMemoriesStore } from './stores/memories'
+import { useSkillsStore } from './stores/skills'
+import { useWorkspacesStore } from './stores/workspaces'
 
 const consoleStore = useConsoleStore()
 const authStore = useAuthStore()
+const departmentsStore = useDepartmentsStore()
+const groupsStore = useGroupsStore()
+const memoriesStore = useMemoriesStore()
+const skillsStore = useSkillsStore()
+const workspacesStore = useWorkspacesStore()
 const router = useRouter()
 let lifecycleStarted = false
 
@@ -40,6 +50,18 @@ watch(
     if (authenticated) await loadConsoleForCurrentRoute()
     else consoleStore.resetConsole()
   },
+)
+
+watch(
+  () => authStore.currentWorkspaceId,
+  (workspaceId) => {
+    departmentsStore.resetDepartments(workspaceId)
+    groupsStore.resetGroups(workspaceId)
+    memoriesStore.resetMemories()
+    skillsStore.resetSkills()
+    workspacesStore.resetWorkspaces(workspaceId)
+  },
+  { immediate: true },
 )
 
 // 新会话首次派发后会由 SSE 把本地占位 id 替换成后端 id，同时规范化地址栏。

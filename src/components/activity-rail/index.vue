@@ -17,6 +17,7 @@ let resizeFrame = 0
 
 const items = [
   { key: 'workbench', label: '应用会话', icon: 'message-square-more', to: '/chat' },
+  { key: 'memories', label: '长期记忆', icon: 'brain', to: '/memories' },
   { key: 'build', label: '构建资源', icon: 'boxes', to: '/platform/build/agents' },
   { key: 'market', label: '应用市场', icon: 'store', to: '/apps' },
   { key: 'governance', label: '治理控制台', icon: 'shield-check', to: '/platform/governance/policies' },
@@ -25,6 +26,7 @@ const items = [
 
 const activeModule = computed(() => {
   if (route.name === 'chat') return 'workbench'
+  if (route.name === 'memories') return 'memories'
   if (route.name === 'apps') return 'market'
   if (route.name === 'skills') return 'build'
   if (route.name === 'platform-resource') return route.params.module

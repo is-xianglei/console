@@ -60,4 +60,115 @@ describe('createSseReducer', () => {
     expect(onSessionId).toHaveBeenCalledOnce()
     expect(onSessionId).toHaveBeenCalledWith(42)
   })
+
+  it('把通用人工交互事件转换为可渲染的交互卡', () => {
+    const ai: ChatMessage = { id: 'ai-3', role: 'ai', time: '10:02', blocks: [] }
+    const reducer = createSseReducer({
+      ai,
+      agents: [],
+      selectAgent: vi.fn(),
+    })
+
+    reducer.handle(createEvent('interaction_request', {
+      actor: { role: 'orchestrator', name: 'orchestrator' },
+      interaction: {
+        request_id: 'request-1',
+        suspension_id: 'suspension-1',
+        kind: 'tool_approval',
+        schema_version: 1,
+        request_payload: {
+          tool: { id: 'tool-1', name: 'Bash', input: { command: 'pwd' } },
+          reason: '危险工具默认需审批',
+          allowed_decisions: ['allow_once', 'always_allow', 'deny'],
+          can_update_input: true,
+        },
+      },
+    }))
+
+    expect(ai.blocks).toEqual([{
+      kind: 'interaction',
+      interaction: expect.objectContaining({ request_id: 'request-1', kind: 'tool_approval' }),
+      status: 'pending',
+    }])
+  })
+
+  it('渲染思考、工具调用与流内错误', () => {
+    const ai: ChatMessage = { id: 'ai-4', role: 'ai', time: '10:03', blocks: [] }
+    const reducer = createSseReducer({ ai, agents: [], selectAgent: vi.fn() })
+
+    reducer.handle(createEvent('block_start', { block: { index: 0, block_type: 'thinking' } }))
+    reducer.handle(createEvent('thinking_delta', { block: { index: 0 }, text: '正在分析' }))
+    reducer.handle(createEvent('block_stop', { block: { index: 0 } }))
+    reducer.handle(createEvent('tool_use', {
+      tool: { id: 'tool-1', name: 'Search', input: { query: 'pump-01' } },
+    }))
+    reducer.handle(createEvent('tool_result', {
+      tool: { id: 'tool-1', name: 'Search', output: '找到 2 条记录', is_error: false },
+    }))
+    reducer.handle(createEvent('error', {
+      error: { code: 'MODEL_TIMEOUT', message: '模型超时', retriable: true, fatal: false },
+    }))
+
+    expect(ai.blocks).toEqual([
+      { kind: 'think', text: '正在分析', duration: '推理完成', collapsed: true },
+      {
+        kind: 'tool',
+        tag: 'RESULT',
+        fn: 'Search(query="pump-01")',
+        body: '找到 2 条记录',
+        done: true,
+      },
+      { kind: 'tool', tag: 'ERROR', fn: 'MODEL_TIMEOUT', body: '模型超时', done: true },
+    ])
+  })
+
+  it('透传会话任务全量快照', () => {
+    const onTaskSnapshot = vi.fn()
+    const reducer = createSseReducer({
+      ai: { id: 'ai-5', role: 'ai', time: '10:04', blocks: [] },
+      agents: [],
+      selectAgent: vi.fn(),
+      onTaskSnapshot,
+    })
+    const tasks = [{
+      id: 8,
+      session_id: 12,
+      subject: '根因分析',
+      description: '检查振动数据',
+      status: 'in_progress',
+      owner: 'research',
+      blocked_by: [],
+      created_at: '2026-08-01T00:00:00Z',
+      updated_at: '2026-08-01T00:00:01Z',
+    }]
+
+    reducer.handle(createEvent('task_snapshot', { data: { session_id: 12, tasks } }))
+
+    expect(onTaskSnapshot).toHaveBeenCalledWith(tasks)
+  })
+
+  it('累加子代理增量并收束运行状态', () => {
+    const agents: Parameters<typeof createSseReducer>[0]['agents'] = []
+    const selectAgent = vi.fn()
+    const reducer = createSseReducer({
+      ai: { id: 'ai-6', role: 'ai', time: '10:05', blocks: [] },
+      agents,
+      selectAgent,
+    })
+    const actor = { role: 'subagent' as const, name: 'research', run_id: 'run-1', task: '调查振动历史' }
+
+    reducer.handle(createEvent('turn_start', { actor }))
+    reducer.handle(createEvent('block_start', { actor, block: { index: 1, block_type: 'text' } }))
+    reducer.handle(createEvent('text_delta', { actor, block: { index: 1 }, text: '调查完成' }))
+    reducer.handle(createEvent('block_stop', { actor, block: { index: 1 } }))
+    reducer.handle(createEvent('turn_end', { actor }))
+
+    expect(selectAgent).toHaveBeenCalledWith('run-1')
+    expect(agents).toEqual([expect.objectContaining({
+      id: 'run-1',
+      status: 'done',
+      progress: 100,
+      stream: [{ kind: 'answer', text: '调查完成' }],
+    })])
+  })
 })

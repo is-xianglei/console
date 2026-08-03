@@ -25,6 +25,7 @@ const mobileRightOpen = ref(false)
 
 const commandItems = [
   { label: '应用会话工作台', meta: 'WORKBENCH', icon: 'message-square-more', to: '/chat' },
+  { label: '长期记忆', meta: 'MEMORY', icon: 'brain', to: '/memories' },
   { label: 'Agents', meta: 'BUILD RESOURCE', icon: 'bot', to: '/platform/build/agents' },
   { label: 'Teams', meta: 'BUILD RESOURCE', icon: 'network', to: '/platform/build/teams' },
   { label: 'Models', meta: 'BUILD RESOURCE', icon: 'cpu', to: '/platform/build/models' },
@@ -52,8 +53,8 @@ const moduleContext = computed<PlatformModuleKey | null>(() => {
   const module = String(route.params.module)
   return module === 'build' || module === 'governance' || module === 'organization' ? module : null
 })
-const healthDot = computed(() => state.health === 'ok' ? 'nominal' : state.health === 'unknown' ? 'idle' : 'error')
-const healthText = computed(() => state.health === 'ok' ? 'SYSTEM NOMINAL' : state.health === 'unknown' ? 'CONNECTING…' : 'BACKEND OFFLINE')
+const healthDot = computed(() => state.health === 'ok' ? 'nominal' : state.health === 'degraded' ? 'warning' : state.health === 'unknown' ? 'idle' : 'error')
+const healthText = computed(() => state.health === 'ok' ? 'SYSTEM NOMINAL' : state.health === 'degraded' ? 'PARTIAL SERVICE' : state.health === 'unknown' ? 'CONNECTING…' : 'BACKEND OFFLINE')
 const filteredCommands = computed(() => {
   const query = commandQuery.value.trim().toLowerCase()
   if (!query) return commandItems

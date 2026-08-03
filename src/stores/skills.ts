@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
 import { ApiError } from '../http'
-import { createSkill, deleteSkill, getSkillDetail, getSkillList } from '../http/skill'
+import { createSkill, deleteSkill, getSkillDetail, getSkillList, validateSkill } from '../http/skill'
 import type { SkillDetailResponse, SkillResponse } from '../interfaces/skill/model'
 
 interface SkillsState {
@@ -78,6 +78,13 @@ export const useSkillsStore = defineStore('skills', () => {
     const generation = dataGeneration
     state.skillUploading = true
     try {
+      const validation = await validateSkill(file)
+      if (generation !== dataGeneration) return null
+      if (!validation.ok) {
+        return validation.errors.length
+          ? `校验失败：${validation.errors.join('；')}`
+          : '校验失败：Skill 包不符合要求'
+      }
       const created = await createSkill(file)
       if (generation !== dataGeneration) return null
       await loadSkills()

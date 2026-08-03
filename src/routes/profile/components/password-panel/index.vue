@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FormError } from '@nuxt/ui'
 import { onBeforeUnmount, ref } from 'vue'
-import { changePassword } from '@/http/auth'
+import { changeCurrentUserPassword } from '@/http/user'
 
 defineOptions({ name: 'PasswordPanel' })
 
@@ -32,7 +32,7 @@ async function onSubmit() {
   loading.value = true
   if (successTimer) clearTimeout(successTimer)
   try {
-    await changePassword({
+    await changeCurrentUserPassword({
       old_password: form.value.oldPassword,
       new_password: form.value.newPassword,
     })

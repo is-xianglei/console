@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import PasswordPanel from '@/routes/profile/components/password-panel/index.vue'
 import ProfileInfoPanel from '@/routes/profile/components/profile-info-panel/index.vue'
@@ -10,7 +11,17 @@ defineOptions({ name: 'ProfilePage' })
 type ProfileTab = 'profile' | 'password' | 'workspaces'
 
 const authStore = useAuthStore()
-const activeTab = ref<ProfileTab>('profile')
+const route = useRoute()
+const router = useRouter()
+const activeTab = computed<ProfileTab>({
+  get: () => {
+    const tab = route.query.tab
+    return tab === 'password' || tab === 'workspaces' ? tab : 'profile'
+  },
+  set: (tab) => {
+    void router.replace({ query: { ...route.query, tab } })
+  },
+})
 const user = computed(() => authStore.state.user)
 const tabs: { id: ProfileTab; value: ProfileTab; label: string }[] = [
   { id: 'profile', value: 'profile', label: '个人信息' },

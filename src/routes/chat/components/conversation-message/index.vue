@@ -2,6 +2,7 @@
 import type { ChatMessage } from '@/interfaces'
 import AnswerBlock from '../answer-block/index.vue'
 import ApprovalCard from '../approval-card/index.vue'
+import InteractionCard from '../interaction-card/index.vue'
 import ThinkingBlock from '../thinking-block/index.vue'
 import ToolCallCard from '../tool-call-card/index.vue'
 
@@ -45,6 +46,12 @@ defineProps<{ message: ChatMessage; busy: boolean }>()
             :tool-input="block.toolInput"
             :reason="block.reason"
             :status="block.status"
+          />
+          <InteractionCard
+            v-else-if="block.kind === 'interaction'"
+            :interaction="block.interaction"
+            :status="block.status"
+            :response-label="block.responseLabel"
           />
           <AnswerBlock
             v-else-if="block.kind === 'answer'"
