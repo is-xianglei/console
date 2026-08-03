@@ -1,0 +1,150 @@
+.page {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px var(--page-gutter) 28px;
+  background: var(--bg-deep);
+}
+
+.header {
+  display: flex;
+  width: 100%;
+  max-width: var(--page-content-max);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 auto 18px;
+}
+
+.heading {
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header h1 {
+  margin: 3px 0 4px;
+  color: var(--text-primary);
+  font-size: var(--page-title-size);
+  line-height: 1.2;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.kicker,
+.expiry {
+  color: var(--text-dim);
+  font-size: 9px;
+}
+
+.recordCount {
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.actions > button {
+  min-height: 36px;
+  border-radius: var(--radius-control);
+}
+
+.layout {
+  width: 100%;
+  max-width: var(--page-content-max);
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+}
+
+.layout.inspectorOpen {
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 36%, 440px);
+}
+
+.mobileSwitch {
+  display: none;
+  width: 100%;
+  max-width: var(--page-content-max);
+  margin: 0 auto 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-panel);
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 920px) {
+  .page {
+    padding: 16px;
+  }
+
+  .layout,
+  .layout.inspectorOpen {
+    display: block;
+  }
+
+  .mobileSwitch {
+    display: block;
+  }
+
+  .mobileHidden {
+    display: none !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 14px 12px calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+
+  .actions > button:first-child {
+    flex: 1;
+  }
+}

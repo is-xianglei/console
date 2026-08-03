@@ -1,0 +1,23 @@
+.warning {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  color: var(--text-secondary);
+}
+
+.warning :global(.iconify) {
+  margin-top: 2px;
+  color: var(--status-warning);
+  font-size: 18px;
+}
+
+.warning p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.input {
+  width: 100%;
+}
