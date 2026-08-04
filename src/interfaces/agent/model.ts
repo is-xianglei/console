@@ -95,6 +95,22 @@ export interface McpServerOption {
 }
 
 export interface AgentValidationIssue {
-  section: 'identity' | 'prompt' | 'model' | 'capabilities' | 'policy'
+  section: 'identity' | 'prompt' | 'model' | 'capabilities'
   message: string
+}
+
+/** Agent 创建与编辑页使用的表单模型，仅包含后端可持久化字段。 */
+export interface AgentFormModel {
+  id: number | null
+  workspaceId: number | null
+  createdByUserId: number | null
+  name: string
+  description: string
+  systemPrompt: string
+  modelName: string
+  isEnabled: boolean
+  toolIds: number[]
+  skillIds: number[]
+  createdAt: string
+  updatedAt: string
 }

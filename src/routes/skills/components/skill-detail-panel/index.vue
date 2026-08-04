@@ -26,10 +26,7 @@ const frontmatterRows = computed(() => {
   }))
 })
 
-const statusLabel: Record<string, string> = {
-  enabled: '已启用',
-  disabled: '已禁用',
-}
+const resources = computed(() => state.skillDetail?.resources ?? [])
 
 function formatBytes(size: number): string {
   if (size < 1024) return `${size} B`
@@ -70,9 +67,6 @@ function formatTime(iso: string): string {
             <span v-if="state.skillDetail.version" class="mono" :class="$style['sk-ver']">
               v{{ state.skillDetail.version }}
             </span>
-            <span :class="[$style['sk-badge'], $style[state.skillDetail.status]]">
-              {{ statusLabel[state.skillDetail.status] ?? state.skillDetail.status }}
-            </span>
           </div>
           <p :class="$style['sk-detail-desc']">{{ state.skillDetail.description }}</p>
         </header>
@@ -83,8 +77,8 @@ function formatTime(iso: string): string {
             <span class="mono" :class="$style['sk-meta-v']">{{ state.skillDetail.scope }}</span>
           </div>
           <div :class="$style['sk-meta']">
-            <span :class="$style['sk-meta-k']">状态</span>
-            <span class="mono" :class="$style['sk-meta-v']">{{ state.skillDetail.status }}</span>
+            <span :class="$style['sk-meta-k']">工作区 ID</span>
+            <span class="mono" :class="$style['sk-meta-v']">{{ state.skillDetail.workspace_id }}</span>
           </div>
           <div :class="$style['sk-meta']">
             <span :class="$style['sk-meta-k']">创建时间</span>
@@ -106,14 +100,14 @@ function formatTime(iso: string): string {
           </div>
         </section>
 
-        <section v-if="state.skillDetail.resources.length" :class="$style['sk-section']">
+        <section v-if="resources.length" :class="$style['sk-section']">
           <div :class="$style['sk-section-title']">
-            资源清单 <span class="mono" :class="$style['sk-count']">{{ state.skillDetail.resources.length }}</span>
+            资源清单 <span class="mono" :class="$style['sk-count']">{{ resources.length }}</span>
           </div>
           <div :class="$style['sk-cli']">
             <div class="mono" :class="$style['sk-cli-head']">┌─ [ RESOURCES ] ─────────────────────</div>
             <div
-              v-for="resource in state.skillDetail.resources"
+              v-for="resource in resources"
               :key="resource.relative_path"
               class="mono"
               :class="$style['sk-cli-row']"

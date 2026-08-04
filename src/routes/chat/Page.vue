@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { getWorkbenchApp } from '@/constants'
 import { useRuntimePaneResize } from '@/hooks'
 import type { WorkbenchMode } from '@/interfaces'
+import { useAgentsStore } from '@/stores/agents'
 import { useConsoleStore } from '@/stores/console'
 import AppRuntimePanel from './components/app-runtime-panel/index.vue'
 import ConversationPane from './components/conversation-pane/index.vue'
@@ -11,6 +12,7 @@ import WorkbenchHeader from './components/workbench-header/index.vue'
 defineOptions({ name: 'ChatPage' })
 
 const { state, setWorkbenchMode } = useConsoleStore()
+const agentsStore = useAgentsStore()
 const {
   workArea,
   resizing,
@@ -28,6 +30,11 @@ const {
 const activeSession = computed(() =>
   state.sessions.find((session) => session.id === state.activeSessionId),
 )
+const activeAgentLabel = computed(() => {
+  const agentId = activeSession.value?.agentId ?? state.newSessionAgentId
+  if (!agentId) return '平台默认 Agent'
+  return agentsStore.state.items.find((agent) => agent.id === agentId)?.name ?? `Agent #${agentId}`
+})
 const activeApp = computed(() => getWorkbenchApp(state.activeAppId))
 const effectiveMode = computed<WorkbenchMode>(() => {
   if (!activeApp.value) return 'chat'
@@ -49,6 +56,7 @@ watch(effectiveMode, (mode) => {
     <WorkbenchHeader
       :active-app="activeApp"
       :active-session="activeSession"
+      :agent-label="activeAgentLabel"
       :mode="effectiveMode"
       :split-available="splitAvailable"
       @select-mode="setWorkbenchMode"

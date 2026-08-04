@@ -7,6 +7,7 @@ defineOptions({ name: 'WorkbenchHeader' })
 const props = defineProps<{
   activeApp?: WorkbenchApp
   activeSession?: Session
+  agentLabel: string
   mode: WorkbenchMode
   splitAvailable: boolean
 }>()
@@ -55,7 +56,7 @@ function selectMode(value: string | number) {
       aria-label="工作台视图"
       @update:model-value="selectMode"
     />
-    <div v-else :class="$style['conv-model']"><span class="dot think"></span> Fable-5 · MYTHOS</div>
+    <div v-else :class="$style['conv-model']"><span class="dot think"></span>{{ activeSession?.agentId ? agentLabel : activeSession?.modelName || agentLabel }}</div>
     <span :class="$style['mode-announcer']" aria-live="polite">{{ modeDescriptions[mode] }}</span>
   </header>
 </template>

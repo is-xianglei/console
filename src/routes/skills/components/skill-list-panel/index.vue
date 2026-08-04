@@ -11,11 +11,6 @@ const uploadError = ref('')
 const uploadFile = ref<File | null>(null)
 const pendingDeleteName = ref<string | null>(null)
 
-const statusLabel: Record<string, string> = {
-  enabled: '已启用',
-  disabled: '已禁用',
-}
-
 async function handleFile(file: File | undefined) {
   if (!file) return
   uploadError.value = ''
@@ -123,14 +118,11 @@ async function onDeleteConfirm() {
             <span :class="$style['sk-row-main']">
               <span class="mono" :class="$style['sk-row-name']">{{ skill.name }}</span>
               <span :class="$style['sk-row-desc']">{{ skill.description }}</span>
+              <span class="mono" :class="$style['sk-row-desc']">
+                {{ skill.scope }} · WS #{{ skill.workspace_id }}
+              </span>
             </span>
             <span v-if="skill.version" class="mono" :class="$style['sk-ver']">v{{ skill.version }}</span>
-            <span
-              :class="$style['sk-status']"
-              :title="statusLabel[skill.status] ?? skill.status"
-            >
-              <span class="dot" :class="skill.status === 'enabled' ? 'nominal' : 'idle'"></span>
-            </span>
           </UButton>
           <div :class="$style['sk-row-actions']">
             <UTooltip text="删除技能">

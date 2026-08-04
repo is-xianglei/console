@@ -508,7 +508,7 @@
   }
 
   .ag-tool-head > span:nth-child(3),
-.ag-tool-row > em {
+.ag-tool-row > span:nth-child(3) {
     display: none;
   }
 }

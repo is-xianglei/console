@@ -5,15 +5,16 @@ export interface SessionResponse {
   id: number
   title: string
   status: string
-  model_name: string | null
-  system_prompt: string | null
-  user_id: number | null
-  workspace_id: number | null
-  visibility: SessionVisibility
-  shared_with: number[]
-  shared_with_departments: number[]
-  shared_with_groups: number[]
-  metadata: Record<string, unknown>
+  model_name?: string | null
+  system_prompt?: string | null
+  user_id?: number | null
+  workspace_id?: number | null
+  agent_id?: number | null
+  visibility: string
+  shared_with?: number[]
+  shared_with_departments?: number[]
+  shared_with_groups?: number[]
+  metadata?: Record<string, unknown>
   created_at: string
   updated_at: string
   last_active_at: string
@@ -29,10 +30,10 @@ export interface SessionShareTargets {
 
 export interface SessionShareResult {
   session_id: number
-  visibility: SessionVisibility
-  users: number[]
-  departments: number[]
-  groups: number[]
+  visibility: string
+  users?: number[]
+  departments?: number[]
+  groups?: number[]
 }
 
 /** 助手消息中持久化的内容块。 */
@@ -54,7 +55,7 @@ export interface SessionMessageResponse {
   session_id: number
   turn_id?: string | null
   role: 'user' | 'assistant' | 'tool' | string
-  content: string | MsgContentBlock[]
+  content: unknown
   token_estimate: number
   created_at: string
 }
@@ -207,8 +208,13 @@ export interface Session {
   count: number
   badge?: string
   appId?: SessionAppId
+  agentId?: number | null
+  modelName?: string | null
   status?: string
   visibility?: SessionVisibility
+  sharedWith?: number[]
+  sharedWithDepartments?: number[]
+  sharedWithGroups?: number[]
 }
 
 export type CliTag =

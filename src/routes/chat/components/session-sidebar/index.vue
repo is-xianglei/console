@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import type { DropdownMenuItem } from '@nuxt/ui'
+import type { DropdownMenuItem, FormError } from '@nuxt/ui'
 import { useToast } from '@nuxt/ui/composables'
 import { useRoute, useRouter } from 'vue-router'
 import WorkspaceSelector from '@/components/workspace-selector/index.vue'
 import { WORKBENCH_APPS } from '@/constants'
 import type { Session, SessionAppId } from '@/interfaces'
 import { useConsoleStore } from '@/stores/console'
+import { parseShareIdList } from '@/utils/session-share'
 
 defineOptions({ name: 'SessionSidebar' })
 
@@ -148,27 +149,38 @@ function requestDelete(ids: string[]) {
 function openShare(session: Session) {
   sharingSession.value = session
   shareForm.visibility = session.visibility ?? 'private'
-  shareForm.users = ''
-  shareForm.departments = ''
-  shareForm.groups = ''
+  shareForm.users = (session.sharedWith ?? []).join(', ')
+  shareForm.departments = (session.sharedWithDepartments ?? []).join(', ')
+  shareForm.groups = (session.sharedWithGroups ?? []).join(', ')
 }
 
-function parseIdList(value: string): number[] {
-  return [...new Set(value.split(',')
-    .map((item) => Number(item.trim()))
-    .filter((item) => Number.isInteger(item) && item > 0))]
+function validateShare(values: Partial<typeof shareForm>): FormError[] {
+  const fields = [
+    ['users', '用户 ID'],
+    ['departments', '部门 ID'],
+    ['groups', '群组 ID'],
+  ] as const
+  return fields.flatMap(([name, label]) => (
+    parseShareIdList(values[name] ?? '') === null
+      ? [{ name, message: `${label}必须是用逗号分隔的正整数` }]
+      : []
+  ))
 }
 
 async function confirmShare() {
   const session = sharingSession.value
   if (!session || sharing.value) return
+  const users = parseShareIdList(shareForm.users)
+  const departments = parseShareIdList(shareForm.departments)
+  const groups = parseShareIdList(shareForm.groups)
+  if (!users || !departments || !groups) return
   sharing.value = true
   const ok = await consoleStore.shareSession(session.id, {
     visibility: shareForm.visibility,
     share_with: {
-      users: parseIdList(shareForm.users),
-      departments: parseIdList(shareForm.departments),
-      groups: parseIdList(shareForm.groups),
+      users,
+      departments,
+      groups,
     },
   })
   sharing.value = false
@@ -438,7 +450,7 @@ async function confirmDelete() {
       @update:open="(open) => { if (!open) sharingSession = null }"
     >
       <template #body>
-        <UForm :state="shareForm" :class="$style['share-form']" @submit="confirmShare">
+        <UForm id="session-share-form" :state="shareForm" :validate="validateShare" :class="$style['share-form']" @submit="confirmShare">
           <UFormField label="可见性" name="visibility">
             <USelect v-model="shareForm.visibility" :items="visibilityItems" value-key="value" class="w-full" />
           </UFormField>
@@ -455,7 +467,7 @@ async function confirmDelete() {
       </template>
       <template #footer>
         <UButton color="neutral" variant="outline" label="取消" @click="sharingSession = null" />
-        <UButton label="保存共享" icon="i-lucide-share-2" :loading="sharing" @click="confirmShare" />
+        <UButton type="submit" form="session-share-form" label="保存共享" icon="i-lucide-share-2" :loading="sharing" />
       </template>
     </UModal>
   </aside>

@@ -1,6 +1,6 @@
 import type { ApiResponse } from '../interfaces/common/api'
 
-/** 后端基址前缀。开发期由 vite.config.ts 的 /api 代理转发到 :8000;
+/** 后端基址前缀。开发期由 vite.config.ts 的 /api 代理转发到 :8001;
  *  生产期同源部署也走 /api。需要改基址时只动这里。 */
 const BASE = '/api'
 

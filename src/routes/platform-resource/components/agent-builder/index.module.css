@@ -316,6 +316,7 @@ button.active {
   .ag-builder-nav > button {
     width: auto;
     min-width: 112px;
+    min-height: 40px;
     grid-template-columns: 14px minmax(0, 1fr) auto;
   }
 
@@ -348,7 +349,7 @@ button.active {
   }
 
   .ag-builder-actions .ag-primary-button {
-    min-height: 34px;
+    min-height: 40px;
     padding: 0 10px;
   }
 }
@@ -357,6 +358,21 @@ button.active {
 
   .ag-builder-title h1 {
     max-width: 120px;
+  }
+
+  .ag-builder-nav > button {
+    min-width: 87px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ag-builder-nav .ag-nav-index,
+  .ag-builder-nav .ag-nav-complete {
+    display: none;
+  }
+
+  .ag-builder-nav > button > span:nth-child(3) {
+    grid-column: 1;
+    text-align: center;
   }
 }
 .ag-builder,

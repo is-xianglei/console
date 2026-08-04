@@ -123,6 +123,7 @@
 }
 
 .sk-upload-err {
+  width: calc(100% - 24px);
   margin: 0 12px 4px;
   padding: 8px 10px;
   border: 1px solid color-mix(in srgb, var(--status-error) 30%, transparent);

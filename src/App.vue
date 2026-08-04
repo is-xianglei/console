@@ -4,6 +4,7 @@ import { zh_cn } from '@nuxt/ui/locale'
 import { useRouter } from 'vue-router'
 import { useConsoleStore } from './stores/console'
 import { useAuthStore } from './stores/auth'
+import { useAgentsStore } from './stores/agents'
 import { useDepartmentsStore } from './stores/departments'
 import { useGroupsStore } from './stores/groups'
 import { useMemoriesStore } from './stores/memories'
@@ -12,6 +13,7 @@ import { useWorkspacesStore } from './stores/workspaces'
 
 const consoleStore = useConsoleStore()
 const authStore = useAuthStore()
+const agentsStore = useAgentsStore()
 const departmentsStore = useDepartmentsStore()
 const groupsStore = useGroupsStore()
 const memoriesStore = useMemoriesStore()
@@ -55,6 +57,7 @@ watch(
 watch(
   () => authStore.currentWorkspaceId,
   (workspaceId) => {
+    agentsStore.resetAgents()
     departmentsStore.resetDepartments(workspaceId)
     groupsStore.resetGroups(workspaceId)
     memoriesStore.resetMemories()

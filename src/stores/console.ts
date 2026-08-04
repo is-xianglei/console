@@ -29,6 +29,7 @@ import type {
   Session,
   SessionMessageResponse,
   SessionResponse,
+  SessionVisibility,
   SseInteraction,
   SubAgent,
   Task,
@@ -58,9 +59,15 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
 }
 
+function normalizeVisibility(value: string): SessionVisibility {
+  if (value === 'workspace' || value === 'public') return value
+  return 'private'
+}
+
 /** 后端 SessionResponse → 前端 Session 视图模型 */
 function mapSession(s: SessionResponse): Session {
-  const metadataAppId = s.metadata.app_id ?? s.metadata.appId
+  const metadata = s.metadata ?? {}
+  const metadataAppId = metadata.app_id ?? metadata.appId
   const appId = typeof metadataAppId === 'string'
     ? metadataAppId.trim() || undefined
     : typeof metadataAppId === 'number'
@@ -72,8 +79,13 @@ function mapSession(s: SessionResponse): Session {
     time: formatTime(s.last_active_at),
     count: 0,
     appId,
+    agentId: s.agent_id ?? null,
+    modelName: s.model_name ?? null,
     status: s.status,
-    visibility: s.visibility,
+    visibility: normalizeVisibility(s.visibility),
+    sharedWith: [...(s.shared_with ?? [])],
+    sharedWithDepartments: [...(s.shared_with_departments ?? [])],
+    sharedWithGroups: [...(s.shared_with_groups ?? [])],
   }
 }
 
@@ -96,15 +108,38 @@ function mapPendingInteraction(request: InteractionRequestResponse): SseInteract
   }
 }
 
-/** 把后端 content 归一化为内容块数组:
- *  数组原样;单个块对象({type:...})包成单元素数组;其它(字符串/空)→ 空数组。
- *  避免"裸对象 content"被 Array.isArray 判否而误当空消息。 */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeBlock(value: unknown): MsgContentBlock | null {
+  if (typeof value === 'string') return value ? { type: 'text', text: value } : null
+  if (!isRecord(value) || typeof value.type !== 'string') return null
+
+  const block: MsgContentBlock = { type: value.type }
+  if (typeof value.thinking === 'string') block.thinking = value.thinking
+  if (typeof value.text === 'string') block.text = value.text
+  if (typeof value.id === 'string') block.id = value.id
+  if (typeof value.name === 'string') block.name = value.name
+  if (isRecord(value.input)) block.input = value.input
+  if (typeof value.tool_use_id === 'string') block.tool_use_id = value.tool_use_id
+  if ('content' in value) block.content = value.content
+  if (typeof value.is_error === 'boolean') block.is_error = value.is_error
+  return block
+}
+
+/** 把开放结构的历史 content 归一化为经过字段校验的内容块数组。 */
 function normalizeBlocks(content: unknown): MsgContentBlock[] {
-  if (Array.isArray(content)) return content as MsgContentBlock[]
-  if (content && typeof content === 'object' && 'type' in content) {
-    return [content as MsgContentBlock]
-  }
-  return []
+  const values = Array.isArray(content) ? content : [content]
+  return values.map(normalizeBlock).filter((block): block is MsgContentBlock => block !== null)
+}
+
+function messageText(content: unknown): string {
+  if (typeof content === 'string') return content
+  return normalizeBlocks(content)
+    .filter((block) => block.type === 'text' && block.text)
+    .map((block) => block.text)
+    .join('\n')
 }
 
 /** tool_result 的 content 提取为可展示文本(字符串/Anthropic 文本块数组/对象兜底 JSON)。 */
@@ -150,7 +185,7 @@ function mapMessages(list: SessionMessageResponse[]): ChatMessage[] {
     const time = formatTime(m.created_at)
 
     if (m.role === 'user') {
-      const text = typeof m.content === 'string' ? m.content : ''
+      const text = messageText(m.content)
       if (text) out.push({ id: 'm-' + m.id, role: 'user', time, text })
       continue
     }
@@ -242,6 +277,7 @@ interface ConsoleState {
   messages: ChatMessage[]
   agents: SubAgent[]
   selectedAgentId: string | null
+  newSessionAgentId: number | null
   tasks: Task[]
   busy: boolean
   theme: 'dark' | 'light'
@@ -274,6 +310,7 @@ export const useConsoleStore = defineStore('console', () => {
     messages: [],
     agents: [],
     selectedAgentId: null,
+    newSessionAgentId: null,
     tasks: [],
     busy: false,
     theme: 'dark',
@@ -308,6 +345,7 @@ export const useConsoleStore = defineStore('console', () => {
       state.agents = []
       state.tasks = []
       state.selectedAgentId = null
+      state.newSessionAgentId = null
       if (state.activeSessionId) await loadMessages(state.activeSessionId)
       return true
     } catch {
@@ -387,6 +425,7 @@ export const useConsoleStore = defineStore('console', () => {
     state.messages = []
     state.agents = []
     state.selectedAgentId = null
+    state.newSessionAgentId = null
     state.tasks = []
     state.busy = false
     permissionsStore.resetPermissions()
@@ -415,6 +454,7 @@ export const useConsoleStore = defineStore('console', () => {
     state.agents = []
     state.tasks = []
     state.selectedAgentId = null
+    state.newSessionAgentId = null
     loadMessages(id)
   }
   function newSession(appId?: Session['appId']) {
@@ -433,6 +473,14 @@ export const useConsoleStore = defineStore('console', () => {
     state.agents = []
     state.tasks = []
     state.selectedAgentId = null
+    state.newSessionAgentId = null
+  }
+
+  function setNewSessionAgent(agentId: number | null) {
+    if (isBackendSession(state.activeSessionId)) return
+    state.newSessionAgentId = agentId
+    const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
+    if (localSession) localSession.agentId = agentId
   }
   function setSearch(v: string) {
     state.search = v
@@ -449,6 +497,7 @@ export const useConsoleStore = defineStore('console', () => {
       state.agents = []
       state.tasks = []
       state.selectedAgentId = null
+      state.newSessionAgentId = null
       if (appSession) void loadMessages(appSession.id)
     }
   }
@@ -502,6 +551,7 @@ export const useConsoleStore = defineStore('console', () => {
         state.agents = []
         state.tasks = []
         state.selectedAgentId = null
+        state.newSessionAgentId = null
       }
     }
   }
@@ -521,10 +571,18 @@ export const useConsoleStore = defineStore('console', () => {
   /** 覆盖后端会话共享范围，并同步本地可见性。 */
   async function shareSessionAction(id: string, payload: ShareSessionRequest): Promise<boolean> {
     if (!isBackendSession(id)) return false
+    const generation = dataGeneration
+    const expectedSessionId = Number(id)
     try {
       const result = await shareSession(id, payload)
+      if (generation !== dataGeneration || result.session_id !== expectedSessionId) return false
       const target = state.sessions.find((session) => session.id === id)
-      if (target) target.visibility = result.visibility
+      if (target) {
+        target.visibility = normalizeVisibility(result.visibility)
+        target.sharedWith = [...(result.users ?? payload.share_with?.users ?? [])]
+        target.sharedWithDepartments = [...(result.departments ?? payload.share_with?.departments ?? [])]
+        target.sharedWithGroups = [...(result.groups ?? payload.share_with?.groups ?? [])]
+      }
       return true
     } catch {
       return false
@@ -550,7 +608,7 @@ export const useConsoleStore = defineStore('console', () => {
   }
 
   /** 为一条 AI 消息构造 SSE 归约器(dispatch 与 respondApproval 共用)。 */
-  function buildReducer(ai: ChatMessage) {
+  function buildReducer(ai: ChatMessage, configuredAgentId?: number) {
     return createSseReducer({
       ai,
       agents: state.agents,
@@ -572,10 +630,12 @@ export const useConsoleStore = defineStore('console', () => {
               time: '刚刚',
               count: 0,
               appId: state.activeAppId ?? undefined,
+              agentId: configuredAgentId ?? null,
             })
           }
           state.activeSessionId = idStr
         }
+        state.newSessionAgentId = null
       },
       // 任务全量快照:随 SSE 流实时到达,直接整体替换任务面板
       onTaskSnapshot: (tasks) => {
@@ -585,8 +645,8 @@ export const useConsoleStore = defineStore('console', () => {
   }
 
   /** 为一条 AI 消息构造 SSE 回调(错误块 + 收尾停流式;dispatch 与 respondApproval 共用)。 */
-  function streamHandlers(ai: ChatMessage): SseHandlers {
-    const reducer = buildReducer(ai)
+  function streamHandlers(ai: ChatMessage, configuredAgentId?: number): SseHandlers {
+    const reducer = buildReducer(ai, configuredAgentId)
     const generation = dataGeneration
     return {
       onEvent: (ev) => {
@@ -617,7 +677,7 @@ export const useConsoleStore = defineStore('console', () => {
   }
 
   /** 派发一次任务:POST /api/sessions/messages,消费 SSE 流增量更新对话与右栏 */
-  function dispatch(text: string): boolean {
+  function dispatch(text: string, agentId?: number | null): boolean {
     const content = text.trim()
     if (state.busy || !content) return false
     state.busy = true
@@ -638,8 +698,23 @@ export const useConsoleStore = defineStore('console', () => {
     const sessionId = /^\d+$/.test(state.activeSessionId)
       ? Number(state.activeSessionId)
       : undefined
+    const localSession = sessionId === undefined
+      ? state.sessions.find((session) => session.id === state.activeSessionId)
+      : undefined
+    const requestedAgentId = agentId !== undefined
+      ? agentId
+      : localSession?.agentId ?? state.newSessionAgentId
+    const configuredAgentId = sessionId === undefined ? requestedAgentId ?? undefined : undefined
+    if (localSession) localSession.agentId = configuredAgentId ?? null
 
-    activeStreamAbort = sendMessage({ session_id: sessionId, content }, streamHandlers(ai))
+    activeStreamAbort = sendMessage(
+      {
+        session_id: sessionId,
+        ...(configuredAgentId == null ? {} : { agent_id: configuredAgentId }),
+        content,
+      },
+      streamHandlers(ai, configuredAgentId),
+    )
     return true
   }
 
@@ -786,6 +861,7 @@ export const useConsoleStore = defineStore('console', () => {
     selectSession,
     newSession,
     openApp,
+    setNewSessionAgent,
     setWorkbenchMode,
     setSearch,
     renameSession: renameSessionAction,

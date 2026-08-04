@@ -1,10 +1,10 @@
 /** Skill 列表与上传响应中的摘要。 */
 export interface SkillResponse {
   id: number
+  workspace_id: number
   name: string
   description: string
-  version: string | null
-  status: string
+  version?: string | null
   scope: string
   created_at: string
   updated_at: string
@@ -20,6 +20,6 @@ export interface SkillResourceItem {
 /** Skill 完整详情。 */
 export interface SkillDetailResponse extends SkillResponse {
   frontmatter: Record<string, unknown>
-  resources: SkillResourceItem[]
+  resources?: SkillResourceItem[]
   body: string
 }

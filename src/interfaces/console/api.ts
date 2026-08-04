@@ -12,7 +12,8 @@ import type {
 
 /** 发送会话消息请求。 */
 export interface SendMessageRequest {
-  session_id?: number
+  session_id?: number | null
+  agent_id?: number | null
   content: string
 }
 

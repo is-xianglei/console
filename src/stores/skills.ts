@@ -81,8 +81,9 @@ export const useSkillsStore = defineStore('skills', () => {
       const validation = await validateSkill(file)
       if (generation !== dataGeneration) return null
       if (!validation.ok) {
-        return validation.errors.length
-          ? `校验失败：${validation.errors.join('；')}`
+        const errors = validation.errors ?? []
+        return errors.length
+          ? `校验失败：${errors.join('；')}`
           : '校验失败：Skill 包不符合要求'
       }
       const created = await createSkill(file)
