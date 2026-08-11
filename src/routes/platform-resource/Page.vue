@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AgentResource from './components/agent-resource/index.vue'
 import BuildResourceManager from './components/build-resource-manager/index.vue'
 import OrganizationResource from './components/organization-resource/index.vue'
+import PlanResource from './components/plan-resource/index.vue'
 import {
   PLATFORM_MODULES,
   RESOURCE_PAGES,
@@ -245,6 +246,7 @@ onBeforeUnmount(() => {
 
 <template>
   <AgentResource v-if="moduleKey === 'build' && page.key === 'agents'" />
+  <PlanResource v-else-if="moduleKey === 'build' && page.key === 'plans'" />
   <BuildResourceManager v-else-if="moduleKey === 'build'" :page="page" />
   <OrganizationResource
     v-else-if="moduleKey === 'organization' && ['departments', 'groups', 'people'].includes(page.key)"

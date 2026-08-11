@@ -8,6 +8,7 @@ import { useAgentsStore } from './stores/agents'
 import { useDepartmentsStore } from './stores/departments'
 import { useGroupsStore } from './stores/groups'
 import { useMemoriesStore } from './stores/memories'
+import { useOrchestrationPlansStore } from './stores/orchestrationPlans'
 import { useSkillsStore } from './stores/skills'
 import { useWorkspacesStore } from './stores/workspaces'
 
@@ -17,6 +18,7 @@ const agentsStore = useAgentsStore()
 const departmentsStore = useDepartmentsStore()
 const groupsStore = useGroupsStore()
 const memoriesStore = useMemoriesStore()
+const orchestrationPlansStore = useOrchestrationPlansStore()
 const skillsStore = useSkillsStore()
 const workspacesStore = useWorkspacesStore()
 const router = useRouter()
@@ -61,6 +63,7 @@ watch(
     departmentsStore.resetDepartments(workspaceId)
     groupsStore.resetGroups(workspaceId)
     memoriesStore.resetMemories()
+    orchestrationPlansStore.resetPlans()
     skillsStore.resetSkills()
     workspacesStore.resetWorkspaces(workspaceId)
   },
@@ -75,10 +78,10 @@ watch(
     const current = router.currentRoute.value
     if (current.name !== 'chat') return
     const routeSessionId = current.params.sessionId
+    // 本地草稿升级为后端会话:newSession 不导航,地址栏必然还停在上一个会话,
+    // 不规范化就会被 app-shell 的路由跟随watcher 把会话拽回去。
     const promotedLocalSession =
-      typeof previousSessionId === 'string' &&
-      previousSessionId.startsWith('sess-') &&
-      routeSessionId === previousSessionId
+      typeof previousSessionId === 'string' && previousSessionId.startsWith('sess-')
     const createdWithoutPlaceholder = routeSessionId == null || routeSessionId === ''
     if (!promotedLocalSession && !createdWithoutPlaceholder) return
 

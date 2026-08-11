@@ -14,6 +14,8 @@ import type {
 export interface SendMessageRequest {
   session_id?: number | null
   agent_id?: number | null
+  /** 编排方案 ID:仅开新会话时可传,与 agent_id 互斥 */
+  orchestration_plan_id?: number | null
   content: string
 }
 

@@ -18,6 +18,8 @@ export interface SseTarget {
   onSessionId?: (id: number) => void
   /** task_snapshot 到达:携带该会话全量任务,前端整体替换任务面板 */
   onTaskSnapshot?: (tasks: TaskResponse[]) => void
+  /** 编排节点事件(node_start/node_end):图状态归并,不建面板 */
+  onNodeEvent?: (ev: SseEvent) => void
 }
 
 /** 子代理唯一键:subagent 用 run_id,teammate 用 name,缺失兜底 name */
@@ -52,7 +54,9 @@ function ensureAgent(t: SseTarget, ev: SseEvent): SubAgent {
   t.agents.push({
     id: key,
     pid: actor.run_id ? actor.run_id : actor.name,
-    name: actor.task || actor.name,
+    // 标题用 actor.name(编排叶子即 Agent 名)。task 是渲染后的完整 instruction,
+    // 顺序编排里会带上游全文,三个面板标题会长得几乎一样,不能作标题。
+    name: actor.name || actor.task || '子代理',
     icon: iconFor(actor.name, actor.role),
     status: 'queued',
     progress: 0,
@@ -100,6 +104,14 @@ export function createSseReducer(target: SseTarget) {
     // 任务全量快照(会话级,不带 actor):直接透传全量 tasks,面板整体替换
     if (ev.type === 'task_snapshot') {
       target.onTaskSnapshot?.(ev.data?.tasks ?? [])
+      return
+    }
+
+    // 编排节点事件:只做图状态归并,必须在 actor.role 分流前早退。
+    // 节点事件的 actor 是父 FlowAgent(名字为方案名),且 node_start 早于叶子 turn_start,
+    // 一旦流入 handleAgent 就会以方案名误建右栏面板并抢占标题。
+    if (ev.type === 'node_start' || ev.type === 'node_end') {
+      target.onNodeEvent?.(ev)
       return
     }
 

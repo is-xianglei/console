@@ -1,0 +1,89 @@
+.workflow-graph {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-deep);
+  border-left: 1px solid var(--ui-border);
+}
+
+/* ===== 顶部标题栏 ===== */
+.graph-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.graph-title {
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+}
+.graph-mode {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+/* 把轮次/命中分支角标推到标题栏右上角 */
+.graph-spacer {
+  flex: 1;
+}
+.graph-badge {
+  padding: 1px 8px;
+  border: 1px solid var(--ui-border-accented);
+  border-radius: 999px;
+  color: var(--accent-agent);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+/* ===== 画布 ===== */
+.graph-canvas {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.graph-empty {
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 16px;
+}
+
+/* Vue Flow 自带的背景是透明的，画布底色由这里给。
+   缩放与平移由 viewport.ts 算好后 setViewport 写入，不用它的 fitView。
+   绝对定位铺满：容器为了空态文案用了 align-items: flex-start，
+   flex 子项拿不到拉伸高度，height: 100% 会塌成 0。 */
+.graph-flow {
+  position: absolute;
+  inset: 0;
+}
+.graph-flow :global(.vue-flow__pane) {
+  cursor: default;
+}
+/* 只读视图不需要选中态的高亮描边 */
+.graph-flow :global(.vue-flow__node) {
+  cursor: default;
+}
+
+/* ===== 底部状态条 ===== */
+.graph-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.graph-status-mark {
+  color: var(--accent-agent);
+}

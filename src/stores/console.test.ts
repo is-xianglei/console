@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import type { SseEvent, SseNodeInfo } from '../interfaces/console/model'
 import {
   getPendingInteraction,
   getSessionList,
@@ -174,7 +175,7 @@ describe('console store 会话恢复', () => {
     store.newSession()
     store.setNewSessionAgent(9)
 
-    expect(store.dispatch('改用默认 Agent', null)).toBe(true)
+    expect(store.dispatch('改用默认 Agent', { agentId: null })).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
       { session_id: undefined, content: '改用默认 Agent' },
       expect.any(Object),
@@ -189,11 +190,86 @@ describe('console store 会话恢复', () => {
 
     expect(await store.reloadConsole()).toBe(true)
     expect(store.state.sessions[0]?.agentId).toBe(9)
-    expect(store.dispatch('继续当前会话', 12)).toBe(true)
+    expect(store.dispatch('继续当前会话', { agentId: 12 })).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
       { session_id: 42, content: '继续当前会话' },
       expect.any(Object),
     )
+  })
+
+  it('新会话绑定编排方案时携带方案 ID 且不带 Agent ID', () => {
+    const store = useConsoleStore()
+    store.resetConsole()
+    store.setNewSessionAgent(9)
+    store.setNewSessionPlan(3)
+
+    expect(store.state.newSessionAgentId).toBeNull()
+    expect(store.state.workbenchMode).toBe('graph')
+    expect(store.dispatch('按编排方案执行')).toBe(true)
+    expect(sendMessage).toHaveBeenCalledWith(
+      { session_id: undefined, orchestration_plan_id: 3, content: '按编排方案执行' },
+      expect.any(Object),
+    )
+  })
+
+  it('从编排方案切回平台默认 Agent 后不再携带方案 ID', () => {
+    const store = useConsoleStore()
+    store.resetConsole()
+    store.setNewSessionPlan(3)
+    expect(store.state.newSessionPlanId).toBe(3)
+
+    // setNewSessionAgent(null) 只清 Agent 不清方案,composer 正是依赖这一点才显式解绑
+    store.setNewSessionAgent(null)
+    expect(store.state.newSessionPlanId).toBe(3)
+
+    store.setNewSessionPlan(null)
+    expect(store.state.workbenchMode).toBe('chat')
+    expect(store.dispatch('改用平台默认 Agent')).toBe(true)
+    expect(sendMessage).toHaveBeenCalledWith(
+      { session_id: undefined, content: '改用平台默认 Agent' },
+      expect.any(Object),
+    )
+  })
+
+  it('切换到绑定编排方案的会话时默认进入执行图视图', async () => {
+    vi.mocked(getSessionList).mockResolvedValue([
+      session,
+      { ...session, id: 51, agent_id: null, orchestration_plan_id: 7 },
+    ])
+    vi.mocked(getSessionMessageList).mockResolvedValue([])
+    vi.mocked(getPendingInteraction).mockResolvedValue(null)
+
+    const store = useConsoleStore()
+    expect(await store.reloadConsole()).toBe(true)
+    expect(store.state.workbenchMode).toBe('chat')
+    store.selectSession('51')
+    expect(store.state.workbenchMode).toBe('graph')
+    store.setWorkbenchMode('chat')
+    expect(store.state.workbenchMode).toBe('chat')
+    store.setWorkbenchMode('graph')
+    expect(store.state.workbenchMode).toBe('graph')
+  })
+
+  it('编排节点的分支消息不进主时间线', async () => {
+    // 一次三成员的顺序编排会落 3 条 branch 消息 + 1 条主线汇总,
+    // 若不按 branch 过滤,刷新后主对话会多出三条重复回复。
+    vi.mocked(getSessionMessageList).mockResolvedValue([
+      { ...message, id: 1, role: 'user', content: '写一段介绍', branch: null },
+      { ...message, id: 2, branch: '内容生产流水线/n0_专业写作', content: '初稿正文' },
+      { ...message, id: 3, branch: '内容生产流水线/n1_专业评审', content: '评审意见' },
+      { ...message, id: 4, branch: '内容生产流水线/n2_专业翻译', content: '英文译文' },
+      { ...message, id: 5, branch: null, content: '最终产出' },
+    ])
+    vi.mocked(getPendingInteraction).mockResolvedValue(null)
+
+    const store = useConsoleStore()
+    expect(await store.reloadConsole()).toBe(true)
+    expect(store.state.messages).toHaveLength(2)
+    expect(store.state.messages[0]).toMatchObject({ role: 'user', text: '写一段介绍' })
+    expect(store.state.messages[1]?.blocks?.[0]).toMatchObject({
+      kind: 'answer',
+      text: '最终产出',
+    })
   })
 
   it('共享响应省略目标列表时使用本次提交值同步会话', async () => {
@@ -240,5 +316,97 @@ describe('console store 会话恢复', () => {
 
     expect(await sharing).toBe(false)
     expect(store.state.sessions).toEqual([])
+  })
+})
+
+describe('console store 编排执行图', () => {
+  let sequence = 0
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.resetAllMocks()
+    vi.mocked(sendMessage).mockReturnValue(() => {})
+    sequence = 0
+  })
+
+  /** 派发一条消息并拿到该流的回调,用于直接灌入节点事件。 */
+  function startStream() {
+    const store = useConsoleStore()
+    store.resetConsole()
+    store.setNewSessionPlan(3)
+    expect(store.dispatch('按编排方案执行')).toBe(true)
+    const handlers = vi.mocked(sendMessage).mock.calls.at(-1)?.[1]
+    if (!handlers) throw new Error('未捕获到 SSE handlers')
+    return { store, emit: handlers.onEvent, finish: () => handlers.onDone?.() }
+  }
+
+  function nodeEvent(
+    type: 'node_start' | 'node_end',
+    path: string,
+    overrides: Partial<SseNodeInfo> = {},
+  ): SseEvent {
+    sequence += 1
+    return {
+      type,
+      sequence,
+      session_id: 12,
+      actor: { role: 'subagent', name: '内容生产方案', run_id: `a1b2c3d4:${path}` },
+      node: { path, name: path.split('/').pop() ?? path, kind: 'leaf', ...overrides },
+    }
+  }
+
+  it('并行模式下 start/end 乱序到达仍按 path 归并到各自节点', () => {
+    const { store, emit } = startStream()
+    const writer = '内容生产方案/n0_写作专员'
+    const reviewer = '内容生产方案/n1_评审专员'
+    const translator = '内容生产方案/n2_翻译专员'
+
+    // 三个 start 集中出现,end 按各分支完成快慢乱序返回
+    emit(nodeEvent('node_start', writer))
+    emit(nodeEvent('node_start', reviewer))
+    emit(nodeEvent('node_start', translator))
+    emit(nodeEvent('node_end', reviewer, { status: 'completed' }))
+    emit(nodeEvent('node_end', translator, { status: 'failed' }))
+
+    expect(store.state.graphNodes[reviewer]).toMatchObject({ path: reviewer, status: 'completed' })
+    expect(store.state.graphNodes[translator]).toMatchObject({ status: 'failed' })
+    // 尚未回来的分支保持运行中,不被其他分支的 end 误收
+    expect(store.state.graphNodes[writer]).toMatchObject({ status: 'running' })
+    expect(store.state.graphNodes[writer]?.runId).toBe(`a1b2c3d4:${writer}`)
+  })
+
+  it('loop 同一成员跨轮次复用同一节点并刷新轮次角标', () => {
+    const { store, emit } = startStream()
+    const base = '内容生产方案/n0_写作专员'
+
+    emit(nodeEvent('node_start', '内容生产方案#0/n0_写作专员', {
+      detail: { iteration: 1, max_iterations: 2 },
+    }))
+    emit(nodeEvent('node_end', '内容生产方案#0/n0_写作专员', {
+      status: 'completed',
+      detail: { iteration: 1, max_iterations: 2 },
+    }))
+    emit(nodeEvent('node_start', '内容生产方案#1/n0_写作专员', {
+      detail: { iteration: 2, max_iterations: 2 },
+    }))
+
+    // 两轮归并到同一个裸路径,图上只画一个节点框
+    expect(Object.keys(store.state.graphNodes)).toEqual([base])
+    expect(store.state.graphNodes[base]).toMatchObject({
+      status: 'running',
+      iteration: 2,
+      maxIterations: 2,
+    })
+  })
+
+  it('新一轮派发清空上一轮的执行图状态', () => {
+    const { store, emit, finish } = startStream()
+    emit(nodeEvent('node_end', '内容生产方案/n0_写作专员', { status: 'completed' }))
+    expect(Object.keys(store.state.graphNodes)).toHaveLength(1)
+
+    // 上一轮流收尾后才能再次派发(dispatch 在 busy 时直接拒绝)
+    finish()
+    expect(store.dispatch('再跑一次')).toBe(true)
+    expect(store.state.graphNodes).toEqual({})
   })
 })

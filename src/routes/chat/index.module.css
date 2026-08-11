@@ -28,6 +28,26 @@
   width: 100%;
   flex-basis: 100%;
 }
+/* 执行图与应用运行时共用同一条侧栏轨道,宽度由 --runtime-pane-width 统一驱动 */
+.graph-pane {
+  width: var(--runtime-pane-width);
+  flex: 0 0 var(--runtime-pane-width);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  transition: width var(--dur-med) var(--ease-out), flex-basis var(--dur-med) var(--ease-out);
+}
+.graph-pane:global(.workbench-pane-enter-active),
+.graph-pane:global(.workbench-pane-leave-active) {
+  transition: width var(--dur-med) var(--ease-out), flex-basis var(--dur-med) var(--ease-out), opacity var(--dur-med) var(--ease-out);
+}
+.graph-pane:global(.workbench-pane-enter-from),
+.graph-pane:global(.workbench-pane-leave-to) {
+  width: 0;
+  flex-basis: 0;
+  opacity: 0;
+}
 .split-resizer {
   position: relative;
   width: 10px;
@@ -87,6 +107,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .runtime-pane,
+  .graph-pane,
   :global(.workbench-pane-enter-active),
   :global(.workbench-pane-leave-active),
   :global(.split-divider-enter-active),

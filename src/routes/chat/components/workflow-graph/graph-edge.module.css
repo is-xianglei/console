@@ -1,0 +1,49 @@
+/* Vue Flow 的 .vue-flow__edge-path 自带 stroke，这里靠更高优先级的
+   CSS Modules 类覆盖。stroke-width 与旧实现一致，不随缩放变粗。 */
+.edge {
+  fill: none;
+  stroke-width: 1.25;
+}
+
+.edge-idle {
+  stroke: var(--ui-border-accented);
+  stroke-dasharray: 4 4;
+}
+.edge-active {
+  stroke: var(--status-success);
+}
+.edge-loop {
+  stroke: var(--accent-agent);
+  stroke-dasharray: 4 4;
+}
+
+/* 目标节点正在执行时，Vue Flow 给边加 .animated 驱动虚线流动。
+   旧实现的虚线是静态的，这是本次唯一有意新增的视觉。 */
+:global(.vue-flow__edge.animated) .edge {
+  stroke-dasharray: 4 4;
+  animation: edge-flow 0.6s linear infinite;
+}
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -8;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :global(.vue-flow__edge.animated) .edge {
+    animation: none;
+  }
+}
+
+/* 分支标签：底板与画布同色，把压住的那截连线遮掉 */
+.edge-label {
+  position: absolute;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+}

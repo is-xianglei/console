@@ -10,6 +10,8 @@ export interface SessionResponse {
   user_id?: number | null
   workspace_id?: number | null
   agent_id?: number | null
+  /** 会话绑定的编排方案 ID;未绑定为 null */
+  orchestration_plan_id?: number | null
   visibility: string
   shared_with?: number[]
   shared_with_departments?: number[]
@@ -56,6 +58,8 @@ export interface SessionMessageResponse {
   turn_id?: string | null
   role: 'user' | 'assistant' | 'tool' | string
   content: unknown
+  /** 编排分支路径,主线消息为空;非空表示编排某个节点的产出 */
+  branch?: string | null
   token_estimate: number
   created_at: string
 }
@@ -80,6 +84,23 @@ export interface SseActor {
   run_id?: string
   task?: string
   team?: { id: number; is_lead: boolean }
+}
+
+/** 编排节点事件(node_start/node_end)携带的节点信息。
+ *  path 是与静态拓扑对齐的裸路径;status 只在 node_end 出现。 */
+export interface SseNodeInfo {
+  path: string
+  name: string
+  kind: 'sequential' | 'parallel' | 'routing' | 'loop' | 'leaf' | string
+  status?: 'completed' | 'suspended' | 'failed' | 'escalated' | string
+  detail?: {
+    root?: boolean
+    plan_id?: number
+    mode?: string
+    route?: string
+    iteration?: number
+    max_iterations?: number
+  }
 }
 
 export type InteractionKind =
@@ -153,6 +174,8 @@ export interface SseEvent {
     | 'interaction_request'
     | 'error'
     | 'task_snapshot'
+    | 'node_start'
+    | 'node_end'
     | string
   sequence: number
   session_id: number
@@ -183,6 +206,8 @@ export interface SseEvent {
     reason?: string
   }
   interaction?: SseInteraction
+  /** 编排节点事件(node_start/node_end)的节点负载 */
+  node?: SseNodeInfo
   stop_reason?: string
   usage?: {
     input_tokens: number
@@ -198,7 +223,24 @@ export type ApprovalDecision = 'allow_once' | 'always_allow' | 'deny'
 /** 子代理或思考点的运行状态。 */
 export type RunStatus = 'queued' | 'think' | 'run' | 'done' | 'error'
 export type TaskState = 'queued' | 'active' | 'done' | 'error'
-export type WorkbenchMode = 'chat' | 'split' | 'app'
+export type WorkbenchMode = 'chat' | 'split' | 'app' | 'graph'
+
+/** 编排执行图节点的运行时状态：node_start/node_end 按去掉 #N 轮次的裸路径归并。
+ *  pending 由「表中无该键」表达，避免与事件驱动的状态混淆。 */
+export interface GraphNodeState {
+  /** 去掉 loop 轮次(#N)后的裸路径，与静态拓扑对齐 */
+  path: string
+  status: 'running' | 'completed' | 'suspended' | 'failed' | 'escalated'
+  /** 点击节点切右栏的流键(带 turn 前缀)；前端推不出来，只能取自事件 actor.run_id */
+  runId?: string
+  /** loop 当前轮次(从 1 起)与轮次上限，取自 detail，不从 path 解析 */
+  iteration?: number
+  maxIterations?: number
+  /** routing 命中的 route_key(挂在被选中叶子上) */
+  route?: string
+  /** 根节点标记(detail.root)，驱动整图总状态，不匹配任何成员节点 */
+  root?: boolean
+}
 
 /** 会话列表视图模型。 */
 export interface Session {
@@ -209,6 +251,8 @@ export interface Session {
   badge?: string
   appId?: SessionAppId
   agentId?: number | null
+  /** 会话绑定的编排方案 ID;与 agentId 互斥 */
+  orchestrationPlanId?: number | null
   modelName?: string | null
   status?: string
   visibility?: SessionVisibility

@@ -25,11 +25,13 @@ import type {
   ApprovalDecision,
   ChatBlock,
   ChatMessage,
+  GraphNodeState,
   MsgContentBlock,
   Session,
   SessionMessageResponse,
   SessionResponse,
   SessionVisibility,
+  SseEvent,
   SseInteraction,
   SubAgent,
   Task,
@@ -80,6 +82,7 @@ function mapSession(s: SessionResponse): Session {
     count: 0,
     appId,
     agentId: s.agent_id ?? null,
+    orchestrationPlanId: s.orchestration_plan_id ?? null,
     modelName: s.model_name ?? null,
     status: s.status,
     visibility: normalizeVisibility(s.visibility),
@@ -182,6 +185,10 @@ function mapMessages(list: SessionMessageResponse[]): ChatMessage[] {
   }
 
   for (const m of list) {
+    // 编排节点的中间产出(branch 非空)属于各自分支,不进主时间线,
+    // 否则一次三成员的编排会在主对话里多出三条重复回复。
+    if (m.branch) continue
+
     const time = formatTime(m.created_at)
 
     if (m.role === 'user') {
@@ -278,7 +285,11 @@ interface ConsoleState {
   agents: SubAgent[]
   selectedAgentId: string | null
   newSessionAgentId: number | null
+  /** 新会话草稿选中的编排方案 ID;与 newSessionAgentId 互斥 */
+  newSessionPlanId: number | null
   tasks: Task[]
+  /** 编排执行图节点状态,按去掉 #N 轮次的裸路径归并;表中无该键即 pending */
+  graphNodes: Record<string, GraphNodeState>
   busy: boolean
   theme: 'dark' | 'light'
 }
@@ -305,13 +316,16 @@ export const useConsoleStore = defineStore('console', () => {
     sessions: [...SESSIONS],
     activeSessionId: SESSIONS[0].id,
     activeAppId: SESSIONS[0].appId ?? null,
+    // seed 会话不含编排方案,初始视图只需区分是否带应用
     workbenchMode: SESSIONS[0].appId ? 'split' : 'chat',
     search: '',
     messages: [],
     agents: [],
     selectedAgentId: null,
     newSessionAgentId: null,
+    newSessionPlanId: null,
     tasks: [],
+    graphNodes: {},
     busy: false,
     theme: 'dark',
   })
@@ -340,12 +354,14 @@ export const useConsoleStore = defineStore('console', () => {
       state.activeSessionId = preferred ?? state.sessions[0]?.id ?? ''
       const activeSession = state.sessions.find((session) => session.id === state.activeSessionId)
       state.activeAppId = activeSession?.appId ?? null
-      state.workbenchMode = getWorkbenchApp(state.activeAppId) ? 'split' : 'chat'
       state.messages = []
       state.agents = []
       state.tasks = []
       state.selectedAgentId = null
       state.newSessionAgentId = null
+      state.newSessionPlanId = null
+      // 先清空草稿选择,再按会话绑定关系计算默认视图,避免上个草稿的方案泄漏
+      state.workbenchMode = defaultWorkbenchMode(state.activeSessionId)
       if (state.activeSessionId) await loadMessages(state.activeSessionId)
       return true
     } catch {
@@ -359,6 +375,19 @@ export const useConsoleStore = defineStore('console', () => {
   /** 后端会话 id 为纯数字字符串;种子/本地新建会话 id 形如 sess-xxxx */
   function isBackendSession(id: string): boolean {
     return /^\d+$/.test(id)
+  }
+
+  /** 会话绑定的编排方案 ID;本地草稿会话回退到 newSessionPlanId。 */
+  function sessionPlanId(id: string): number | null {
+    const session = state.sessions.find((item) => item.id === id)
+    if (session?.orchestrationPlanId != null) return session.orchestrationPlanId
+    return isBackendSession(id) ? null : state.newSessionPlanId
+  }
+
+  /** 会话切换后的默认工作台模式:打开应用优先分屏,绑定编排方案落到执行图。 */
+  function defaultWorkbenchMode(sessionId: string): WorkbenchMode {
+    if (getWorkbenchApp(state.activeAppId)) return 'split'
+    return sessionPlanId(sessionId) != null ? 'graph' : 'chat'
   }
 
   /**
@@ -420,13 +449,16 @@ export const useConsoleStore = defineStore('console', () => {
     state.sessions = []
     state.activeSessionId = ''
     state.activeAppId = null
+    // 全量重置后无会话亦无方案,对话视图是唯一合法模式
     state.workbenchMode = 'chat'
     state.search = ''
     state.messages = []
     state.agents = []
     state.selectedAgentId = null
     state.newSessionAgentId = null
+    state.newSessionPlanId = null
     state.tasks = []
+    state.graphNodes = {}
     state.busy = false
     permissionsStore.resetPermissions()
     skillsStore.resetSkills()
@@ -450,11 +482,12 @@ export const useConsoleStore = defineStore('console', () => {
     state.activeSessionId = id
     const session = state.sessions.find((item) => item.id === id)
     state.activeAppId = session?.appId ?? null
-    state.workbenchMode = getWorkbenchApp(state.activeAppId) ? 'split' : 'chat'
     state.agents = []
     state.tasks = []
     state.selectedAgentId = null
     state.newSessionAgentId = null
+    state.newSessionPlanId = null
+    state.workbenchMode = defaultWorkbenchMode(id)
     loadMessages(id)
   }
   function newSession(appId?: Session['appId']) {
@@ -474,13 +507,38 @@ export const useConsoleStore = defineStore('console', () => {
     state.tasks = []
     state.selectedAgentId = null
     state.newSessionAgentId = null
+    state.newSessionPlanId = null
   }
 
   function setNewSessionAgent(agentId: number | null) {
     if (isBackendSession(state.activeSessionId)) return
     state.newSessionAgentId = agentId
+    // 后端约束 agent 与编排方案互斥:选中 Agent 即放弃方案草稿
+    if (agentId != null) setNewSessionPlanDraft(null)
     const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
     if (localSession) localSession.agentId = agentId
+  }
+
+  /** 仅更新方案草稿及本地会话标记,不处理与 Agent 的互斥(由调用方决定)。 */
+  function setNewSessionPlanDraft(planId: number | null) {
+    state.newSessionPlanId = planId
+    const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
+    if (localSession) localSession.orchestrationPlanId = planId
+  }
+
+  /** 为新会话草稿绑定编排方案;绑定后默认切到执行图视图。 */
+  function setNewSessionPlan(planId: number | null) {
+    if (isBackendSession(state.activeSessionId)) return
+    setNewSessionPlanDraft(planId)
+    // 与 Agent 互斥:选中方案即回退到平台默认 Agent
+    if (planId != null) {
+      state.newSessionAgentId = null
+      const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
+      if (localSession) localSession.agentId = null
+    }
+    if (!getWorkbenchApp(state.activeAppId)) {
+      state.workbenchMode = planId != null ? 'graph' : 'chat'
+    }
   }
   function setSearch(v: string) {
     state.search = v
@@ -489,6 +547,7 @@ export const useConsoleStore = defineStore('console', () => {
   /** 从左侧应用节点进入运行工作台；优先恢复该应用最近一条会话。 */
   function openApp(appId: string) {
     state.activeAppId = appId
+    // 打开应用是显式动作,即使会话绑了编排方案也切到分屏
     state.workbenchMode = 'split'
     const appSession = state.sessions.find((session) => session.appId === appId)
     if (!appSession || appSession.id !== state.activeSessionId) {
@@ -498,11 +557,17 @@ export const useConsoleStore = defineStore('console', () => {
       state.tasks = []
       state.selectedAgentId = null
       state.newSessionAgentId = null
+      state.newSessionPlanId = null
       if (appSession) void loadMessages(appSession.id)
     }
   }
 
   function setWorkbenchMode(mode: WorkbenchMode) {
+    // 执行图只依赖会话绑定的编排方案,不要求打开应用
+    if (mode === 'graph') {
+      state.workbenchMode = sessionPlanId(state.activeSessionId) != null ? 'graph' : 'chat'
+      return
+    }
     state.workbenchMode = getWorkbenchApp(state.activeAppId) ? mode : 'chat'
   }
 
@@ -552,6 +617,7 @@ export const useConsoleStore = defineStore('console', () => {
         state.tasks = []
         state.selectedAgentId = null
         state.newSessionAgentId = null
+        state.newSessionPlanId = null
       }
     }
   }
@@ -607,8 +673,40 @@ export const useConsoleStore = defineStore('console', () => {
     return prompt ? dispatch(prompt) : false
   }
 
+  /** 把 node_start / node_end 归并进执行图状态。
+   *  key 用去掉 #N 轮次的裸路径:loop 同一成员跨轮次是不同 path,但图上复用同一个节点框。
+   *  并行模式下 start/end 不成对相邻到达(end 按各分支完成快慢返回),故按 path 建索引而非按序配对。 */
+  function mergeNodeEvent(ev: SseEvent) {
+    const node = ev.node
+    if (!node?.path) return
+    const key = node.path.replace(/#\d+/g, '')
+    const detail = node.detail ?? {}
+    const prev = state.graphNodes[key]
+    const next: GraphNodeState = {
+      ...prev,
+      path: key,
+      // node_start 无 status 字段;node_end 的 status 为节点终态
+      status: ev.type === 'node_end' ? nodeEndStatus(node.status) : 'running',
+    }
+    // run_id 带 turn 前缀,前端推不出来,只能取自事件;点节点切右栏流靠它
+    if (ev.actor?.run_id) next.runId = ev.actor.run_id
+    // 轮次取自 detail(从 1 起),不从 path 的 #N 解析(那个从 0 起且在根节点段)
+    if (typeof detail.iteration === 'number') next.iteration = detail.iteration
+    if (typeof detail.max_iterations === 'number') next.maxIterations = detail.max_iterations
+    // routing 命中的分支键,挂在被选中的叶子上;未命中分支无任何事件
+    if (typeof detail.route === 'string') next.route = detail.route
+    if (detail.root === true) next.root = true
+    state.graphNodes[key] = next
+  }
+
+  /** node_end 的 status 收窄到图状态;缺失或未知值按失败处理,避免节点卡在运行中。 */
+  function nodeEndStatus(status: string | undefined): GraphNodeState['status'] {
+    if (status === 'completed' || status === 'suspended' || status === 'escalated') return status
+    return 'failed'
+  }
+
   /** 为一条 AI 消息构造 SSE 归约器(dispatch 与 respondApproval 共用)。 */
-  function buildReducer(ai: ChatMessage, configuredAgentId?: number) {
+  function buildReducer(ai: ChatMessage, configuredAgentId?: number, configuredPlanId?: number) {
     return createSseReducer({
       ai,
       agents: state.agents,
@@ -619,10 +717,14 @@ export const useConsoleStore = defineStore('console', () => {
         const idStr = String(sid)
         // 新建会话:把本地占位会话替换成后端真实 id
         if (state.activeSessionId !== idStr) {
-          const cur = state.sessions.find((s) => s.id === state.activeSessionId)
-          if (cur && !/^\d+$/.test(cur.id)) {
-            cur.id = idStr
-          } else if (!cur) {
+          const draft = state.sessions.find(
+            (s) => s.id === state.activeSessionId && !isBackendSession(s.id),
+          )
+          if (draft) {
+            draft.id = idStr
+          } else if (!state.sessions.some((s) => s.id === idStr)) {
+            // 草稿已被会话切换顶掉:补建会话对象,否则 activeSessionId 会悬空,
+            // 绑定的编排方案随之丢失,执行图会在跑起来的瞬间消失。
             const latestPrompt = [...state.messages].reverse().find((message) => message.role === 'user')?.text?.trim()
             state.sessions.unshift({
               id: idStr,
@@ -631,22 +733,38 @@ export const useConsoleStore = defineStore('console', () => {
               count: 0,
               appId: state.activeAppId ?? undefined,
               agentId: configuredAgentId ?? null,
+              orchestrationPlanId: configuredPlanId ?? null,
             })
           }
           state.activeSessionId = idStr
         }
+        // 会话已落库,方案改由会话自身承载;草稿字段必须清空,否则下一个新会话会继承它
+        const promoted = state.sessions.find((s) => s.id === idStr)
+        if (promoted) {
+          if (configuredAgentId != null) promoted.agentId = configuredAgentId
+          if (configuredPlanId != null) promoted.orchestrationPlanId = configuredPlanId
+        }
         state.newSessionAgentId = null
+        state.newSessionPlanId = null
       },
       // 任务全量快照:随 SSE 流实时到达,直接整体替换任务面板
       onTaskSnapshot: (tasks) => {
         state.tasks = tasks.filter((t) => t.status !== 'deleted').map(mapTask)
       },
+      // 编排节点事件:归并到执行图状态,不建右栏面板(面板仍由叶子自身的流事件创建)
+      onNodeEvent: (ev) => {
+        mergeNodeEvent(ev)
+      },
     })
   }
 
   /** 为一条 AI 消息构造 SSE 回调(错误块 + 收尾停流式;dispatch 与 respondApproval 共用)。 */
-  function streamHandlers(ai: ChatMessage, configuredAgentId?: number): SseHandlers {
-    const reducer = buildReducer(ai, configuredAgentId)
+  function streamHandlers(
+    ai: ChatMessage,
+    configuredAgentId?: number,
+    configuredPlanId?: number,
+  ): SseHandlers {
+    const reducer = buildReducer(ai, configuredAgentId, configuredPlanId)
     const generation = dataGeneration
     return {
       onEvent: (ev) => {
@@ -677,7 +795,10 @@ export const useConsoleStore = defineStore('console', () => {
   }
 
   /** 派发一次任务:POST /api/sessions/messages,消费 SSE 流增量更新对话与右栏 */
-  function dispatch(text: string, agentId?: number | null): boolean {
+  function dispatch(
+    text: string,
+    options?: { agentId?: number | null; planId?: number | null },
+  ): boolean {
     const content = text.trim()
     if (state.busy || !content) return false
     state.busy = true
@@ -688,6 +809,8 @@ export const useConsoleStore = defineStore('console', () => {
     // 重置本轮舰队与任务
     state.agents = []
     state.tasks = []
+    // 执行图按轮重置:上一轮的节点状态不能残留到本轮
+    state.graphNodes = {}
     state.selectedAgentId = null
 
     // 新建空 AI 消息,作为本轮 orchestrator 内容的容器
@@ -701,19 +824,30 @@ export const useConsoleStore = defineStore('console', () => {
     const localSession = sessionId === undefined
       ? state.sessions.find((session) => session.id === state.activeSessionId)
       : undefined
-    const requestedAgentId = agentId !== undefined
-      ? agentId
+    // 后端约束:agent_id / orchestration_plan_id 仅开新会话可传且互斥;方案优先生效
+    const requestedPlanId = options?.planId !== undefined
+      ? options.planId
+      : localSession?.orchestrationPlanId ?? state.newSessionPlanId
+    const configuredPlanId = sessionId === undefined ? requestedPlanId ?? undefined : undefined
+    const requestedAgentId = options?.agentId !== undefined
+      ? options.agentId
       : localSession?.agentId ?? state.newSessionAgentId
-    const configuredAgentId = sessionId === undefined ? requestedAgentId ?? undefined : undefined
-    if (localSession) localSession.agentId = configuredAgentId ?? null
+    const configuredAgentId = sessionId === undefined && configuredPlanId == null
+      ? requestedAgentId ?? undefined
+      : undefined
+    if (localSession) {
+      localSession.agentId = configuredAgentId ?? null
+      localSession.orchestrationPlanId = configuredPlanId ?? null
+    }
 
     activeStreamAbort = sendMessage(
       {
         session_id: sessionId,
         ...(configuredAgentId == null ? {} : { agent_id: configuredAgentId }),
+        ...(configuredPlanId == null ? {} : { orchestration_plan_id: configuredPlanId }),
         content,
       },
-      streamHandlers(ai, configuredAgentId),
+      streamHandlers(ai, configuredAgentId, configuredPlanId),
     )
     return true
   }
@@ -821,7 +955,7 @@ export const useConsoleStore = defineStore('console', () => {
       state.sessions = [...SESSIONS]
       state.activeSessionId = SESSIONS[0]?.id ?? ''
       state.activeAppId = SESSIONS[0]?.appId ?? null
-      state.workbenchMode = getWorkbenchApp(state.activeAppId) ? 'split' : 'chat'
+      state.workbenchMode = defaultWorkbenchMode(state.activeSessionId)
     }
     if (state.messages.length) return
     state.messages.push({
@@ -862,6 +996,7 @@ export const useConsoleStore = defineStore('console', () => {
     newSession,
     openApp,
     setNewSessionAgent,
+    setNewSessionPlan,
     setWorkbenchMode,
     setSearch,
     renameSession: renameSessionAction,

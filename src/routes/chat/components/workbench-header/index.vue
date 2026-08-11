@@ -10,20 +10,29 @@ const props = defineProps<{
   agentLabel: string
   mode: WorkbenchMode
   splitAvailable: boolean
+  /** 当前会话是否绑定了编排方案(执行图视图的可用条件) */
+  planBound: boolean
 }>()
 const emit = defineEmits<{ selectMode: [mode: WorkbenchMode] }>()
 
-const modes: WorkbenchMode[] = ['chat', 'split', 'app']
-const labels: Record<WorkbenchMode, string> = { chat: '对话', split: '分屏', app: '应用' }
+const modes: WorkbenchMode[] = ['chat', 'split', 'app', 'graph']
+const labels: Record<WorkbenchMode, string> = { chat: '对话', split: '分屏', app: '应用', graph: '执行图' }
 const modeDescriptions: Record<WorkbenchMode, string> = {
   chat: '对话视图',
   split: '对话与应用分屏',
   app: '应用视图',
+  graph: '编排执行图视图',
 }
 
+// 分屏/应用依赖打开的应用,执行图依赖会话绑定的编排方案
 const modeOptions = computed(() =>
   modes
-    .filter((mode) => mode !== 'split' || props.splitAvailable)
+    .filter((mode) => {
+      if (mode === 'split') return Boolean(props.activeApp) && props.splitAvailable
+      if (mode === 'app') return Boolean(props.activeApp)
+      if (mode === 'graph') return props.planBound
+      return true
+    })
     .map((value) => ({ value, label: labels[value] })),
 )
 
@@ -46,7 +55,7 @@ function selectMode(value: string | number) {
     </div>
 
     <UTabs
-      v-if="activeApp"
+      v-if="activeApp || planBound"
       :class="$style['view-switch']"
       :model-value="mode"
       :items="modeOptions"

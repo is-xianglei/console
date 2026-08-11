@@ -1,0 +1,206 @@
+import { defineStore } from 'pinia'
+import { reactive } from 'vue'
+import { ApiError } from '@/http'
+import {
+  createPlan,
+  deletePlan,
+  getPlanDetail,
+  getPlanList,
+  updatePlan,
+} from '@/http/orchestration-plan'
+import type {
+  PlanCreateRequest,
+  PlanMemberRequest,
+  PlanMode,
+  PlanResponse,
+} from '@/interfaces/orchestration-plan/api'
+import { useAuthStore } from './auth'
+
+interface OrchestrationPlansState {
+  items: PlanResponse[]
+  total: number
+  loading: boolean
+  saving: boolean
+  deleting: boolean
+}
+
+/** 保存方案的输入；成员按数组顺序提交，position 由后端依序生成。 */
+export interface SavePlanInput {
+  id?: number
+  name: string
+  description: string
+  mode: PlanMode
+  maxIterations: number
+  fallback: string
+  isEnabled: boolean
+  members: Array<{ agentId: number; routeKey: string; when: string }>
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiError ? error.message : fallback
+}
+
+async function getAllPlanPages() {
+  const items: PlanResponse[] = []
+  let total: number
+  do {
+    const response = await getPlanList({ limit: 100, offset: items.length })
+    items.push(...response.items)
+    total = response.total
+    if (!response.items.length) break
+  } while (items.length < total)
+  return { items, total }
+}
+
+/** 由表单输入构造后端载荷；routing 模式才携带 route_key/when 与 fallback。 */
+function buildPlanPayload(input: SavePlanInput): PlanCreateRequest {
+  const members: PlanMemberRequest[] = input.members.map((member) => ({
+    agent_id: member.agentId,
+    role_config: input.mode === 'routing'
+      ? { route_key: member.routeKey.trim(), when: member.when.trim() }
+      : {},
+  }))
+  const config: Record<string, unknown> = {}
+  if (input.mode === 'loop') config.max_iterations = input.maxIterations
+  if (input.mode === 'routing' && input.fallback.trim()) config.fallback = input.fallback.trim()
+  return {
+    name: input.name,
+    description: input.description || null,
+    mode: input.mode,
+    config,
+    is_enabled: input.isEnabled,
+    members,
+  }
+}
+
+export const useOrchestrationPlansStore = defineStore('orchestrationPlans', () => {
+  const authStore = useAuthStore()
+  let dataGeneration = 0
+  let planListGeneration = 0
+  const state = reactive<OrchestrationPlansState>({
+    items: [],
+    total: 0,
+    loading: false,
+    saving: false,
+    deleting: false,
+  })
+
+  function contextChanged(generation: number, workspaceId: number | null) {
+    return generation !== dataGeneration || workspaceId !== authStore.currentWorkspaceId
+  }
+
+  function invalidatePlanListRequests() {
+    planListGeneration += 1
+    state.loading = false
+  }
+
+  function upsertPlan(plan: PlanResponse) {
+    invalidatePlanListRequests()
+    const index = state.items.findIndex((item) => item.id === plan.id)
+    if (index >= 0) state.items[index] = plan
+    else state.items.unshift(plan)
+    state.total = Math.max(state.total, state.items.length)
+  }
+
+  function resetPlans() {
+    dataGeneration += 1
+    planListGeneration += 1
+    state.items = []
+    state.total = 0
+    state.loading = false
+    state.saving = false
+    state.deleting = false
+  }
+
+  async function loadPlans(): Promise<string | null> {
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    const listGeneration = ++planListGeneration
+    state.loading = true
+    try {
+      const response = await getAllPlanPages()
+      if (contextChanged(generation, workspaceId) || listGeneration !== planListGeneration) return null
+      state.items = response.items
+      state.total = response.total
+      return null
+    } catch (error) {
+      if (contextChanged(generation, workspaceId) || listGeneration !== planListGeneration) return null
+      state.items = []
+      state.total = 0
+      return errorMessage(error, '编排方案列表加载失败')
+    } finally {
+      if (!contextChanged(generation, workspaceId) && listGeneration === planListGeneration) {
+        state.loading = false
+      }
+    }
+  }
+
+  async function loadPlanDetail(planId: number): Promise<PlanResponse | null | undefined> {
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    try {
+      const detail = await getPlanDetail(planId)
+      if (contextChanged(generation, workspaceId)) return undefined
+      upsertPlan(detail)
+      return detail
+    } catch {
+      if (contextChanged(generation, workspaceId)) return undefined
+      return null
+    }
+  }
+
+  async function savePlan(input: SavePlanInput): Promise<{ item: PlanResponse | null; error: string | null }> {
+    if (state.saving) return { item: null, error: '编排方案正在保存，请稍候' }
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    invalidatePlanListRequests()
+    state.saving = true
+    const payload = buildPlanPayload(input)
+
+    try {
+      const saved = input.id == null
+        ? await createPlan(payload)
+        : await updatePlan(input.id, payload)
+      if (contextChanged(generation, workspaceId)) return { item: null, error: null }
+      upsertPlan(saved)
+      return { item: saved, error: null }
+    } catch (error) {
+      if (contextChanged(generation, workspaceId)) return { item: null, error: null }
+      await loadPlans()
+      if (contextChanged(generation, workspaceId)) return { item: null, error: null }
+      return { item: null, error: errorMessage(error, input.id ? '编排方案更新失败' : '编排方案创建失败') }
+    } finally {
+      if (!contextChanged(generation, workspaceId)) state.saving = false
+    }
+  }
+
+  async function removePlan(planId: number): Promise<string | null | undefined> {
+    if (state.deleting) return '编排方案正在删除，请稍候'
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    invalidatePlanListRequests()
+    state.deleting = true
+    try {
+      await deletePlan(planId)
+      if (contextChanged(generation, workspaceId)) return undefined
+      invalidatePlanListRequests()
+      state.items = state.items.filter((item) => item.id !== planId)
+      state.total = Math.max(0, state.total - 1)
+      return null
+    } catch (error) {
+      if (contextChanged(generation, workspaceId)) return undefined
+      return errorMessage(error, '编排方案删除失败')
+    } finally {
+      if (!contextChanged(generation, workspaceId)) state.deleting = false
+    }
+  }
+
+  return {
+    state,
+    resetPlans,
+    loadPlans,
+    loadPlanDetail,
+    savePlan,
+    removePlan,
+  }
+})
