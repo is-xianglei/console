@@ -3,7 +3,7 @@ import type { AgentResponse } from '@/interfaces/agent/api'
 import type { AgentFormModel, AgentValidationIssue } from '@/interfaces/agent/model'
 import { useAgentsStore } from '@/stores/agents'
 
-function emptyAgentForm(): AgentFormModel {
+export function emptyAgentForm(): AgentFormModel {
   return {
     id: null,
     workspaceId: null,
@@ -37,20 +37,24 @@ export function agentResponseToForm(agent: AgentResponse): AgentFormModel {
   }
 }
 
+export function validateAgent(agent: AgentFormModel): AgentValidationIssue[] {
+  const issues: AgentValidationIssue[] = []
+  if (!agent.name.trim()) issues.push({ section: 'identity', message: '名称不能为空。' })
+  if (!agent.systemPrompt.trim()) issues.push({ section: 'prompt', message: '系统提示词不能为空。' })
+  return issues
+}
+
+/** 列表页：加载、筛选、删除；不含编辑/保存(见 useAgentEditor)。 */
 export function useAgentManager() {
   const agentsStore = useAgentsStore()
   const search = ref('')
   const enabledFilter = ref<'all' | 'enabled' | 'disabled'>('all')
   const selectedId = ref<number | null>(null)
-  const builderOpen = ref(false)
-  const builderMode = ref<'create' | 'edit'>('create')
-  const draft = ref<AgentFormModel>(emptyAgentForm())
   const pendingDelete = ref<AgentResponse | null>(null)
   const loadingError = ref('')
   const toast = ref('')
   let toastTimer: ReturnType<typeof setTimeout> | undefined
   let loadRequest = 0
-  let editRequest = 0
 
   const agents = computed(() => agentsStore.state.items)
   const tools = computed(() => agentsStore.state.tools)
@@ -94,104 +98,11 @@ export function useAgentManager() {
 
   function resetView() {
     loadRequest += 1
-    editRequest += 1
-    builderOpen.value = false
-    builderMode.value = 'create'
-    draft.value = emptyAgentForm()
     selectedId.value = null
     pendingDelete.value = null
     loadingError.value = ''
     toast.value = ''
     if (toastTimer) clearTimeout(toastTimer)
-  }
-
-  function openCreate() {
-    editRequest += 1
-    loadingError.value = ''
-    builderMode.value = 'create'
-    draft.value = emptyAgentForm()
-    builderOpen.value = true
-  }
-
-  async function openEdit(agent: AgentResponse) {
-    const request = ++editRequest
-    builderMode.value = 'edit'
-    const detail = await agentsStore.loadAgentDetail(agent.id)
-    if (request !== editRequest || detail === undefined) return
-    if (!detail) {
-      loadingError.value = 'Agent 详情加载失败，未进入编辑模式。请刷新后重试。'
-      return
-    }
-    loadingError.value = ''
-    draft.value = agentResponseToForm(detail)
-    builderOpen.value = true
-  }
-
-  function openDuplicate(agent: AgentResponse) {
-    editRequest += 1
-    loadingError.value = ''
-    builderMode.value = 'create'
-    draft.value = {
-      ...agentResponseToForm(agent),
-      id: null,
-      workspaceId: null,
-      createdByUserId: null,
-      name: `${agent.name} 副本`,
-      isEnabled: false,
-      createdAt: '',
-      updatedAt: '',
-    }
-    builderOpen.value = true
-  }
-
-  function validateAgent(agent: AgentFormModel): AgentValidationIssue[] {
-    const issues: AgentValidationIssue[] = []
-    if (!agent.name.trim()) issues.push({ section: 'identity', message: '名称不能为空。' })
-    if (!agent.systemPrompt.trim()) issues.push({ section: 'prompt', message: '系统提示词不能为空。' })
-    return issues
-  }
-
-  async function persistDraft(enabled = draft.value.isEnabled) {
-    const result = await agentsStore.saveAgent({
-      id: draft.value.id ?? undefined,
-      name: draft.value.name.trim(),
-      description: draft.value.description.trim(),
-      systemPrompt: draft.value.systemPrompt.trim(),
-      modelName: draft.value.modelName.trim(),
-      isEnabled: enabled,
-      toolIds: [...draft.value.toolIds],
-      skillIds: [...draft.value.skillIds],
-    })
-    if (result.error) {
-      if (result.item) draft.value = agentResponseToForm(result.item)
-      loadingError.value = result.error
-      return false
-    }
-    if (!result.item) {
-      return false
-    }
-
-    loadingError.value = ''
-    draft.value = agentResponseToForm(result.item)
-    builderMode.value = 'edit'
-    selectedId.value = result.item.id
-    showToast(`${result.item.name} 已保存`)
-    return true
-  }
-
-  async function saveDraft() {
-    if (validateAgent(draft.value).length) return false
-    return persistDraft()
-  }
-
-  async function publish() {
-    if (validateAgent(draft.value).length) return false
-    const saved = await persistDraft(true)
-    if (saved) {
-      builderOpen.value = false
-      showToast(`${draft.value.name} 已启用`)
-    }
-    return saved
   }
 
   async function confirmDelete() {
@@ -221,9 +132,6 @@ export function useAgentManager() {
     search,
     enabledFilter,
     selectedId,
-    builderOpen,
-    builderMode,
-    draft,
     pendingDelete,
     loadingError,
     toast,
@@ -233,12 +141,6 @@ export function useAgentManager() {
     showToast,
     loadAll,
     resetView,
-    openCreate,
-    openEdit,
-    openDuplicate,
-    validateAgent,
-    saveDraft,
-    publish,
     confirmDelete,
   }
 }

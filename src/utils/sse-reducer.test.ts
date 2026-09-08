@@ -208,4 +208,40 @@ describe('createSseReducer', () => {
       stream: [{ kind: 'answer', text: '结构清晰' }],
     })
   })
+
+  it('workflow_progress 只喂进度图,不进主时间线也不建面板', () => {
+    const ai: ChatMessage = { id: 'ai-8', role: 'ai', time: '10:07', blocks: [] }
+    const agents: Parameters<typeof createSseReducer>[0]['agents'] = []
+    const onWorkflowProgress = vi.fn()
+    const reducer = createSseReducer({ ai, agents, selectAgent: vi.fn(), onWorkflowProgress })
+    const progress = { phase: 'member', status: 'running', agent_id: 1, member_name: '专业写作', ordinal: 1, total: 2 }
+
+    reducer.handle(createEvent('workflow_progress', {
+      actor: { role: 'orchestrator', name: 'orchestrator' },
+      progress,
+    }))
+    // 缺 progress 负载的事件同样早退,不触发回调
+    reducer.handle(createEvent('workflow_progress', { actor: { role: 'orchestrator', name: 'orchestrator' } }))
+
+    expect(onWorkflowProgress).toHaveBeenCalledTimes(1)
+    expect(onWorkflowProgress).toHaveBeenCalledWith(progress)
+    expect(ai.blocks).toEqual([])
+    expect(agents).toEqual([])
+  })
+
+  it('Workflow 成员面板记录 actor.agent_id 供进度图反查 run_id', () => {
+    const agents: Parameters<typeof createSseReducer>[0]['agents'] = []
+    const reducer = createSseReducer({
+      ai: { id: 'ai-9', role: 'ai', time: '10:08', blocks: [] },
+      agents,
+      selectAgent: vi.fn(),
+    })
+    const actor = { role: 'subagent' as const, name: 'wf-专业写作', run_id: 'run-1', agent_id: 1 }
+
+    reducer.handle(createEvent('turn_start', { actor }))
+    reducer.handle(createEvent('turn_end', { actor }))
+
+    expect(agents).toHaveLength(1)
+    expect(agents[0]).toMatchObject({ id: 'run-1', name: 'wf-专业写作', agentId: 1, status: 'done' })
+  })
 })

@@ -1,0 +1,38 @@
+@import '../shared/index.module.css';
+@import '../../components/agent-inspector/index.module.css';
+
+/* detail 全页专用：外壳与底部分区。 */
+.ag-detail-shell {
+  max-width: var(--page-content-max);
+  margin: 0 auto;
+  padding: var(--space-lg) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.ag-detail-shell > .ag-detail-section {
+  margin-top: 0;
+}
+
+.ag-detail-actions {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.ag-detail-actions .ag-icon-button {
+  margin-right: auto;
+}
+
+.ag-modal-copy {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}

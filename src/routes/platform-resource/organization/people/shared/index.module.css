@@ -1,0 +1,15 @@
+/* people 三页共用：直接复用 departments 抽取的页面壳、指标条、工具栏、表格、详情与表单外壳样式，仅补 people 专有类。 */
+@import '../../departments/shared/index.module.css';
+
+/* 角色/归属徽标里的英文角色值不做大写转换；「我」徽标紧跟姓名。 */
+.roleBadge { text-transform: none; }
+.mineBadge { margin-left: 6px; text-transform: none; }
+/* 详情页头像 + 姓名/邮箱 hero 区。 */
+.personHero { display: flex; align-items: center; gap: 11px; }
+.personHero > div { min-width: 0; display: flex; flex-direction: column; }
+.personHero strong { color: var(--text-primary); font-size: 12px; }
+.personHero span { margin-top: 3px; overflow: hidden; color: var(--text-dim); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+/* 详情页「工作区归属」编辑区：部门/角色下拉 + 岗位只读。 */
+.assignmentForm { margin-top: 10px; display: grid; gap: 9px; }
+.assignmentForm :global([data-slot='label']) { color: var(--text-muted); font-size: 9px; }
+.assignmentHint { margin-top: 8px; color: var(--text-dim); font-size: 9px; line-height: 1.6; }

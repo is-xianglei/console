@@ -1,0 +1,5 @@
+@import '../shared/index.module.css';
+
+/* departments 列表页专用补充。 */
+.filterTabs { flex: 0 0 auto; }
+.statusBadge { text-transform: none; }

@@ -1,0 +1,10 @@
+.form { display: grid; gap: 13px; }
+.form :global([data-slot='label']) { color: var(--text-muted); font-size: 9px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.field { width: 100%; }
+.toggle { min-height: 48px; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border-subtle); }
+.toggle > span { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.toggle strong { color: var(--text-secondary); font-size: 10px; }
+.toggle small { margin-top: 3px; color: var(--text-dim); font-size: 8px; }
+.actions { min-height: 58px; padding-top: 10px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border); }
+@media (max-width: 720px) { .grid { grid-template-columns: minmax(0, 1fr); } }

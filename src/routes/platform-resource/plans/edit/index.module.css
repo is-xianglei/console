@@ -1,0 +1,32 @@
+@import '../shared/index.module.css';
+
+.pl-loading {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  color: var(--text-primary);
+  background: var(--bg-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pl-loading-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.pl-loading-back {
+  position: fixed;
+  top: 12px;
+  left: var(--page-gutter);
+}
+
+.pl-modal-copy {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}

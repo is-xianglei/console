@@ -31,9 +31,69 @@
 .task-head:hover {
   background: var(--bg-surface);
 }
+/* ===== AICSS 三态头部图标:清单 / 虚线环+conic 饼图 / 对勾,叠放靠 opacity 交叉过渡 ===== */
+.task-head-ic-wrap {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.task-head-ic,
+.task-head-pie,
+.task-head-check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+.task-head-ic.on,
+.task-head-pie.on,
+.task-head-check.on {
+  opacity: 1;
+}
 .task-head-ic {
   font-size: 14px;
   color: var(--accent-agent);
+}
+.task-head-check {
+  font-size: 15px;
+  color: var(--status-success);
+}
+/* @property 让 conic 百分比可平滑过渡;不支持 Houdini 的浏览器只是不过渡,不报错 */
+@property --todo-pie {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+/* 运行中:外圈虚线环缓慢旋转,内芯 conic-gradient 按进度扇形填充 */
+.task-head-pie {
+  border-radius: 50%;
+  color: var(--accent-agent);
+  transition: opacity 140ms ease, --todo-pie 400ms ease;
+}
+.task-head-pie-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  color: var(--text-dim);
+  animation: task-ring-spin 6s linear infinite;
+}
+.task-head-pie::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: conic-gradient(currentColor var(--todo-pie, 0%), transparent 0);
+}
+@keyframes task-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .task-head-title {
   font-family: var(--font-ui);
@@ -41,9 +101,36 @@
   font-weight: 600;
   color: var(--text-primary);
 }
+/* ===== 数字滚动:外层 1em 视窗裁剪,内层双帧列向上位移 ===== */
 .task-count {
+  display: inline-flex;
+  align-items: baseline;
   font-size: 11px;
   color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.roll-digit {
+  display: inline-block;
+  overflow: hidden;
+  height: 1em;
+  line-height: 1em;
+}
+.roll-inner {
+  display: flex;
+  flex-direction: column;
+  transition: transform 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.roll-inner span {
+  height: 1em;
+  line-height: 1em;
+}
+.roll-inner.on {
+  transform: translateY(-1em);
+}
+.roll-static {
+  display: inline-block;
+  height: 1em;
+  line-height: 1em;
 }
 .task-chev {
   margin-left: auto;
@@ -100,6 +187,19 @@
   padding: 9px 14px;
   font-family: var(--font-body);
   font-size: 12px;
+  /* AICSS 逐项入场:--i 驱动 stagger 延迟,展开时依次淡入下滑 */
+  animation: task-item-in 360ms ease backwards;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+@keyframes task-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(-7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .task-row + .task-row {
   border-top: 1px solid var(--border-subtle);
@@ -110,23 +210,40 @@
   width: 18px;
   flex-shrink: 0;
 }
-/* 状态圆点:比彩色徽章更克制的行首状态指示 */
-.task-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+/* ===== AICSS 四态行图标:虚线圈 / 箭头 / 对勾 / 叉,叠放靠 opacity 切换 ===== */
+/* 每个图标只看自身 t.state 的判断结果,与列表位置无关(任务并行 + 可阻塞,完成顺序不线性) */
+.task-icon-wrap {
+  position: relative;
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
-  background: var(--text-dim);
 }
-.task-dot.active {
-  background: var(--accent-agent);
-  box-shadow: 0 0 0 3px var(--accent-agent-dim);
+.task-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity 320ms ease;
 }
-.task-dot.done {
-  background: var(--status-success);
+.task-icon.on {
+  opacity: 1;
 }
-.task-dot.error {
-  background: var(--status-error);
+.task-icon.strong {
+  color: var(--accent-agent);
+}
+.task-icon.ok {
+  color: var(--status-success);
+}
+.task-icon.bad {
+  color: var(--status-error);
+}
+/* active 行的箭头图标轻微脉冲,呼应"正在执行" */
+.task-row.active .task-icon.strong.on {
+  animation: pulse-dot 2s infinite;
 }
 .task-row-main {
   flex: 1;
@@ -136,19 +253,61 @@
   min-width: 0;
 }
 .task-row-name {
+  position: relative;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 360ms ease;
+}
+/* AICSS 扫光:active 行文字换成渐变裁切副本,高光带从右往左掠过 */
+.task-row-name::before {
+  content: attr(data-label);
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--text-primary) 0%,
+    var(--text-primary) 30%,
+    color-mix(in srgb, var(--text-primary) 45%, transparent) 45%,
+    color-mix(in srgb, var(--text-primary) 45%, transparent) 55%,
+    var(--text-primary) 70%,
+    var(--text-primary) 100%
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  opacity: 0;
+  transition: opacity 360ms ease;
+  pointer-events: none;
+}
+.task-row.active .task-row-name {
+  color: transparent;
+  font-weight: 500;
+}
+.task-row.active .task-row-name::before {
+  opacity: 1;
+  animation: task-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+@keyframes task-shine {
+  0%,
+  18% {
+    background-position: 100% 0;
+  }
+  82%,
+  100% {
+    background-position: 0% 0;
+  }
 }
 .task-row.done .task-row-name {
   color: var(--text-muted);
   text-decoration: line-through;
   text-decoration-color: var(--border-strong, var(--text-dim));
 }
-.task-row.active .task-row-name {
-  color: var(--text-primary);
-  font-weight: 500;
+.task-row.error .task-row-name {
+  color: var(--status-error);
 }
 .task-row.blocked {
   opacity: 0.55;
@@ -189,7 +348,7 @@
   width: 2px;
   background: var(--accent-agent);
 }
-/* 状态徽章:仅表头汇总用;行内改用小圆点 + sm 徽章 */
+/* 状态徽章:仅表头汇总用;行内改用状态图标 + sm 徽章 */
 .task-badge {
   font-family: var(--font-data);
   font-size: 9px;
@@ -217,4 +376,21 @@
 .task-badge.error {
   color: var(--status-error);
   background: color-mix(in srgb, var(--status-error) 10%, transparent);
+}
+/* 降级:减少动态偏好时关掉入场/扫光/旋转/滚动动画,状态切换直接跳变 */
+@media (prefers-reduced-motion: reduce) {
+  .task-row {
+    animation: none;
+  }
+  .task-icon,
+  .task-row-name,
+  .task-row-name::before,
+  .roll-inner {
+    transition: none;
+  }
+  .task-row.active .task-row-name::before,
+  .task-row.active .task-icon.strong.on,
+  .task-head-pie-ring {
+    animation: none;
+  }
 }

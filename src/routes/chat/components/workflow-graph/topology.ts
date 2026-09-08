@@ -1,4 +1,5 @@
 import type { PlanMemberResponse, PlanResponse } from '@/interfaces/orchestration-plan/api'
+import type { WorkflowAgentResponse, WorkflowResponse } from '@/interfaces/workflow/api'
 import type { TopoEdge, TopoNode, Topology, WfNodeKind } from './types'
 
 /** 成员节点键用 position 而非数组下标：position 是后端定的稳定序号，
@@ -18,7 +19,7 @@ function routeKeyOf(member: PlanMemberResponse): string | null {
 function structNode(id: string, kind: WfNodeKind, label: string): TopoNode {
   return {
     id,
-    data: { kind, label, position: null, disabled: false, status: 'pending', runId: null },
+    data: { kind, label, position: null, agentId: null, disabled: false, status: 'pending', runId: null },
   }
 }
 
@@ -29,6 +30,7 @@ function memberNode(member: PlanMemberResponse): TopoNode {
       kind: 'member',
       label: member.agent_name,
       position: member.position,
+      agentId: null,
       disabled: !member.is_available,
       status: 'pending',
       runId: null,
@@ -104,4 +106,70 @@ export function buildTopology(plan: PlanResponse): Topology {
   }
 
   return { nodes, edges, loopbacks }
+}
+
+/** Workflow 成员节点键用 agent_id：后端约束同一 Agent 不能重复绑定，天然唯一且稳定；
+ *  workflow_progress 事件也只带 agent_id，运行时补丁按它找节点。 */
+function workflowMemberId(member: WorkflowAgentResponse): string {
+  return `m${member.agent_id}`
+}
+
+/** Workflow 成员节点。agent_name 为 null 表示成员 Agent 已被软删除，运行必然失败，标成 disabled。 */
+function workflowMemberNode(member: WorkflowAgentResponse): TopoNode {
+  return {
+    id: workflowMemberId(member),
+    data: {
+      kind: 'member',
+      label: member.agent_name ?? '已删除的 Agent',
+      position: null,
+      agentId: member.agent_id,
+      disabled: member.agent_name == null,
+      status: 'pending',
+      runId: null,
+    },
+  }
+}
+
+/**
+ * 把后端 Workflow 定义转成抽象图，三种模式与后端编排器一一对应：
+ * sequential 是 start→成员链→end 单链；parallel 由 start 扇出、经「汇总结果」收束（后端
+ * merging 阶段）；llm_routing 在起点后加「智能路由」节点（后端 routing 阶段）扇出到各成员，
+ * 只有命中的那个会运行，成员直接接 end，不设汇聚节点。Workflow 没有回环，loopbacks 恒空。
+ */
+export function buildWorkflowTopology(workflow: WorkflowResponse): Topology {
+  // 接口已按 (sort_order, agent_id) 升序返回，这里再排一次防御外部构造的乱序数据
+  const members = [...workflow.agents].sort(
+    (left, right) => left.sort_order - right.sort_order || left.agent_id - right.agent_id,
+  )
+  if (!members.length) return { nodes: [], edges: [], loopbacks: [] }
+
+  const hasRouterNode = workflow.mode === 'llm_routing'
+  const hasJoinNode = workflow.mode === 'parallel'
+
+  const nodes: TopoNode[] = [structNode('start', 'anchor-start', '开始')]
+  if (hasRouterNode) nodes.push(structNode('router', 'router', '智能路由'))
+  nodes.push(...members.map(workflowMemberNode))
+  if (hasJoinNode) nodes.push(structNode('join', 'join', '汇总结果'))
+  nodes.push(structNode('end', 'anchor-end', '结束'))
+
+  const edges: TopoEdge[] = []
+  if (workflow.mode === 'sequential') {
+    let prev = 'start'
+    for (const member of members) {
+      edges.push(flowEdge(prev, workflowMemberId(member)))
+      prev = workflowMemberId(member)
+    }
+    edges.push(flowEdge(prev, 'end'))
+  } else {
+    const fan = hasRouterNode ? 'router' : 'start'
+    const sink = hasJoinNode ? 'join' : 'end'
+    if (hasRouterNode) edges.push(flowEdge('start', 'router'))
+    for (const member of members) {
+      edges.push(flowEdge(fan, workflowMemberId(member)))
+      edges.push(flowEdge(workflowMemberId(member), sink))
+    }
+    if (hasJoinNode) edges.push(flowEdge('join', 'end'))
+  }
+
+  return { nodes, edges, loopbacks: [] }
 }

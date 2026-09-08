@@ -1,0 +1,11 @@
+@import '../shared/index.module.css';
+
+/* people 详情全页专用：外壳、状态行、身份信息卡与归属卡。 */
+.detailShell { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); gap: 16px; align-items: start; }
+.card { padding: 16px 18px; border: 1px solid var(--border); background: var(--bg-panel); }
+.stateRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stateRow > span:last-child { color: var(--text-dim); font-size: 9px; }
+.detailActions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.detailActions > button:first-child { margin-right: auto; }
+.badgeGroup { display: flex; align-items: center; gap: 6px; }
+@media (max-width: 1080px) { .detailShell { grid-template-columns: minmax(0, 1fr); } }

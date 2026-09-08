@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useConsoleStore } from '@/stores/console'
 
 defineOptions({ name: 'TaskBar' })
@@ -23,6 +23,8 @@ const errorCount = computed(() => state.tasks.filter((t) => t.state === 'error')
 const allDone = computed(
   () => hasTasks.value && doneCount.value === state.tasks.length && !errorCount.value,
 )
+/** 头部图标的"运行中"态:存在正在执行的任务时显示虚线环 + conic 饼图 */
+const running = computed(() => activeCount.value > 0 && !allDone.value)
 const progress = computed(() =>
   state.tasks.length ? (doneCount.value / state.tasks.length) * 100 : 0,
 )
@@ -35,10 +37,26 @@ const doneIds = computed(
 function blockingIds(t: (typeof state.tasks)[number]): number[] {
   return (t.blockedBy ?? []).filter((id) => !doneIds.value.has(id))
 }
+/** 待办态:非 done/active/error 的一切状态都渲染虚线圈,只看自身 state,不做位置推断 */
+function isPending(t: (typeof state.tasks)[number]): boolean {
+  return t.state !== 'done' && t.state !== 'active' && t.state !== 'error'
+}
 const summary = computed(() => {
   if (!state.tasks.length) return '0 / 0 待命'
   const tail = errorCount.value ? '有失败' : activeCount.value ? '运行中' : '完成'
   return `${doneCount.value} / ${state.tasks.length} ${tail}`
+})
+
+// doneCount 变化时数字向上滚动:生成 {from,to} 双帧,双重 rAF 触发位移,380ms 后清理
+const roll = ref<{ from: string; to: string } | null>(null)
+const rollUp = ref(false)
+let rollTimer: ReturnType<typeof setTimeout> | null = null
+watch(doneCount, (val, old) => {
+  roll.value = { from: String(old), to: String(val) }
+  rollUp.value = false
+  requestAnimationFrame(() => requestAnimationFrame(() => (rollUp.value = true)))
+  if (rollTimer) clearTimeout(rollTimer)
+  rollTimer = setTimeout(() => (roll.value = null), 380)
 })
 
 // 有新任务出现时自动展开;全部完成后延时自动收起
@@ -60,6 +78,11 @@ watch(
   },
   { immediate: true },
 )
+
+onBeforeUnmount(() => {
+  if (closeTimer) clearTimeout(closeTimer)
+  if (rollTimer) clearTimeout(rollTimer)
+})
 </script>
 
 <template>
@@ -67,9 +90,31 @@ watch(
     <div :class="[$style['task-card'], { [$style.open]: open }]">
       <div :class="$style['task-head-wrap']">
         <UButton color="neutral" variant="ghost" block :class="$style['task-head']" @click="open = !open">
-          <i :class="[$style['task-head-ic'], 'icon icon-list-checks']"></i>
+          <!-- 三态头部图标叠放:清单(默认) / 虚线环+conic 饼图(运行中) / 对勾(全部完成),靠 opacity 交叉过渡 -->
+          <span :class="$style['task-head-ic-wrap']" aria-hidden="true">
+            <i :class="[$style['task-head-ic'], { [$style.on]: !running && !allDone }, 'icon icon-list-checks']"></i>
+            <span
+              :class="[$style['task-head-pie'], { [$style.on]: running }]"
+              :style="{ '--todo-pie': progress + '%' }"
+            >
+              <svg :class="$style['task-head-pie-ring']" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="2.2 4.4" stroke-linecap="round" />
+              </svg>
+            </span>
+            <i :class="[$style['task-head-check'], { [$style.on]: allDone }, 'icon icon-circle-check']"></i>
+          </span>
           <span :class="$style['task-head-title']">任务编排</span>
-          <span :class="[$style['task-count'], 'mono']">{{ doneCount }}/{{ state.tasks.length }}</span>
+          <!-- 数字滚动:doneCount 变化时旧值上移、新值顶入 -->
+          <span :class="[$style['task-count'], 'mono']" :aria-label="doneCount + '/' + state.tasks.length">
+            <span :class="$style['roll-digit']">
+              <span v-if="roll" :class="[$style['roll-inner'], { [$style.on]: rollUp }]">
+                <span>{{ roll.from }}</span>
+                <span>{{ roll.to }}</span>
+              </span>
+              <template v-else>{{ doneCount }}</template>
+            </span>
+            <span :class="$style['roll-static']">/{{ state.tasks.length }}</span>
+          </span>
           <span
             :class="[
               $style['task-badge'],
@@ -97,15 +142,23 @@ watch(
                 {
                   [$style.done]: t.state === 'done',
                   [$style.active]: t.state === 'active',
+                  [$style.error]: t.state === 'error',
                   [$style.blocked]: blockingIds(t).length > 0,
                 },
               ]"
+              :style="{ '--i': i }"
               :title="t.description || t.name"
             >
               <span :class="[$style['task-row-ix'], 'mono']">{{ String(i + 1).padStart(2, '0') }}</span>
-              <span :class="[$style['task-dot'], $style[t.state]]"></span>
+              <!-- 三态行图标叠放:严格按 t.state 逐项判断,不做任何位置/顺序推断 -->
+              <span :class="$style['task-icon-wrap']" aria-hidden="true">
+                <i :class="[$style['task-icon'], { [$style.on]: isPending(t) }, 'icon icon-circle-dashed']"></i>
+                <i :class="[$style['task-icon'], $style.strong, { [$style.on]: t.state === 'active' }, 'icon icon-circle-arrow-right']"></i>
+                <i :class="[$style['task-icon'], $style.ok, { [$style.on]: t.state === 'done' }, 'icon icon-circle-check']"></i>
+                <i :class="[$style['task-icon'], $style.bad, { [$style.on]: t.state === 'error' }, 'icon icon-circle-x']"></i>
+              </span>
               <span :class="$style['task-row-main']">
-                <span :class="$style['task-row-name']">{{ t.name }}</span>
+                <span :class="$style['task-row-name']" :data-label="t.name">{{ t.name }}</span>
                 <span v-if="t.owner && t.owner !== 'agent' || blockingIds(t).length" :class="$style['task-row-meta']">
                   <span v-if="t.owner && t.owner !== 'agent'" :class="$style['task-owner']">
                     <i class="icon icon-user"></i>{{ t.owner }}

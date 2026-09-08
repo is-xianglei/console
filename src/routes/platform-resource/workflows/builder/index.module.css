@@ -1,0 +1,585 @@
+.wf-builder {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  color: var(--text-primary);
+  background: var(--bg-deep);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wf-builder button,
+.wf-builder input,
+.wf-builder select,
+.wf-builder textarea {
+  font-size: 12px;
+}
+
+.wf-builder-head {
+  min-height: 58px;
+  padding: 0 var(--page-gutter);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wf-builder-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.wf-builder-title nav {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.wf-builder-title nav strong {
+  color: var(--text-muted);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-builder-title h1 {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.wf-builder-title h1 span {
+  color: var(--text-dim);
+  font-size: 9px;
+}
+
+.wf-builder-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.wf-primary-button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--accent-agent);
+  border-radius: var(--radius-control);
+  background: var(--accent-agent);
+  color: var(--ui-text-inverted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: none !important;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+
+.wf-primary-button:hover {
+  border-color: var(--accent-agent-hover);
+  background: var(--accent-agent-hover);
+}
+
+.wf-primary-button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.wf-icon-button {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  cursor: pointer;
+  box-shadow: none !important;
+  line-height: 1;
+}
+
+.wf-icon-button:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.wf-validation-banner {
+  min-height: 38px;
+  padding: 6px var(--page-gutter);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.wf-builder-body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-lg) var(--page-gutter) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  overflow-y: auto;
+}
+
+.wf-section {
+  max-width: 920px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+}
+
+.wf-section-head {
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.wf-section-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  color: var(--accent-agent);
+  font-size: 15px;
+}
+
+.wf-section-head > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.wf-section-head > div > span {
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.wf-section-head h2 {
+  margin-top: 1px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.wf-section-head p {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.wf-member-count {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.wf-member-count.invalid {
+  border-color: color-mix(in srgb, var(--status-warning) 45%, transparent);
+  color: var(--status-warning);
+}
+
+.wf-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.wf-field {
+  min-width: 0;
+}
+
+.wf-span-2 {
+  grid-column: span 2;
+}
+
+.wf-field [data-slot='label'] {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.wf-field [data-slot='help'] {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.wf-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  gap: var(--space-sm);
+}
+
+.wf-mode-card {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: inherit;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.wf-mode-card:hover {
+  border-color: var(--border-strong);
+}
+
+.wf-mode-card.selected {
+  border-color: var(--accent-agent);
+  background: var(--accent-agent-dim);
+  box-shadow: 0 0 0 1px var(--accent-agent-glow);
+}
+
+.wf-mode-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.wf-mode-card.selected .wf-mode-icon {
+  border-color: var(--accent-agent-glow);
+  color: var(--accent-agent);
+}
+
+.wf-mode-main {
+  min-width: 0;
+}
+
+.wf-mode-main strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.wf-mode-main small {
+  color: var(--text-dim);
+  font-size: 9px;
+}
+
+.wf-mode-hint {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* 模式卡片下方的成员数量说明。 */
+.wf-mode-note {
+  margin: var(--space-sm) 0 0;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+
+.wf-mode-note i {
+  color: var(--status-warning);
+  font-size: 11px;
+}
+
+.wf-agent-search {
+  width: min(360px, 100%);
+  margin-bottom: var(--space-sm);
+}
+
+.wf-agent-list {
+  max-height: 300px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.wf-agent-row {
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+
+.wf-agent-row + .wf-agent-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.wf-agent-row:hover {
+  background: var(--bg-hover);
+}
+
+.wf-agent-row.selected {
+  background: var(--accent-agent-dim);
+}
+
+.wf-agent-row.disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.wf-agent-glyph {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.wf-agent-row.selected .wf-agent-glyph {
+  border-color: var(--accent-agent-glow);
+  color: var(--accent-agent);
+}
+
+.wf-agent-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.wf-agent-main strong,
+.wf-agent-main small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-agent-main strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wf-agent-main small {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.wf-agent-meta {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.wf-agent-meta strong {
+  display: block;
+  color: var(--accent-agent);
+  font-size: 10px;
+}
+
+.wf-agent-meta small {
+  color: var(--text-dim);
+  font-size: 9px;
+}
+
+.wf-agent-meta small.offline {
+  color: var(--status-error);
+}
+
+.wf-member-list {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  list-style: none;
+}
+
+.wf-member-row {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  transition: border-color var(--dur-fast), background var(--dur-fast), opacity var(--dur-fast);
+}
+
+.wf-member-row.dragging {
+  opacity: .45;
+}
+
+.wf-member-row.drag-over {
+  border-color: var(--accent-agent);
+  background: var(--accent-agent-dim);
+}
+
+.wf-member-row.unavailable {
+  border-color: color-mix(in srgb, var(--status-error) 45%, transparent);
+  background: color-mix(in srgb, var(--status-error) 7%, transparent);
+}
+
+.wf-drag-handle {
+  color: var(--text-dim);
+  display: inline-grid;
+  place-items: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+.wf-drag-handle:active {
+  cursor: grabbing;
+}
+
+.wf-member-index {
+  width: 24px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.wf-member-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.wf-member-main strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wf-member-main small {
+  color: var(--text-dim);
+  font-size: 9px;
+}
+
+/* 成员 Agent 被停用或删除时的红色提示。 */
+.wf-member-warning {
+  color: var(--status-error);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+
+.wf-member-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wf-modal-copy {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+/* 底部检查清单：校验问题按区块分组展示。 */
+.wf-issue-groups {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.wf-issue-group {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--status-warning) 30%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--status-warning) 6%, transparent);
+}
+
+.wf-issue-group > strong {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.wf-issue-group ul {
+  margin-top: 6px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wf-issue-group li {
+  color: var(--status-warning);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.wf-issue-group li i {
+  margin-top: 1px;
+  font-size: 11px;
+}
+
+/* 校验通过时的绿色确认条。 */
+.wf-issue-clear {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--status-success) 28%, transparent);
+  border-radius: var(--radius-control);
+  color: var(--status-success);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.wf-builder-footer {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+@media (max-width: 900px) {
+  .wf-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wf-span-2 {
+    grid-column: auto;
+  }
+
+  .wf-builder-actions {
+    display: none;
+  }
+}

@@ -1,0 +1,30 @@
+.wf-loading {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  color: var(--text-primary);
+  background: var(--bg-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wf-loading-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.wf-loading-back {
+  position: fixed;
+  top: 12px;
+  left: var(--page-gutter);
+}
+
+.wf-modal-copy {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}

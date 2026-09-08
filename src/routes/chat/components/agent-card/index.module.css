@@ -102,3 +102,8 @@
 .agent-mini-fill.done {
   background: var(--status-success);
 }
+/* Orb 调用处适配:负外边距把布局占位压到 6px,与静态圆点一致,
+   状态切换时行高与文案起点不跳动;溢出的视觉部分由 Orb 自身裁切。 */
+.orb-fit {
+  margin: -4px;
+}

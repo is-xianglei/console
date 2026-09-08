@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { useToast } from '@nuxt/ui/composables'
-import MemoryDetailPanel from './components/memory-detail-panel/index.vue'
 import MemoryListPanel from './components/memory-list-panel/index.vue'
 import type { MemoryPurgeConfirmationResponse } from '@/interfaces/memory/api'
 import { useMemoriesStore } from '@/stores/memories'
@@ -10,10 +10,8 @@ import { useMemoriesStore } from '@/stores/memories'
 defineOptions({ name: 'MemoriesPage' })
 
 const memoriesStore = useMemoriesStore()
+const router = useRouter()
 const toast = useToast()
-const creating = ref(false)
-const editing = ref(false)
-const mobilePane = ref<'list' | 'detail'>('list')
 const purgeOpen = ref(false)
 const purgeLoading = ref(false)
 const purgePhrase = ref('')
@@ -21,13 +19,6 @@ const purgeConfirmation = ref<MemoryPurgeConfirmationResponse | null>(null)
 const rollbackOpen = ref(false)
 const rollbackLoading = ref(false)
 const rollbackForm = reactive({ jobId: '', catalogVersion: 0 })
-const mobilePaneItems = [
-  { value: 'list', label: '记忆列表' },
-  { value: 'detail', label: '详情' },
-]
-const showInspector = computed(() => (
-  creating.value || memoriesStore.state.selectedId !== null || memoriesStore.state.detailLoading
-))
 const pageMenuItems: DropdownMenuItem[][] = [
   [{
     label: '回滚 Dream',
@@ -43,40 +34,7 @@ const pageMenuItems: DropdownMenuItem[][] = [
 ]
 
 function onCreate() {
-  memoriesStore.clearSelection()
-  creating.value = true
-  editing.value = false
-  mobilePane.value = 'detail'
-}
-
-function onSelected() {
-  creating.value = false
-  editing.value = false
-  mobilePane.value = 'detail'
-}
-
-function onEdit() {
-  creating.value = false
-  editing.value = true
-  mobilePane.value = 'detail'
-}
-
-function onCancelEdit() {
-  creating.value = false
-  editing.value = false
-  if (!memoriesStore.state.detail) mobilePane.value = 'list'
-}
-
-function onSaved() {
-  creating.value = false
-  editing.value = false
-}
-
-function onCloseInspector() {
-  creating.value = false
-  editing.value = false
-  mobilePane.value = 'list'
-  memoriesStore.clearSelection()
+  void router.push({ name: 'memory-create' })
 }
 
 async function onExport() {
@@ -187,27 +145,8 @@ async function onRollback() {
       </div>
     </header>
 
-    <div v-if="showInspector" :class="$style.mobileSwitch">
-      <UTabs v-model="mobilePane" :items="mobilePaneItems" :content="false" :ui="{ list: 'w-full', trigger: 'grow' }" />
-    </div>
-
-    <div :class="[$style.layout, { [$style.inspectorOpen]: showInspector }]">
-      <MemoryListPanel
-        :class="{ [$style.mobileHidden]: showInspector && mobilePane === 'detail' }"
-        @create="onCreate"
-        @selected="onSelected"
-        @edit="onEdit"
-      />
-      <MemoryDetailPanel
-        v-if="showInspector"
-        :creating="creating"
-        :editing="editing"
-        :class="{ [$style.mobileHidden]: mobilePane === 'list' }"
-        @cancel-create="onCancelEdit"
-        @cancel-edit="onCancelEdit"
-        @close="onCloseInspector"
-        @saved="onSaved"
-      />
+    <div :class="$style.panelWrap">
+      <MemoryListPanel />
     </div>
 
     <UModal v-model:open="rollbackOpen" title="回滚 Dream" description="使用审计中的 Dream 任务 ID 和任务完成后的 Catalog 版本执行并发安全回滚。">

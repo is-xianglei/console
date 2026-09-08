@@ -1,0 +1,88 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  /* 所有墨色走 currentColor，这里是唯一颜色入口。 */
+  color: var(--accent-agent);
+}
+
+/* 胶囊形态：同一组件，加壳。 */
+.root[data-pill] {
+  gap: 7px;
+  height: 30px;
+  padding: 0 11px 0 5px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  /* 用发丝环而非 border，不参与布局；外加一层紧贴阴影与一层环境阴影。 */
+  box-shadow:
+    0 0 0 0.5px var(--border),
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 2px 4px rgb(0 0 0 / 0.3);
+}
+
+.pill-label {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  line-height: 1;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.glyph {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  overflow: hidden;
+  contain: strict;
+}
+
+.morph {
+  position: absolute;
+  inset: 0;
+  transform: scale(var(--orb-k, 1));
+}
+
+.morph-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: orb-morph 4.8s cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+}
+
+/* 每段末尾的停顿（5%）让四个形态各自成立，而不是匀速转圈。 */
+@keyframes orb-morph {
+  0%,
+  5% {
+    transform: translate(var(--m-1));
+  }
+  25%,
+  30% {
+    transform: translate(var(--m-2));
+  }
+  50%,
+  55% {
+    transform: translate(var(--m-3));
+  }
+  75%,
+  80% {
+    transform: translate(var(--m-4));
+  }
+  100% {
+    transform: translate(var(--m-1));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 停在第一帧，8 个点构成一个静态圆环。 */
+  .morph-dot {
+    animation: none;
+    transform: translate(var(--m-1));
+  }
+}

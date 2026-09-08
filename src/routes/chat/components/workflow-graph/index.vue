@@ -4,11 +4,14 @@ import { MarkerType, VueFlow, useVueFlow, type Edge, type Node, type NodeMouseEv
 import { Background } from '@vue-flow/background'
 import { getPlanDetail } from '@/http/orchestration-plan'
 import { PLAN_MODE_LABEL } from '@/hooks/useOrchestrationPlanManager'
+import { WORKFLOW_MODE_LABEL } from '@/constants/workflow'
 import type { PlanResponse } from '@/interfaces/orchestration-plan/api'
+import type { WorkflowResponse } from '@/interfaces/workflow/api'
 import { useConsoleStore } from '@/stores/console'
+import { useWorkflowsStore } from '@/stores/workflows'
 import GraphEdge from './graph-edge.vue'
 import GraphNode from './graph-node.vue'
-import { buildTopology } from './topology'
+import { buildTopology, buildWorkflowTopology } from './topology'
 import { layoutTopology } from './layout'
 import { MIN_ZOOM, fitViewport } from './viewport'
 import {
@@ -16,8 +19,12 @@ import {
   deriveHitRoute,
   deriveIterationBadge,
   deriveStatusText,
+  deriveWorkflowEdgeActive,
+  deriveWorkflowStatusText,
+  deriveWorkflowStepBadge,
   findRootState,
   resolveMemberRuntime,
+  resolveWorkflowRuntime,
 } from './runtime'
 import type { WfEdgeData, WfNodeData } from './types'
 
@@ -26,9 +33,12 @@ defineOptions({ name: 'WorkflowGraph' })
 const props = defineProps<{
   /** 当前会话绑定的编排方案 ID */
   planId?: number | null
+  /** 当前会话绑定的 Workflow ID；与 planId 二选一，同时给时 Workflow 优先 */
+  workflowId?: number | null
 }>()
 
 const store = useConsoleStore()
+const workflowsStore = useWorkflowsStore()
 
 /** 只读视图：关掉全部编辑能力。未来开放拖拽编辑只需改这一处。 */
 const READONLY = {
@@ -52,6 +62,7 @@ const nodeTypes = { wf: markRaw(GraphNode) }
 const edgeTypes = { wf: markRaw(GraphEdge) }
 
 const plan = ref<PlanResponse | null>(null)
+const workflow = ref<WorkflowResponse | null>(null)
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const canvasRef = ref<HTMLElement | null>(null)
@@ -61,7 +72,10 @@ const { findNode, findEdge, setViewport } = useVueFlow()
 /** 静态布局。依赖里只有 plan，没有 graphNodes —— 这是全组件最关键的一行：
  *  Vue 的依赖追踪由此保证 SSE 事件涌进来时 dagre 一次都不会重跑。
  *  一旦在这条链路里读了 graphNodes，每个事件都会触发一次全图重排。 */
-const layouted = computed(() => (plan.value ? layoutTopology(buildTopology(plan.value)) : null))
+const layouted = computed(() => {
+  if (workflow.value) return layoutTopology(buildWorkflowTopology(workflow.value))
+  return plan.value ? layoutTopology(buildTopology(plan.value)) : null
+})
 
 /** 灌给 Vue Flow 的初始节点/边。用 shallowRef 存，避免深层响应式在打补丁时反复触发。 */
 const flowNodes = shallowRef<Node<WfNodeData>[]>([])
@@ -102,8 +116,15 @@ watch(
 const runtimePatch = computed(() => {
   const result = layouted.value
   if (!result) return null
-  const runtime = resolveMemberRuntime(result.nodes, store.state.graphNodes)
   const flowOnly = result.edges.filter((edge) => edge.data.kind === 'flow')
+  if (workflow.value) {
+    // Workflow 图：数据源是 workflow_progress 归并结果 + 右栏面板（反查 run_id）
+    const progress = store.state.workflowProgress
+    const runtime = resolveWorkflowRuntime(result.nodes, progress, store.state.agents)
+    const active = deriveWorkflowEdgeActive(result.nodes, flowOnly, runtime, progress.routedAgentId)
+    return { runtime, active, nodes: result.nodes, edges: result.edges }
+  }
+  const runtime = resolveMemberRuntime(result.nodes, store.state.graphNodes)
   const active = deriveEdgeActive(result.nodes, flowOnly, runtime)
   return { runtime, active, nodes: result.nodes, edges: result.edges }
 })
@@ -133,8 +154,13 @@ watch(runtimePatch, applyPatch)
 watch(layouted, () => applyPatch(runtimePatch.value), { flush: 'post' })
 
 // ===== 头部角标与底部状态条 =====
+/** 顺序 Workflow 的步骤角标；方案图不用它。 */
+const stepBadge = computed(() =>
+  workflow.value?.mode === 'sequential' ? deriveWorkflowStepBadge(store.state.workflowProgress) : null,
+)
+
 const iterationBadge = computed(() => {
-  if (plan.value?.mode !== 'loop' || !layouted.value) return null
+  if (workflow.value || plan.value?.mode !== 'loop' || !layouted.value) return null
   return deriveIterationBadge(
     layouted.value.nodes,
     store.state.graphNodes,
@@ -143,14 +169,25 @@ const iterationBadge = computed(() => {
 })
 
 const hitRoute = computed(() =>
-  layouted.value ? deriveHitRoute(layouted.value.nodes, store.state.graphNodes) : null,
+  layouted.value && !workflow.value ? deriveHitRoute(layouted.value.nodes, store.state.graphNodes) : null,
 )
 
+/** llm_routing 命中的成员名，作头部角标。 */
+const routedMemberName = computed(() => {
+  const agentId = store.state.workflowProgress.routedAgentId
+  if (!workflow.value || agentId == null) return null
+  const member = workflow.value.agents.find((item) => item.agent_id === agentId)
+  return member?.agent_name ?? store.state.workflowProgress.members[agentId]?.memberName ?? null
+})
+
 const statusText = computed(() => {
-  if (loading.value) return '正在加载方案拓扑…'
+  if (loading.value) return workflow.value || props.workflowId != null ? '正在加载 Workflow 定义…' : '正在加载方案拓扑…'
   if (loadError.value) return loadError.value
   const patch = runtimePatch.value
   if (!patch) return '等待开始'
+  if (workflow.value) {
+    return deriveWorkflowStatusText(patch.nodes, patch.runtime, store.state.workflowProgress)
+  }
   return deriveStatusText(patch.nodes, patch.runtime, findRootState(store.state.graphNodes))
 })
 
@@ -226,9 +263,32 @@ async function loadPlan(planId: number) {
   }
 }
 
+/** 拉 Workflow 定义；成员顺序与模式全靠它，进度事件只带 agent_id。 */
+async function loadWorkflow(workflowId: number) {
+  loading.value = true
+  loadError.value = null
+  const detail = await workflowsStore.loadWorkflowDetail(workflowId)
+  // 请求返回时 props 可能已切到别的 Workflow；undefined 表示工作区已切换，同样丢弃
+  if (props.workflowId !== workflowId || detail === undefined) return
+  loading.value = false
+  if (detail === null) {
+    workflow.value = null
+    loadError.value = 'Workflow 定义加载失败'
+    return
+  }
+  workflow.value = detail
+}
+
+/** Workflow 与方案二选一，Workflow 优先：两者互斥由后端保证，这里只做兜底。 */
 watch(
-  () => props.planId,
-  (planId) => {
+  () => [props.workflowId, props.planId] as const,
+  ([workflowId, planId]) => {
+    if (workflowId != null) {
+      plan.value = null
+      void loadWorkflow(workflowId)
+      return
+    }
+    workflow.value = null
     if (planId == null) {
       plan.value = null
       loadError.value = null
@@ -244,17 +304,20 @@ watch(
 <template>
   <section :class="$style['workflow-graph']" aria-label="编排执行图">
     <header :class="$style['graph-head']">
-      <span :class="$style['graph-title']">{{ plan?.name ?? '编排执行图' }}</span>
-      <span v-if="plan" :class="$style['graph-mode']">{{ PLAN_MODE_LABEL[plan.mode] }}</span>
+      <span :class="$style['graph-title']">{{ workflow?.name ?? plan?.name ?? '编排执行图' }}</span>
+      <span v-if="workflow" :class="$style['graph-mode']">{{ WORKFLOW_MODE_LABEL[workflow.mode] }}</span>
+      <span v-else-if="plan" :class="$style['graph-mode']">{{ PLAN_MODE_LABEL[plan.mode] }}</span>
       <span :class="$style['graph-spacer']"></span>
+      <span v-if="stepBadge" :class="$style['graph-badge']">第 {{ stepBadge }} 步</span>
       <span v-if="iterationBadge" :class="$style['graph-badge']">第 {{ iterationBadge }} 轮</span>
       <span v-if="hitRoute" :class="$style['graph-badge']">命中分支 {{ hitRoute }}</span>
+      <span v-if="routedMemberName" :class="$style['graph-badge']">路由至 {{ routedMemberName }}</span>
     </header>
 
     <div ref="canvasRef" :class="$style['graph-canvas']">
       <p v-if="loadError" :class="$style['graph-empty']">{{ loadError }}</p>
-      <p v-else-if="loading" :class="$style['graph-empty']">正在加载方案拓扑…</p>
-      <p v-else-if="isEmpty" :class="$style['graph-empty']">该方案暂无成员</p>
+      <p v-else-if="loading" :class="$style['graph-empty']">{{ workflowId != null ? '正在加载 Workflow 定义…' : '正在加载方案拓扑…' }}</p>
+      <p v-else-if="isEmpty" :class="$style['graph-empty']">{{ workflowId != null ? '该 Workflow 暂无成员' : '该方案暂无成员' }}</p>
       <VueFlow
         v-else
         :nodes="flowNodes"

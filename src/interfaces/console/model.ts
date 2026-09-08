@@ -12,6 +12,8 @@ export interface SessionResponse {
   agent_id?: number | null
   /** 会话绑定的编排方案 ID;未绑定为 null */
   orchestration_plan_id?: number | null
+  /** 会话绑定的 Workflow ID;未绑定为 null(与 agent_id 互斥) */
+  workflow_id?: number | null
   visibility: string
   shared_with?: number[]
   shared_with_departments?: number[]
@@ -83,6 +85,8 @@ export interface SseActor {
   name: string
   run_id?: string
   task?: string
+  /** 成员 Agent 的数据库 ID(编排/子代理场景均可能携带) */
+  agent_id?: number
   team?: { id: number; is_lead: boolean }
 }
 
@@ -176,6 +180,7 @@ export interface SseEvent {
     | 'task_snapshot'
     | 'node_start'
     | 'node_end'
+    | 'workflow_progress'
     | string
   sequence: number
   session_id: number
@@ -208,6 +213,8 @@ export interface SseEvent {
   interaction?: SseInteraction
   /** 编排节点事件(node_start/node_end)的节点负载 */
   node?: SseNodeInfo
+  /** Workflow 编排进度事件(workflow_progress)的进度负载 */
+  progress?: SseWorkflowProgress
   stop_reason?: string
   usage?: {
     input_tokens: number
@@ -242,6 +249,38 @@ export interface GraphNodeState {
   root?: boolean
 }
 
+/** SSE workflow_progress 事件的进度负载(编排者发出)。 */
+export interface SseWorkflowProgress {
+  /** 阶段:member 成员执行、routing 智能路由、merging 结果汇总 */
+  phase: 'member' | 'routing' | 'merging' | string
+  status: 'running' | 'done' | 'failed' | string
+  /** member/routing 命中时携带的成员 Agent ID;配置期失败(成员被停用/删除)时可能缺失 */
+  agent_id?: number
+  /** 成员的 Agent 显示名;配置期失败时可能缺失 */
+  member_name?: string
+  /** 顺序模式 member 阶段的执行位次(从 1 起) */
+  ordinal?: number
+  /** 顺序模式成员总数 */
+  total?: number
+}
+
+/** 进度图上单个成员的运行时状态。 */
+export interface WorkflowMemberProgress {
+  agentId: number
+  memberName: string | null
+  status: 'running' | 'done' | 'failed'
+  ordinal?: number
+  total?: number
+}
+
+/** Workflow 进度图视图状态:按 agent_id 归并的成员 + 路由/汇总阶段。 */
+export interface WorkflowProgressState {
+  members: Record<number, WorkflowMemberProgress>
+  routing: 'running' | 'done' | 'failed' | null
+  routedAgentId: number | null
+  merging: 'running' | 'done' | 'failed' | null
+}
+
 /** 会话列表视图模型。 */
 export interface Session {
   id: string
@@ -253,6 +292,8 @@ export interface Session {
   agentId?: number | null
   /** 会话绑定的编排方案 ID;与 agentId 互斥 */
   orchestrationPlanId?: number | null
+  /** 会话绑定的 Workflow ID;与 agentId 互斥 */
+  workflowId?: number | null
   modelName?: string | null
   status?: string
   visibility?: SessionVisibility
@@ -286,6 +327,8 @@ export interface SubAgent {
   status: RunStatus
   progress: number
   stream: StreamEvent[]
+  /** 面板对应的数据库 Agent ID(进度图点击跳转时按它匹配) */
+  agentId?: number
 }
 
 /** 控制台任务条中的任务。 */

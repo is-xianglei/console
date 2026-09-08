@@ -410,3 +410,151 @@ describe('console store 编排执行图', () => {
     expect(store.state.graphNodes).toEqual({})
   })
 })
+
+describe('console store Workflow 对话', () => {
+  let sequence = 0
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.resetAllMocks()
+    vi.mocked(sendMessage).mockReturnValue(() => {})
+    sequence = 0
+  })
+
+  /** 以 Workflow 5 派发一条消息并拿到 SSE 回调。 */
+  function startWorkflowStream() {
+    const store = useConsoleStore()
+    store.resetConsole()
+    store.setNewSessionWorkflow(5)
+    expect(store.dispatch('按 Workflow 执行')).toBe(true)
+    const handlers = vi.mocked(sendMessage).mock.calls.at(-1)?.[1]
+    if (!handlers) throw new Error('未捕获到 SSE handlers')
+    return { store, emit: handlers.onEvent, finish: () => handlers.onDone?.() }
+  }
+
+  function progressEvent(progress: NonNullable<SseEvent['progress']>): SseEvent {
+    sequence += 1
+    return {
+      type: 'workflow_progress',
+      sequence,
+      session_id: 12,
+      actor: { role: 'orchestrator', name: 'orchestrator' },
+      progress,
+    }
+  }
+
+  it('新会话绑定 Workflow 时只携带 workflow_id', () => {
+    const store = useConsoleStore()
+    store.resetConsole()
+    store.setNewSessionAgent(9)
+    store.setNewSessionPlan(3)
+    store.setNewSessionWorkflow(5)
+
+    expect(store.state.newSessionAgentId).toBeNull()
+    expect(store.state.newSessionPlanId).toBeNull()
+    expect(store.state.workbenchMode).toBe('graph')
+    expect(store.dispatch('按 Workflow 执行')).toBe(true)
+    expect(sendMessage).toHaveBeenCalledWith(
+      { session_id: undefined, workflow_id: 5, content: '按 Workflow 执行' },
+      expect.any(Object),
+    )
+  })
+
+  it('从 Workflow 切回 Agent 后只携带 agent_id', () => {
+    const store = useConsoleStore()
+    store.resetConsole()
+    store.setNewSessionWorkflow(5)
+    store.setNewSessionAgent(9)
+
+    expect(store.state.newSessionWorkflowId).toBeNull()
+    expect(store.dispatch('改用 Agent')).toBe(true)
+    expect(sendMessage).toHaveBeenCalledWith(
+      { session_id: undefined, agent_id: 9, content: '改用 Agent' },
+      expect.any(Object),
+    )
+  })
+
+  it('已绑定 Workflow 的会话续聊不再携带 workflow_id 与 agent_id', async () => {
+    vi.mocked(getSessionList).mockResolvedValue([
+      { ...session, id: 61, agent_id: null, workflow_id: 5 },
+    ])
+    vi.mocked(getSessionMessageList).mockResolvedValue([])
+    vi.mocked(getPendingInteraction).mockResolvedValue(null)
+
+    const store = useConsoleStore()
+    expect(await store.reloadConsole()).toBe(true)
+    store.selectSession('61')
+    expect(store.state.sessions[0]?.workflowId).toBe(5)
+    expect(store.state.workbenchMode).toBe('graph')
+    expect(store.dispatch('继续', { agentId: 12, workflowId: 7 })).toBe(true)
+    expect(sendMessage).toHaveBeenCalledWith(
+      { session_id: 61, content: '继续' },
+      expect.any(Object),
+    )
+  })
+
+  it('session_ready 后会话对象锁定 workflowId 并清空草稿', () => {
+    const { store, emit } = startWorkflowStream()
+    sequence += 1
+    emit({
+      type: 'session_ready',
+      sequence,
+      session_id: 12,
+      data: { session_id: 12, title: '按 Workflow 执行', status: 'running' },
+    })
+    expect(store.state.activeSessionId).toBe('12')
+    expect(store.state.sessions.find((item) => item.id === '12')?.workflowId).toBe(5)
+    expect(store.state.newSessionWorkflowId).toBeNull()
+  })
+
+  it('workflow_progress 按 agent_id 归并成员并记录路由与汇总阶段', () => {
+    const { store, emit } = startWorkflowStream()
+    emit(progressEvent({ phase: 'routing', status: 'running' }))
+    expect(store.state.workflowProgress.routing).toBe('running')
+
+    emit(progressEvent({ phase: 'routing', status: 'done', agent_id: 2, member_name: '专业评审' }))
+    expect(store.state.workflowProgress.routing).toBe('done')
+    expect(store.state.workflowProgress.routedAgentId).toBe(2)
+
+    emit(progressEvent({ phase: 'member', status: 'running', agent_id: 2, member_name: '专业评审', ordinal: 1, total: 2 }))
+    // 配置期失败：没有 member_name，但要保留此前记录的名字与序号
+    emit(progressEvent({ phase: 'member', status: 'failed', agent_id: 2 }))
+    expect(store.state.workflowProgress.members[2]).toEqual({
+      agentId: 2,
+      memberName: '专业评审',
+      status: 'failed',
+      ordinal: 1,
+      total: 2,
+    })
+
+    emit(progressEvent({ phase: 'merging', status: 'running' }))
+    emit(progressEvent({ phase: 'merging', status: 'done' }))
+    expect(store.state.workflowProgress.merging).toBe('done')
+    // 进度事件不进主时间线
+    expect(store.state.messages.at(-1)?.blocks ?? []).toHaveLength(0)
+  })
+
+  it('member 事件缺少 agent_id 时忽略并告警', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { store, emit } = startWorkflowStream()
+    emit(progressEvent({ phase: 'member', status: 'running', member_name: '匿名' }))
+    expect(store.state.workflowProgress.members).toEqual({})
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
+  })
+
+  it('新一轮派发清空上一轮的 Workflow 进度', () => {
+    const { store, emit, finish } = startWorkflowStream()
+    emit(progressEvent({ phase: 'member', status: 'done', agent_id: 1, member_name: '专业写作' }))
+    expect(Object.keys(store.state.workflowProgress.members)).toHaveLength(1)
+
+    finish()
+    expect(store.dispatch('再跑一次')).toBe(true)
+    expect(store.state.workflowProgress).toEqual({
+      members: {},
+      routing: null,
+      routedAgentId: null,
+      merging: null,
+    })
+  })
+})

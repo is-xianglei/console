@@ -34,6 +34,10 @@ interface MemoriesState {
   saving: boolean
   query: string
   memoryType: MemoryType | 'all'
+  /** 当前页码（从 1 开始）。列表用真分页,每次只拉一页。 */
+  page: number
+  /** 每页条数。列表页真分页时传给 ResourcePagination。 */
+  pageSize: number
 }
 
 export const useMemoriesStore = defineStore('memories', () => {
@@ -49,6 +53,8 @@ export const useMemoriesStore = defineStore('memories', () => {
     saving: false,
     query: '',
     memoryType: 'all',
+    page: 1,
+    pageSize: 50,
   })
 
   function resetMemories() {
@@ -63,29 +69,38 @@ export const useMemoriesStore = defineStore('memories', () => {
     state.saving = false
     state.query = ''
     state.memoryType = 'all'
+    state.page = 1
+    state.pageSize = 50
   }
 
-  async function loadMemories(params?: GetMemoryListParams): Promise<string | null> {
+  /**
+   * 加载 Memory 列表。传入 page 时用真分页（按 offset = (page-1)*pageSize 拉取）;
+   * 搜索态后端不支持 offset,退化为按 limit 单次拉取。缺省用当前 state.page/pageSize。
+   */
+  async function loadMemories(params?: GetMemoryListParams & { page?: number }): Promise<string | null> {
     const generation = dataGeneration
     const requestId = ++listRequestId
     const isCurrent = () => generation === dataGeneration && requestId === listRequestId
     state.loading = true
+    const page = Math.max(1, params?.page ?? state.page)
+    const pageSize = Math.max(1, state.pageSize)
     try {
       const response = state.query.trim()
         ? await searchMemory({
             query: state.query.trim(),
             memory_type: state.memoryType === 'all' ? undefined : state.memoryType,
-            limit: params?.limit ?? 100,
+            limit: pageSize,
           })
         : await getMemoryList({
             status: params?.status ?? 'active',
             memory_type: state.memoryType === 'all' ? undefined : state.memoryType,
-            limit: params?.limit ?? 100,
-            offset: params?.offset ?? 0,
+            limit: pageSize,
+            offset: (page - 1) * pageSize,
           })
       if (!isCurrent()) return null
       state.items = response.items
       state.total = response.total
+      state.page = page
       if (state.selectedId && !response.items.some((item) => item.id === state.selectedId)) {
         state.selectedId = null
         state.detail = null
@@ -99,6 +114,19 @@ export const useMemoriesStore = defineStore('memories', () => {
     } finally {
       if (isCurrent()) state.loading = false
     }
+  }
+
+  /** 切换到指定页并重载；用于 ResourcePagination 翻页。 */
+  async function loadMemoriesPage(page: number): Promise<string | null> {
+    if (page < 1 || page === state.page) return null
+    state.page = page
+    return loadMemories({ page })
+  }
+
+  /** 修改每页条数并回到第 1 页。 */
+  function setPageSize(pageSize: number): void {
+    state.pageSize = Math.max(1, pageSize)
+    state.page = 1
   }
 
   async function selectMemory(id: number): Promise<string | null> {
@@ -212,6 +240,8 @@ export const useMemoriesStore = defineStore('memories', () => {
     state,
     resetMemories,
     loadMemories,
+    loadMemoriesPage,
+    setPageSize,
     selectMemory,
     clearSelection,
     createMemory: createMemoryAction,

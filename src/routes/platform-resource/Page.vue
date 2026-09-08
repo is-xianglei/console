@@ -3,10 +3,13 @@ import { computed, h, onBeforeUnmount, reactive, ref, resolveComponent, useCssMo
 import type { FormError, TableColumn, TableRow } from '@nuxt/ui'
 import { useToast } from '@nuxt/ui/composables'
 import { useRoute, useRouter } from 'vue-router'
-import AgentResource from './components/agent-resource/index.vue'
+import AgentResource from './agents/list/index.vue'
 import BuildResourceManager from './components/build-resource-manager/index.vue'
-import OrganizationResource from './components/organization-resource/index.vue'
-import PlanResource from './components/plan-resource/index.vue'
+import DepartmentResourceList from './organization/departments/list/index.vue'
+import GroupResourceList from './organization/groups/list/index.vue'
+import PeopleResourceList from './organization/people/list/index.vue'
+import PlanResource from './plans/list/index.vue'
+import WorkflowResource from './workflows/list/index.vue'
 import {
   PLATFORM_MODULES,
   RESOURCE_PAGES,
@@ -77,7 +80,6 @@ const filteredRows = computed(() => {
 })
 const selectedRow = computed(() => filteredRows.value.find((row) => row.id === selectedId.value) ?? filteredRows.value[0] ?? null)
 const moduleTitle = computed(() => PLATFORM_MODULES[moduleKey.value].title)
-const organizationResource = computed(() => page.value.key as 'departments' | 'groups' | 'people')
 const statusLabel: Record<ResourceRow['status'], string> = { nominal: '正常', warning: '需关注', error: '高风险', idle: '未启用' }
 const statusColor: Record<ResourceRow['status'], 'success' | 'warning' | 'error' | 'neutral'> = {
   nominal: 'success',
@@ -247,12 +249,11 @@ onBeforeUnmount(() => {
 <template>
   <AgentResource v-if="moduleKey === 'build' && page.key === 'agents'" />
   <PlanResource v-else-if="moduleKey === 'build' && page.key === 'plans'" />
+  <WorkflowResource v-else-if="moduleKey === 'build' && page.key === 'workflows'" />
   <BuildResourceManager v-else-if="moduleKey === 'build'" :page="page" />
-  <OrganizationResource
-    v-else-if="moduleKey === 'organization' && ['departments', 'groups', 'people'].includes(page.key)"
-    :resource="organizationResource"
-    :page="page"
-  />
+  <DepartmentResourceList v-else-if="moduleKey === 'organization' && page.key === 'departments'" />
+  <GroupResourceList v-else-if="moduleKey === 'organization' && page.key === 'groups'" />
+  <PeopleResourceList v-else-if="moduleKey === 'organization' && page.key === 'people'" />
   <main v-else :class="$style['resource-page']">
     <header :class="$style['resource-header']">
       <div :class="$style['resource-heading']">

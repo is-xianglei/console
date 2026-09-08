@@ -1,0 +1,5 @@
+/* groups 三页共用：直接复用 departments 抽取的页面壳、指标条、工具栏、表格、详情与表单外壳样式，仅补 groups 专有类。 */
+@import '../../departments/shared/index.module.css';
+
+.mineBadge { margin-left: 6px; text-transform: none; }
+.joinModeText { text-transform: none; }

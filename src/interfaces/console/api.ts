@@ -16,6 +16,8 @@ export interface SendMessageRequest {
   agent_id?: number | null
   /** 编排方案 ID:仅开新会话时可传,与 agent_id 互斥 */
   orchestration_plan_id?: number | null
+  /** Workflow ID:仅新会话首发可传(会话落库后锁定),与 agent_id 互斥 */
+  workflow_id?: number | null
   content: string
 }
 

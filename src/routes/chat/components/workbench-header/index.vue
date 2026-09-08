@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { AiOrb } from '@/components'
 import type { Session, WorkbenchApp, WorkbenchMode } from '@/interfaces'
 
 defineOptions({ name: 'WorkbenchHeader' })
@@ -65,7 +66,7 @@ function selectMode(value: string | number) {
       aria-label="工作台视图"
       @update:model-value="selectMode"
     />
-    <div v-else :class="$style['conv-model']"><span class="dot think"></span>{{ activeSession?.agentId ? agentLabel : activeSession?.modelName || agentLabel }}</div>
+    <div v-else :class="$style['conv-model']"><AiOrb :class="$style['orb-fit']" :size="14" label="运行中" />{{ activeSession?.agentId ? agentLabel : activeSession?.modelName || agentLabel }}</div>
     <span :class="$style['mode-announcer']" aria-live="polite">{{ modeDescriptions[mode] }}</span>
   </header>
 </template>

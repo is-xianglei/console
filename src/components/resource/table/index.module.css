@@ -1,0 +1,19 @@
+.resource-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.resource-table tbody tr {
+  cursor: pointer;
+  transition: background var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.resource-table tbody tr:hover {
+  background: var(--bg-surface);
+}
+
+.resource-table tbody tr.active {
+  background: var(--accent-agent-dim);
+  box-shadow: inset 2px 0 var(--accent-agent);
+}

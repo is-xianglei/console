@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AiOrb } from '@/components'
 import type { SubAgent } from '@/interfaces'
 
 defineOptions({ name: 'AgentCard' })
@@ -16,11 +17,15 @@ const statusLabel: Record<string, string> = {
   done: '已完成',
   error: '失败',
 }
+/** think/run 是「正在进行」语义,用 Orb 循环动画;其余是静止态,保留静态 dot。 */
+function isRunning(s: string) {
+  return s === 'think' || s === 'run'
+}
+/** 静止态圆点配色;进行中态由 AiOrb 呈现,不走这里。 */
 function dotClass(s: string) {
   if (s === 'done') return 'nominal'
   if (s === 'error') return 'error'
-  if (s === 'queued') return 'idle'
-  return 'think'
+  return 'idle'
 }
 </script>
 
@@ -37,7 +42,8 @@ function dotClass(s: string) {
       <span :class="[$style['agent-pid'], 'mono']">{{ agent.pid }}</span>
     </div>
     <div :class="$style['agent-card-bot']">
-      <span class="dot" :class="dotClass(agent.status)"></span>
+      <AiOrb v-if="isRunning(agent.status)" :class="$style['orb-fit']" :size="14" :label="statusLabel[agent.status]" />
+      <span v-else class="dot" :class="dotClass(agent.status)"></span>
       <span :class="$style['agent-status-txt']">{{ statusLabel[agent.status] }}</span>
       <span :class="$style['agent-mini-prog']">
         <span

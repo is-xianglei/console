@@ -1,0 +1,7 @@
+@import '../shared/index.module.css';
+
+/* people 列表页专用补充。 */
+.filterTabs { flex: 0 0 auto; }
+.statusBadge { text-transform: none; }
+.limitAlert { margin: 10px 10px 0; }
+.emailText { text-transform: none; }

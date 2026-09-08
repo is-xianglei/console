@@ -74,32 +74,18 @@
   border-radius: var(--radius-control);
 }
 
-.layout {
+/* 列表容器：详情/编辑/新建已路由化为独立页面，此处只承载列表面板。 */
+.panelWrap {
   width: 100%;
   max-width: var(--page-content-max);
-  display: grid;
+  display: flex;
   min-height: 0;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr);
+  flex-direction: column;
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--bg-panel);
-}
-
-.layout.inspectorOpen {
-  grid-template-columns: minmax(0, 1fr) clamp(320px, 36%, 440px);
-}
-
-.mobileSwitch {
-  display: none;
-  width: 100%;
-  max-width: var(--page-content-max);
-  margin: 0 auto 8px;
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
   background: var(--bg-panel);
 }
 
@@ -112,19 +98,6 @@
 @media (max-width: 920px) {
   .page {
     padding: 16px;
-  }
-
-  .layout,
-  .layout.inspectorOpen {
-    display: block;
-  }
-
-  .mobileSwitch {
-    display: block;
-  }
-
-  .mobileHidden {
-    display: none !important;
   }
 }
 

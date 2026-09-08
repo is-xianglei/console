@@ -1,0 +1,23 @@
+@import '../shared/index.module.css';
+
+/* departments 详情全页专用：外壳、状态行、成员子表格。 */
+.detailShell { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); gap: 16px; align-items: start; }
+.card { padding: 16px 18px; border: 1px solid var(--border); background: var(--bg-panel); }
+.stateRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stateRow > span:last-child { color: var(--text-dim); font-size: 9px; }
+.hierarchy { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.hierarchy > span { padding: 3px 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-secondary); font-size: 9px; }
+.hierarchy > em { color: var(--text-dim); font-size: 9px; font-style: normal; }
+.detailActions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.detailActions > button:first-child { margin-right: auto; }
+.inlineForm { margin-top: 9px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, .65fr) 32px; gap: 5px; }
+.inlineForm > button { width: 32px; }
+.memberTable { margin-top: 9px; border-top: 1px solid var(--border); }
+.memberRow { min-height: 46px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); }
+.memberRow > span { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.memberRow strong { overflow: hidden; color: var(--text-secondary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.memberRow small { margin-top: 2px; overflow: hidden; color: var(--text-dim); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.memberRole { flex: 0 0 auto; }
+.memberActions { flex: 0 0 auto; display: flex; align-items: center; gap: 1px; }
+@media (max-width: 1080px) { .detailShell { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 720px) { .inlineForm { grid-template-columns: minmax(0, 1fr) 32px; }.inlineForm > :nth-child(2) { display: none; } }

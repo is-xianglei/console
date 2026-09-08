@@ -14,8 +14,10 @@ export interface WfNodeData {
   kind: WfNodeKind
   /** 成员显示名；结构节点用固定文案（如"路由判定"） */
   label: string
-  /** 成员在方案里的 position，结构节点为 null。运行时靠它做前缀匹配 */
+  /** 成员在方案里的 position，结构节点为 null。方案图运行时靠它做前缀匹配 */
   position: number | null
+  /** 成员的数据库 Agent ID，结构节点与方案成员为 null。Workflow 图运行时靠它匹配进度与面板 */
+  agentId: number | null
   /** 成员 Agent 已停用，方案无法运行 */
   disabled: boolean
   /** 运行时状态，默认 pending */

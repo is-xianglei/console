@@ -1,0 +1,41 @@
+@import '../shared/index.module.css';
+
+/* agents 列表页专用补充：toast 与确认弹窗文案。 */
+.ag-modal-copy {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.ag-toast {
+  min-height: 42px;
+  padding: 0 14px;
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  border: 1px solid var(--border-visible);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.ag-toast i {
+  color: var(--status-success);
+}
+
+:global(.ag-toast-enter-active),
+:global(.ag-toast-leave-active) {
+  transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
+}
+
+:global(.ag-toast-enter-from),
+:global(.ag-toast-leave-to) {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+}

@@ -2,6 +2,7 @@ import type {
   ChatBlock,
   ChatMessage,
   SseEvent,
+  SseWorkflowProgress,
   SubAgent,
   TaskResponse,
 } from '../interfaces/console/model'
@@ -20,6 +21,8 @@ export interface SseTarget {
   onTaskSnapshot?: (tasks: TaskResponse[]) => void
   /** 编排节点事件(node_start/node_end):图状态归并,不建面板 */
   onNodeEvent?: (ev: SseEvent) => void
+  /** Workflow 进度事件(workflow_progress):进度图状态归并 */
+  onWorkflowProgress?: (progress: SseWorkflowProgress) => void
 }
 
 /** 子代理唯一键:subagent 用 run_id,teammate 用 name,缺失兜底 name */
@@ -49,7 +52,11 @@ function iconFor(name: string, role: string): string {
 function ensureAgent(t: SseTarget, ev: SseEvent): SubAgent {
   const key = agentKey(ev)
   const existing = t.agents.find((x) => x.id === key)
-  if (existing) return existing
+  if (existing) {
+    // 已存在面板的 agentId 缺失(如旧事件先到时)也补上,保证进度图能按它匹配面板
+    if (existing.agentId == null && ev.actor?.agent_id != null) existing.agentId = ev.actor.agent_id
+    return existing
+  }
   const actor = ev.actor!
   t.agents.push({
     id: key,
@@ -61,6 +68,7 @@ function ensureAgent(t: SseTarget, ev: SseEvent): SubAgent {
     status: 'queued',
     progress: 0,
     stream: [],
+    agentId: actor.agent_id,
   })
   const proxy = t.agents[t.agents.length - 1]
   // 首个子代理自动选中,方便观察
@@ -112,6 +120,13 @@ export function createSseReducer(target: SseTarget) {
     // 一旦流入 handleAgent 就会以方案名误建右栏面板并抢占标题。
     if (ev.type === 'node_start' || ev.type === 'node_end') {
       target.onNodeEvent?.(ev)
+      return
+    }
+
+    // Workflow 进度事件:与节点事件同理必须早退。它的 actor 也是 orchestrator,
+    // 但并不是内容块,落入 handleOrchestrator 只会被 switch 忽略;显式早退是为了语义清楚。
+    if (ev.type === 'workflow_progress') {
+      if (ev.progress) target.onWorkflowProgress?.(ev.progress)
       return
     }
 
