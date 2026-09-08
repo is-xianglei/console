@@ -3,7 +3,7 @@
   "name": "p0-list-foundation",
   "title": "阶段 0：列表页共享基础层（URL 状态 / 布局组件 / 表格分页 / 反馈闭环 / 权限可见性）",
   "description": "抽 useListUrlState、FilterPanel/ListCard 布局组件，升级 ResourceTable/ResourcePagination，统一保存回列表 + toast + 高亮，落地权限可见性与骨架屏。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
