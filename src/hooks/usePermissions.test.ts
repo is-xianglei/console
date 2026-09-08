@@ -19,16 +19,26 @@ describe('usePermissions.can', () => {
     expect(can('edit', 'group', { id: 7 })).toEqual({ allowed: true })
   })
 
-  it('不能删除当前登录用户', () => {
+  it('不能删除当前登录用户；停用自己同样禁止', () => {
     const { can } = usePermissions()
     const result = can('delete', 'person', { id: 42 })
     expect(result.allowed).toBe(false)
     expect(result.reason).toContain('当前登录用户')
+    const toggle = can('toggle', 'person', { id: 42 })
+    expect(toggle.allowed).toBe(false)
+    expect(toggle.reason).toContain('当前登录用户')
   })
 
   it('删除他人允许', () => {
     const { can } = usePermissions()
     expect(can('delete', 'person', { id: 7 }).allowed).toBe(true)
+  })
+
+  it('非管理员不能操作管理员；管理员可操作管理员', () => {
+    const { can } = usePermissions()
+    expect(can('delete', 'person', { id: 7, role: 'admin', operatorRole: 'member' }).allowed).toBe(false)
+    expect(can('toggle', 'person', { id: 7, role: 'admin', operatorRole: 'member' }).allowed).toBe(false)
+    expect(can('delete', 'person', { id: 7, role: 'admin', operatorRole: 'admin' }).allowed).toBe(true)
   })
 
   it('workspace owner 不可移除', () => {

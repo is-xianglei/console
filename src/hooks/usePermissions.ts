@@ -24,19 +24,23 @@ export function usePermissions(): UsePermissionsReturn {
 
   function currentTarget(target?: PermissionTarget): PermissionTarget | undefined {
     const userId = authStore.state.user?.id
-    return userId == null ? target : { ...target, currentUserId: userId }
+    const enriched = userId == null ? target : { ...target, currentUserId: userId }
+    if (!enriched) return undefined
+    // 操作发起者角色：留给 person 行级规则（A6：非管理员不能操作管理员），由按钮层用 workspace 成员角色传入。
+    const operator = authStore.state.user as { workspace_role?: string } | null
+    if (operator?.workspace_role) return { ...enriched, operatorRole: String(operator.workspace_role) }
+    return enriched
   }
 
   function can(action: PermissionAction, resource: PermissionResource, target?: PermissionTarget): PermissionDecision {
     const enriched = currentTarget(target)
     const rule = targetRules[resource] as
-      | ((res: PermissionResource, t: PermissionTarget | undefined) => PermissionDecision)
+      | ((res: PermissionResource, action: PermissionAction, t: PermissionTarget | undefined) => PermissionDecision)
       | undefined
     if (rule) {
-      const decision = rule(resource, enriched)
+      const decision = rule(resource, action, enriched)
       if (!decision.allowed) return decision
     }
-    void action
     return { allowed: true }
   }
 
