@@ -69,6 +69,23 @@ CSS 要点：`--app-header-h: var(--topbar-height)`（本地作用域或 :root�
 
 ---
 
+## Organization 模块约定（people / departments / groups）
+
+同一份部门数据有两种呈现，按页面语义二选一：
+
+- **people 页**：部门是**筛选范围**，做左侧常驻部门树（`UTree`，数据源 `stores/xxx.state.tree`）+ 右侧列表。左树搜索只做树内过滤与高亮，**不触发列表请求**；点树节点写 `departmentId` 且 `page` 归 1；重置需**同时清树选中**。左栏 `shrink-0 w-80`，窄屏（<1200px）折叠为 `USlideover` 抽屉。
+- **departments 页**：部门是**被管理的对象本身**，做树形表格（`ResourceTable :tree-children-key`），**不分页、无批量**；名称列按 `row.depth` 缩进，仅 `getCanExpand()` 画箭头。
+
+其他通用约定：
+
+- 树形递归过滤必须**保留祖先链**：父节点保留条件 = 自身命中或任一子孙命中；命中节点高亮、祖先弱化（`opacity:.55`），搜索态自动全展开。
+- 删除/启用等**后果重**的操作，弹窗确认前先**程序化检查依赖**（树节点 children 判断下级、成员列表接口取人数），有依赖时确认按钮禁用并列出具体原因（"下级 N 个、成员 M 人"）+ "去详情处理"链接；后端拦截原因**原样展示**，不用泛化文案。
+- 停用节点（`is_active=false`）若级联影响子树，子树整体弱化（`subtreeInactive` 标记自上而下传播）。
+- 编辑页上下文依赖 `route.query`（如 `?parent=<id>` 新增子部门、`?from=detail` 从详情进编辑）：详情页编辑按钮带 `from=detail`，保存后按 `from` 分流回详情或回列表带 `?highlight`。
+- 行级权限（删自己、非管理员操作管理员）统一走 `usePermissions().can()`，不满足时按钮**不渲染**（`v-if`）而非 disabled。
+
+---
+
 ## Common Mistakes
 
 1. 用模板字符串拼 Tailwind 任意类（如 `grid-cols-[repeat(${n},...)]`）：Tailwind JIT 只静态扫描源码，运行时拼接的类不生成样式。改用 CSS Module 静态 `grid-template-columns: repeat(var(--filter-cols,3),minmax(0,1fr))` + `:style` 绑变量。
