@@ -81,7 +81,7 @@ function goToList() {
 }
 
 function goToEdit() {
-  void router.push({ name: 'group-edit', params: { id: String(groupId.value) } })
+  void router.push({ name: 'group-edit', params: { id: String(groupId.value) }, query: { from: 'detail' } })
 }
 
 async function load() {

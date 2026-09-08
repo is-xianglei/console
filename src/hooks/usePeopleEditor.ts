@@ -6,6 +6,7 @@ import { inviteWorkspaceMember } from '@/http/workspace'
 import type { UserCreateRequest, UserUpdateRequest } from '@/interfaces/user/api'
 import type { UserResponse } from '@/interfaces/user/model'
 import { useAuthStore } from '@/stores/auth'
+import { useSaveFeedback } from './useSaveFeedback'
 
 /**
  * 人员表单模型：新建 = 姓名/用户名/邮箱/初始密码/邀请开关；
@@ -91,10 +92,16 @@ function errorMessage(error: unknown, fallback: string) {
 export function usePeopleEditor() {
   const router = useRouter()
   const authStore = useAuthStore()
+  const feedback = useSaveFeedback({
+    listRoute: { name: 'platform-resource', params: { module: 'organization', resource: 'people' } },
+    detailRoute: { name: 'person-detail' },
+  })
   const draft = ref<PersonFormModel>(emptyPersonForm())
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
+  /** 编辑来源（D）：'detail' 表示从详情页进入，保存后留在详情而非回列表。 */
+  const from = ref<string | undefined>(undefined)
   /**
    * 两步创建(createUser → inviteWorkspaceMember)中第一步已成功的用户；
    * 第二步失败时保留，再次 saveDraft 只重发邀请而不重复创建。
@@ -117,14 +124,16 @@ export function usePeopleEditor() {
 
   function openCreate(): void {
     error.value = ''
+    from.value = undefined
     createdUser.value = null
     draft.value = emptyPersonForm()
   }
 
   /** getUserDetail 填充 draft；失败返回 false 并写入 error。 */
-  async function openEdit(id: number): Promise<boolean> {
+  async function openEdit(id: number, source?: string): Promise<boolean> {
     draft.value = emptyPersonForm()
     error.value = ''
+    from.value = source
     createdUser.value = null
     loadingDetail.value = true
     try {
@@ -174,17 +183,23 @@ export function usePeopleEditor() {
     }
     error.value = ''
     createdUser.value = null
-    goToDetail(user.id)
+    // 保存成功 → toast + 回列表并带 ?highlight=<id>（D）。
+    await feedback.afterSave({ id: user.id, message: `人员「${user.full_name || user.username}」已创建` })
     return true
   }
 
-  /** 编辑：updateUser(用户名/邮箱不可改)，成功后跳详情页。 */
+  /** 编辑：updateUser(用户名/邮箱不可改)，成功后按来源分流（D）：留在详情或回列表高亮。 */
   async function saveEdit(id: number): Promise<boolean> {
     try {
       const updated = await updateUser(id, personFormToPayload(draft.value) as UserUpdateRequest)
       draft.value = personToForm(updated)
       error.value = ''
-      goToDetail(updated.id)
+      const message = `人员「${updated.full_name || updated.username}」已保存`
+      if (from.value === 'detail') {
+        await feedback.afterSaveToDetail({ id: updated.id, message })
+      } else {
+        await feedback.afterSave({ id: updated.id, message })
+      }
       return true
     } catch (caught) {
       error.value = errorMessage(caught, '用户更新失败')
@@ -221,6 +236,7 @@ export function usePeopleEditor() {
     error,
     workspaceId,
     createdUserId,
+    from,
     openCreate,
     openEdit,
     saveDraft,

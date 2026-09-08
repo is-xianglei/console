@@ -44,7 +44,7 @@ function goToList() {
 }
 
 function goToEdit() {
-  void router.push({ name: 'person-edit', params: { id: String(userId.value) } })
+  void router.push({ name: 'person-edit', params: { id: String(userId.value) }, query: { from: 'detail' } })
 }
 
 /** getUserDetail 失败时返回错误文案，便于与 manager.loadAll 并行。 */

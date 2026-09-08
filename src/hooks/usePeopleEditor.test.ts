@@ -59,6 +59,14 @@ function workspace(): WorkspaceResponse {
   }
 }
 
+function peopleListPush(id: string) {
+  return {
+    name: 'platform-resource',
+    params: { module: 'organization', resource: 'people' },
+    query: { highlight: id },
+  }
+}
+
 describe('usePeopleEditor', () => {
   beforeEach(() => {
     routerPush.mockReset()
@@ -154,7 +162,7 @@ describe('usePeopleEditor', () => {
     expect(inviteWorkspaceMember).toHaveBeenCalledWith(3, { email: 'lisi@example.com', role: 'member' })
     expect(editor.error.value).toBe('')
     expect(editor.createdUserId.value).toBeNull()
-    expect(routerPush).toHaveBeenCalledWith({ name: 'person-detail', params: { id: '9' } })
+    expect(routerPush).toHaveBeenCalledWith(peopleListPush('9'))
   })
 
   it('saveDraft 关闭邀请开关时只创建用户不发邀请', async () => {
@@ -168,7 +176,7 @@ describe('usePeopleEditor', () => {
     editor.draft.value.inviteToWorkspace = false
     expect(await editor.saveDraft()).toBe(true)
     expect(inviteWorkspaceMember).not.toHaveBeenCalled()
-    expect(routerPush).toHaveBeenCalledWith({ name: 'person-detail', params: { id: '9' } })
+    expect(routerPush).toHaveBeenCalledWith(peopleListPush('9'))
   })
 
   it('saveDraft 创建成功但邀请失败：返回明确错误、不跳转、重试只重发邀请', async () => {
@@ -191,7 +199,7 @@ describe('usePeopleEditor', () => {
     expect(createUser).toHaveBeenCalledTimes(1)
     expect(inviteWorkspaceMember).toHaveBeenCalledTimes(2)
     expect(editor.error.value).toBe('')
-    expect(routerPush).toHaveBeenCalledWith({ name: 'person-detail', params: { id: '9' } })
+    expect(routerPush).toHaveBeenCalledWith(peopleListPush('9'))
   })
 
   it('邀请失败后 skipInvite 直接进入已创建用户详情', async () => {
@@ -208,6 +216,7 @@ describe('usePeopleEditor', () => {
     editor.skipInvite()
     expect(editor.createdUserId.value).toBeNull()
     expect(editor.error.value).toBe('')
+    // 跳过邀请直接进入已创建用户的详情页（保留原「进详情」的边缘路径）。
     expect(routerPush).toHaveBeenCalledWith({ name: 'person-detail', params: { id: '9' } })
   })
 
@@ -240,6 +249,6 @@ describe('usePeopleEditor', () => {
     updateUser.mockResolvedValueOnce({ ...user(), full_name: '张三丰', phone: null })
     expect(await editor.saveDraft()).toBe(true)
     expect(createUser).not.toHaveBeenCalled()
-    expect(routerPush).toHaveBeenCalledWith({ name: 'person-detail', params: { id: '7' } })
+    expect(routerPush).toHaveBeenCalledWith(peopleListPush('7'))
   })
 })

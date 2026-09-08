@@ -4,6 +4,7 @@ import type { GroupCreateRequest, GroupUpdateRequest } from '@/interfaces/group/
 import type { GroupJoinMode, GroupResponse, GroupType, GroupVisibility } from '@/interfaces/group/model'
 import { useAuthStore } from '@/stores/auth'
 import { useGroupsStore } from '@/stores/groups'
+import { useSaveFeedback } from './useSaveFeedback'
 
 /** 群组表单模型：下拉值统一用字符串，与 USelect 对齐；isActive 仅编辑模式使用。 */
 export interface GroupFormModel {
@@ -105,10 +106,16 @@ export function useGroupEditor() {
   const router = useRouter()
   const authStore = useAuthStore()
   const groupsStore = useGroupsStore()
+  const feedback = useSaveFeedback({
+    listRoute: { name: 'platform-resource', params: { module: 'organization', resource: 'groups' } },
+    detailRoute: { name: 'group-detail' },
+  })
   const draft = ref<GroupFormModel>(emptyGroupForm())
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
+  /** 编辑来源（D）：'detail' 表示从详情页进入，保存后留在详情而非回列表。 */
+  const from = ref<string | undefined>(undefined)
 
   const issues = computed<GroupValidationIssue[]>(() => validateGroup(draft.value))
   const workspaceId = computed<number | null>(() => (
@@ -133,6 +140,7 @@ export function useGroupEditor() {
 
   async function openCreate(): Promise<void> {
     error.value = ''
+    from.value = undefined
     draft.value = emptyGroupForm()
     loadingDetail.value = true
     try {
@@ -143,9 +151,10 @@ export function useGroupEditor() {
     }
   }
 
-  async function openEdit(id: number): Promise<boolean> {
+  async function openEdit(id: number, source?: string): Promise<boolean> {
     draft.value = emptyGroupForm()
     error.value = ''
+    from.value = source
     loadingDetail.value = true
     try {
       const catalogError = await ensureCatalog()
@@ -186,8 +195,15 @@ export function useGroupEditor() {
       error.value = ''
       const savedId = groupsStore.state.selectedId ?? targetId ?? null
       if (groupsStore.state.detail) draft.value = groupToForm(groupsStore.state.detail)
-      if (savedId != null) goToDetail(savedId)
-      else goToList()
+      // 保存成功 → toast + 按来源分流（D）：从详情进入编辑则留在详情，否则回列表并带 ?highlight=<id>。
+      const message = `群组「${groupsStore.state.detail?.name ?? draft.value.name}」已保存`
+      if (savedId != null && from.value === 'detail') {
+        await feedback.afterSaveToDetail({ id: savedId, message })
+      } else if (savedId != null) {
+        await feedback.afterSave({ id: savedId, message })
+      } else {
+        goToList()
+      }
       return true
     } finally {
       saving.value = false
@@ -201,6 +217,7 @@ export function useGroupEditor() {
     saving,
     error,
     workspaceId,
+    from,
     openCreate,
     openEdit,
     saveDraft,

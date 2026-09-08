@@ -106,7 +106,7 @@ describe('useGroupEditor', () => {
     expect(store.saveGroup).not.toHaveBeenCalled()
   })
 
-  it('saveDraft 成功后跳详情页', async () => {
+  it('saveDraft 成功后回列表并带 highlight', async () => {
     const store = useGroupsStore()
     ;(store.saveGroup as Mock).mockImplementation(async () => {
       store.state.selectedId = 9
@@ -125,7 +125,11 @@ describe('useGroupEditor', () => {
       undefined,
     )
     expect((store.saveGroup as Mock).mock.calls[0][0]).not.toHaveProperty('is_active')
-    expect(routerPush).toHaveBeenCalledWith({ name: 'group-detail', params: { id: '9' } })
+    expect(routerPush).toHaveBeenCalledWith({
+      name: 'platform-resource',
+      params: { module: 'organization', resource: 'groups' },
+      query: { highlight: '9' },
+    })
   })
 
   it('saveDraft 编辑态传 id 与 is_active，失败时写入 error 且不跳转', async () => {

@@ -56,7 +56,7 @@ function goToList() {
 }
 
 function goToEdit() {
-  void router.push({ name: 'department-edit', params: { id: String(departmentId.value) } })
+  void router.push({ name: 'department-edit', params: { id: String(departmentId.value) }, query: { from: 'detail' } })
 }
 
 function goToCreateChild() {

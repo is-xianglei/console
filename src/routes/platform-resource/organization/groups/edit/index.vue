@@ -16,6 +16,9 @@ const groupId = computed(() => {
   return Number(Array.isArray(value) ? value[0] : value)
 })
 
+/** 编辑来源（D）：从详情页点「编辑」跳转会带 ?from=detail，保存后留在详情。 */
+const fromDetail = computed(() => route.query.from === 'detail')
+
 const savedSnapshot = ref('')
 const confirmLeave = ref(false)
 const pendingTarget = ref<Parameters<typeof router.replace>[0] | null>(null)
@@ -24,7 +27,7 @@ const dirty = computed(() =>
 )
 
 async function load() {
-  await editor.openEdit(groupId.value)
+  await editor.openEdit(groupId.value, fromDetail.value ? 'detail' : undefined)
   savedSnapshot.value = JSON.stringify(editor.draft.value)
 }
 

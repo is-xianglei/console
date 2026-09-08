@@ -17,6 +17,10 @@ const departmentId = computed(() => {
   const value = route.params.id
   return Number(Array.isArray(value) ? value[0] : value)
 })
+
+/** 编辑来源（D）：从详情页点「编辑」跳转会带 ?from=detail，保存后留在详情。 */
+const fromDetail = computed(() => route.query.from === 'detail')
+
 const parentOptions = computed(() => support.parentDepartmentOptions(departmentId.value))
 
 const savedSnapshot = ref('')
@@ -27,7 +31,7 @@ const dirty = computed(() =>
 )
 
 async function load() {
-  const ok = await editor.openEdit(departmentId.value)
+  const ok = await editor.openEdit(departmentId.value, fromDetail.value ? 'detail' : undefined)
   savedSnapshot.value = JSON.stringify(editor.draft.value)
   if (ok) void support.loadSupportData(editor.workspaceId.value)
 }

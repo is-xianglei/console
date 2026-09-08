@@ -4,6 +4,7 @@ import type { DepartmentCreateRequest, DepartmentUpdateRequest } from '@/interfa
 import type { DepartmentResponse } from '@/interfaces/department/model'
 import { useAuthStore } from '@/stores/auth'
 import { useDepartmentsStore } from '@/stores/departments'
+import { useSaveFeedback } from './useSaveFeedback'
 
 /** 部门表单模型：下拉值统一用字符串('' 表示未选择)，与 USelect 对齐。 */
 export interface DepartmentFormModel {
@@ -74,10 +75,16 @@ export function useDepartmentEditor() {
   const router = useRouter()
   const authStore = useAuthStore()
   const departmentsStore = useDepartmentsStore()
+  const feedback = useSaveFeedback({
+    listRoute: { name: 'platform-resource', params: { module: 'organization', resource: 'departments' } },
+    detailRoute: { name: 'department-detail' },
+  })
   const draft = ref<DepartmentFormModel>(emptyDepartmentForm())
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
+  /** 编辑来源（D）：'detail' 表示从详情页进入，保存后留在详情而非回列表。 */
+  const from = ref<string | undefined>(undefined)
 
   const issues = computed<DepartmentValidationIssue[]>(() => validateDepartment(draft.value))
   const workspaceId = computed<number | null>(() => (
@@ -102,6 +109,7 @@ export function useDepartmentEditor() {
 
   async function openCreate(parentId?: number): Promise<void> {
     error.value = ''
+    from.value = undefined
     draft.value = emptyDepartmentForm()
     if (parentId != null) draft.value.parentId = String(parentId)
     loadingDetail.value = true
@@ -113,9 +121,10 @@ export function useDepartmentEditor() {
     }
   }
 
-  async function openEdit(id: number): Promise<boolean> {
+  async function openEdit(id: number, source?: string): Promise<boolean> {
     draft.value = emptyDepartmentForm()
     error.value = ''
+    from.value = source
     loadingDetail.value = true
     try {
       const catalogError = await ensureCatalog()
@@ -156,8 +165,15 @@ export function useDepartmentEditor() {
       error.value = ''
       const savedId = departmentsStore.state.selectedId ?? targetId ?? null
       if (departmentsStore.state.detail) draft.value = departmentToForm(departmentsStore.state.detail)
-      if (savedId != null) goToDetail(savedId)
-      else goToList()
+      // 保存成功 → toast + 按来源分流（D）：从详情进入编辑则留在详情，否则回列表并带 ?highlight=<id>。
+      const message = `部门「${departmentsStore.state.detail?.name ?? draft.value.name}」已保存`
+      if (savedId != null && from.value === 'detail') {
+        await feedback.afterSaveToDetail({ id: savedId, message })
+      } else if (savedId != null) {
+        await feedback.afterSave({ id: savedId, message })
+      } else {
+        goToList()
+      }
       return true
     } finally {
       saving.value = false
@@ -171,6 +187,7 @@ export function useDepartmentEditor() {
     saving,
     error,
     workspaceId,
+    from,
     openCreate,
     openEdit,
     saveDraft,

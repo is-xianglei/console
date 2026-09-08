@@ -97,7 +97,7 @@ describe('useDepartmentEditor', () => {
     expect(store.saveDepartment).not.toHaveBeenCalled()
   })
 
-  it('saveDraft 成功后跳详情页', async () => {
+  it('saveDraft 成功后回列表并带 highlight', async () => {
     const store = useDepartmentsStore()
     ;(store.saveDepartment as Mock).mockImplementation(async () => {
       store.state.selectedId = 9
@@ -114,7 +114,11 @@ describe('useDepartmentEditor', () => {
       expect.objectContaining({ name: '质量工程部', parent_id: 2, code: null }),
       undefined,
     )
-    expect(routerPush).toHaveBeenCalledWith({ name: 'department-detail', params: { id: '9' } })
+    expect(routerPush).toHaveBeenCalledWith({
+      name: 'platform-resource',
+      params: { module: 'organization', resource: 'departments' },
+      query: { highlight: '9' },
+    })
   })
 
   it('saveDraft 编辑态传 id，失败时写入 error 且不跳转', async () => {

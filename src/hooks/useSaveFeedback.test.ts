@@ -22,11 +22,12 @@ vi.mock('@nuxt/ui/composables', () => ({
 }))
 
 const listRoute = { name: 'platform-resource', params: { module: 'organization', resource: 'groups' } }
+const detailRoute = { name: 'group-detail' }
 
 function feedback() {
   const scope = effectScope()
   let api!: ReturnType<typeof useSaveFeedback>
-  scope.run(() => { api = useSaveFeedback({ listRoute }) })
+  scope.run(() => { api = useSaveFeedback({ listRoute, detailRoute }) })
   return { api, scope }
 }
 
@@ -41,6 +42,14 @@ describe('useSaveFeedback', () => {
     await api.afterSave({ id: 7, message: '群组已创建' })
     expect(toastAdd).toHaveBeenCalledWith({ title: '群组已创建', color: 'success' })
     expect(router.push).toHaveBeenCalledWith({ ...listRoute, query: { highlight: '7' } })
+    scope.stop()
+  })
+
+  it('afterSaveToDetail 推送到详情页（from === detail 保留在详情，D）', async () => {
+    const { api, scope } = feedback()
+    await api.afterSaveToDetail({ id: 7, message: '群组已保存' })
+    expect(toastAdd).toHaveBeenCalledWith({ title: '群组已保存', color: 'success' })
+    expect(router.push).toHaveBeenCalledWith({ ...detailRoute, params: { id: '7' } })
     scope.stop()
   })
 
