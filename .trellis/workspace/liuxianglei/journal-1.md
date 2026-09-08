@@ -30,3 +30,28 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 2: p1 organization 模块改造
+
+**Date**: 2026-09-08
+**Task**: p1 organization 模块改造
+**Branch**: `main`
+
+### Summary
+
+完成 p1 organization 模块并归档：people 左树右表（query 进 URL、批量删除剔除自己、只读状态 Badge、can() 行级权限、窄屏抽屉）、departments 树形表格（递归祖先链、子树弱化、删除程序拦截、行内新增子部门）、groups 标准列表补齐（group_type 进 URL、成员数删除拦截、时间列）；三个 editor 接 saveFeedback 闭环+from 详情分流；190 用例全绿。真分页/用户启停因后端无接口按 prd 风险条款退化为前端过滤/只读 Badge。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4abb687` | (see git log) |
+| `22255cb` | (see git log) |
+| `03f22dc` | (see git log) |
+| `e1b8ad7` | (see git log) |
+| `b7bae41` | (see git log) |
+
+### Status
+
+[OK] **Completed**
