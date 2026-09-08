@@ -17,3 +17,72 @@
   background: var(--accent-agent-dim);
   box-shadow: inset 2px 0 var(--accent-agent);
 }
+
+/* highlightId 命中行：高亮后 2s 淡出（CSS transition）。 */
+.resource-table tbody tr.highlighted {
+  background: var(--accent-agent-dim);
+  box-shadow: inset 3px 0 var(--accent-agent);
+  animation: highlight-fade 2s var(--ease-out) forwards;
+}
+
+@keyframes highlight-fade {
+  from { background: var(--accent-agent-dim); }
+  to { background: transparent; }
+}
+
+/* 加载骨架：columns × skeletonRows 个 USkeleton，按表格列数等宽排布。 */
+.skeleton {
+  display: grid;
+  grid-template-columns: repeat(var(--skeleton-cols, 1), minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.skeletonCell {
+  height: 18px;
+}
+
+/* 勾选列：居中放 checkbox。 */
+.selectCell {
+  text-align: center;
+}
+
+/* 树形首列：缩进由 depth 驱动，这里只承担 flex 布局。 */
+.treeCell {
+  padding-left: var(--tree-indent, 0) !important;
+}
+
+.treeRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.treeToggle {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.treeToggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.treeToggle i {
+  font-size: 12px;
+}
+
+.empty {
+  padding: 28px 16px;
+  display: grid;
+  place-items: center;
+}
