@@ -3,3 +3,54 @@
 /* groups 列表页专用补充。 */
 .filterTabs { flex: 0 0 auto; }
 .statusBadge { text-transform: none; }
+
+/* ===== p0 骨架：筛选卡 + 列表卡，整页固定高、不滚动 ===== */
+
+/* 外层：高度 = 100vh - 顶栏，垂直排列，不滚动。 */
+.page {
+  --app-header-h: var(--topbar-height);
+  height: calc(100vh - var(--app-header-h));
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.filterRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search { width: min(390px, 100%); }
+
+.workspaceName {
+  margin-left: auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 表格区（ListCard 承载滚动，这里只保留表格自身样式）。 */
+.table { width: 100%; }
+.table :global([data-slot='tbody'] > tr) { cursor: pointer; }
+.table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
+.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: 9px; text-transform: uppercase; }
+.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: 10px; }
+
+.alert { margin: 10px 10px 0; }
+
+@media (max-width: 720px) {
+  .page { padding: 12px; gap: 12px; }
+  .filterRow { flex-wrap: wrap; }
+  .search { width: 100%; }
+  .workspaceName { margin-left: 0; flex: 1; }
+}

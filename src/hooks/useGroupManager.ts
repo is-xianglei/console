@@ -1,19 +1,33 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { GroupResponse } from '@/interfaces/group/model'
 import { useGroupsStore } from '@/stores/groups'
+import { useListUrlState } from './useListUrlState'
 
 export type GroupEnabledFilter = 'all' | 'enabled' | 'disabled'
 
 const SEARCH_DEBOUNCE_MS = 300
+const DEFAULT_PAGE_SIZE = 20
 
 /**
- * 群组列表页：加载、服务端搜索(300ms 防抖)+ 前端过滤、指标、删除、加入/退出；
- * 不含编辑/保存(见 useGroupEditor)。
+ * 群组列表页：筛选/分页状态写入 URL（useListUrlState）、服务端搜索(300ms 防抖) + 前端过滤、
+ * 指标、删除、加入/退出；不含编辑/保存(见 useGroupEditor)。
+ *
+ * p0：作为 p1/p2/p3 的照抄模板——接入 useListUrlState（keyword/enabledFilter 进 URL）、
+ * 真分页（ResourcePagination）、删除走 useSaveFeedback（afterDelete 由页面层调用）。
  */
 export function useGroupManager() {
   const groupsStore = useGroupsStore()
-  const search = ref('')
-  const enabledFilter = ref<GroupEnabledFilter>('all')
+
+  const { state, apply, reset, isDefault } = useListUrlState({
+    defaults: {
+      keyword: '',
+      enabledFilter: 'all' as GroupEnabledFilter,
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+    },
+    resetPageOn: ['keyword', 'enabledFilter', 'pageSize'],
+  })
+
   const pendingDelete = ref<GroupResponse | null>(null)
   const deleting = ref(false)
   const loadingError = ref('')
@@ -23,25 +37,43 @@ export function useGroupManager() {
   let toastTimer: ReturnType<typeof setTimeout> | undefined
   let searchTimer: ReturnType<typeof setTimeout> | undefined
   let loadRequest = 0
-  /** 当前绑定的工作区，由 loadAll 记录，供搜索防抖回调使用。 */
-  let boundWorkspaceId: number | null = null
-  /** 最近一次已发送给后端的搜索词，避免 resetView 清空搜索等场景重复请求。 */
-  let loadedSearch = ''
+
+  // 兼容模板既有绑定名（v-model="search" / enabledFilter），实际读写 state。
+  const search = computed({
+    get: () => state.keyword,
+    set: (v) => { state.keyword = v },
+  })
+  const enabledFilter = computed({
+    get: () => state.enabledFilter,
+    set: (v) => { state.enabledFilter = v },
+  })
+  const page = computed({ get: () => state.page, set: (v) => { state.page = v } })
+  const pageSize = computed({ get: () => state.pageSize, set: (v) => { state.pageSize = v } })
 
   const groups = computed(() => groupsStore.state.items)
   const loading = computed(() => groupsStore.state.loading)
   const myGroupIds = computed(() => new Set(groupsStore.state.myGroups.map((group) => group.id)))
   /** 前端再过滤一次：服务端搜索结果回来前也能即时收窄，且叠加启用状态筛选。 */
   const filteredGroups = computed(() => {
-    const query = search.value.trim().toLowerCase()
+    const query = state.keyword.trim().toLowerCase()
     return groups.value.filter((item) => {
-      const enabledMatches = enabledFilter.value === 'all'
-        || (enabledFilter.value === 'enabled' ? item.is_active : !item.is_active)
+      const enabledMatches = state.enabledFilter === 'all'
+        || (state.enabledFilter === 'enabled' ? item.is_active : !item.is_active)
       const searchMatches = !query
         || [item.name, item.slug, item.description, item.group_type].some((value) => value?.toLowerCase().includes(query))
       return enabledMatches && searchMatches
     })
   })
+
+  const total = computed(() => filteredGroups.value.length)
+  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, state.pageSize))))
+  const clampedPage = computed(() => Math.min(Math.max(1, state.page), pageCount.value))
+  /** 当前页切片（供 ResourceTable.data）。 */
+  const pagedItems = computed(() => {
+    const start = (clampedPage.value - 1) * state.pageSize
+    return filteredGroups.value.slice(start, start + state.pageSize)
+  })
+
   const stats = computed(() => ({
     all: groups.value.length,
     mine: groupsStore.state.myGroups.length,
@@ -66,43 +98,45 @@ export function useGroupManager() {
 
   async function loadAll(workspaceId: number | null) {
     const request = ++loadRequest
-    boundWorkspaceId = workspaceId
     if (!workspaceId) {
       loadingError.value = '当前账号没有可用工作区'
       return
     }
-    const keyword = search.value.trim()
-    loadedSearch = keyword
-    const error = await groupsStore.loadGroups(workspaceId, keyword || undefined)
+    const keyword = state.keyword.trim()
+    const error = await groupsStore.loadPage({
+      workspaceId,
+      keyword: keyword || undefined,
+      page: clampedPage.value,
+      pageSize: state.pageSize,
+    })
     if (request === loadRequest) loadingError.value = error ?? ''
   }
 
   /**
-   * 服务端搜索：关键词变化后 300ms 防抖，调用 loadGroups(workspaceId, search)。
-   * 后端按 search 过滤群组目录，前端 filteredGroups 再叠加一次即时过滤。
+   * 搜索/筛选/分页变化时重新加载。URL 双向绑定下筛选变化会由 useListUrlState 复位 page，
+   * 这里统一监听 state（deep），300ms 防抖后拉取。
    */
-  watch(search, (value) => {
-    clearSearchTimer()
-    if (!boundWorkspaceId) return
-    const workspaceId = boundWorkspaceId
-    const keyword = value.trim()
-    if (keyword === loadedSearch) return
-    searchTimer = setTimeout(() => {
-      searchTimer = undefined
-      if (keyword === loadedSearch) return
-      loadedSearch = keyword
-      const request = ++loadRequest
-      void groupsStore.loadGroups(workspaceId, keyword || undefined).then((error) => {
-        if (request === loadRequest) loadingError.value = error ?? ''
-      })
-    }, SEARCH_DEBOUNCE_MS)
-  })
+  watch(
+    state,
+    () => {
+      clearSearchTimer()
+      const workspaceId = groupsStore.state.workspaceId
+      if (!workspaceId) return
+      searchTimer = setTimeout(() => {
+        searchTimer = undefined
+        void loadAll(workspaceId)
+      }, SEARCH_DEBOUNCE_MS)
+    },
+    { deep: true },
+  )
+
+  // 首次进入 / 工作区切换由页面层 watch(workspaceId) → resetView / loadAll 处理；
+  // 这里不重复绑定 store.workspaceId（切换时可从 URL state 复位后由 state watch 触发重拉）。
 
   function resetView() {
     loadRequest += 1
     clearSearchTimer()
-    search.value = ''
-    enabledFilter.value = 'all'
+    reset()
     pendingDelete.value = null
     loadingError.value = ''
     toast.value = ''
@@ -118,19 +152,20 @@ export function useGroupManager() {
     pendingDelete.value = null
   }
 
-  async function confirmDelete() {
-    if (!pendingDelete.value || deleting.value) return
+  async function confirmDelete(): Promise<boolean> {
+    if (!pendingDelete.value || deleting.value) return false
     const target = pendingDelete.value
     deleting.value = true
     try {
       const error = await groupsStore.removeGroup(target.id)
       if (error) {
         loadingError.value = error
-        return
+        return false
       }
       pendingDelete.value = null
       loadingError.value = ''
       showToast(`${target.name} 已删除`)
+      return true
     } finally {
       deleting.value = false
     }
@@ -172,11 +207,21 @@ export function useGroupManager() {
   })
 
   return {
+    state,
+    apply,
+    reset,
+    isDefault,
+    search,
+    enabledFilter,
+    page,
+    pageSize,
+    total,
+    pageCount,
+    clampedPage,
+    pagedItems,
     groups,
     loading,
     deleting,
-    search,
-    enabledFilter,
     pendingDelete,
     loadingError,
     toast,
