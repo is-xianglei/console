@@ -1,5 +1,78 @@
 @import '../shared/index.module.css';
 
-/* departments 列表页专用补充。 */
+/* departments 列表页：固定高骨架（筛选卡 + 列表卡，整页不滚动，仅表格行区滚动）。 */
+.page {
+  --app-header-h: var(--topbar-height);
+  height: calc(100vh - var(--app-header-h));
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.filterRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .filterTabs { flex: 0 0 auto; }
 .statusBadge { text-transform: none; }
+.search { width: min(390px, 100%); }
+
+.workspaceName {
+  margin-left: auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert { margin: 10px 10px 0; }
+
+/* 表格样式（ListCard 承载滚动，这里只保留表格自身样式与树形弱化/命中态）。 */
+.table { width: 100%; }
+.table :global([data-slot='tbody'] > tr) { cursor: pointer; }
+.table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
+.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: 9px; text-transform: uppercase; }
+.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: 10px; }
+
+.rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+.primaryCell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
+.primaryCell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
+.primaryCell strong { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: 11px; }
+.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: 9px; }
+.entityIcon { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-agent-dim); color: var(--accent-agent); }
+
+/* 搜索命中节点高亮、祖先链弱化。 */
+.matched strong { color: var(--accent-agent); }
+.ancestor { opacity: 0.55; }
+
+/* 停用节点及其子树整体弱化（B4）。subtreeInactive 由 manager 自上而下传播。 */
+.subtreeInactive { opacity: 0.45; }
+
+/* 底部计数条：不分页，仅显示部门总数。 */
+.countBar {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+/* 删除阻断：检查中 loading 与原因列表。 */
+.blockerBusy { padding: 12px 0; color: var(--text-muted); font-size: 11px; display: flex; align-items: center; gap: 8px; }
+.blockerList { margin: 2px 0 6px; padding-left: 16px; color: var(--text-secondary); font-size: 11px; line-height: 1.8; list-style: disc; }
+
+@media (max-width: 720px) {
+  .page { padding: 12px; gap: 12px; }
+  .filterRow { flex-wrap: wrap; }
+  .search { width: 100%; }
+  .workspaceName { margin-left: 0; flex: 1; }
+}
