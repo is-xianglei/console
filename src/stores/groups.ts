@@ -142,6 +142,8 @@ export const useGroupsStore = defineStore('groups', () => {
     page?: number
     pageSize?: number
     keyword?: string
+    /** 服务端 group_type 过滤（getGroupList 支持）。 */
+    groupType?: string
     isEnabled?: GroupsPageState['isEnabled']
   } = {}): Promise<string | null> {
     const workspaceId = params.workspaceId ?? state.workspaceId
@@ -156,7 +158,10 @@ export const useGroupsStore = defineStore('groups', () => {
     state.loading = true
     const requestGeneration = ++pageGeneration
     try {
-      const items = await getGroupList(workspaceId, keyword ? { search: keyword } : undefined)
+      const items = await getGroupList(workspaceId, {
+        search: keyword || undefined,
+        group_type: params.groupType || undefined,
+      })
       if (generation !== dataGeneration || requestGeneration !== pageGeneration) return null
       // 后端无 limit/offset：存全量并在调用方切片；total 取全量长度。
       state.items = items  // 保持编辑器 / 全量依赖一致

@@ -24,18 +24,28 @@ const enabledOptions = [
   { value: 'disabled', label: '已停用' },
 ] as { value: GroupEnabledFilter; label: string }[]
 
+const typeOptions = [
+  { value: 'all', label: '全部类型' },
+  { value: 'team', label: '团队' },
+  { value: 'community', label: '社区' },
+  { value: 'region', label: '区域' },
+  { value: 'custom', label: '自定义' },
+]
+
 const columns: TableColumn<GroupResponse>[] = [
   { id: 'name', header: '群组' },
   { id: 'type', header: '类型' },
   { id: 'visibility', header: '可见性' },
   { id: 'joinMode', header: '加入方式' },
   { id: 'state', header: '状态' },
+  { id: 'createdAt', header: '创建时间' },
   { id: 'actions', header: '操作' },
 ]
 
 const workspaceId = computed(() => authStore.currentWorkspaceId ?? authStore.currentWorkspace?.id ?? null)
 const workspaceName = computed(() => authStore.currentWorkspace?.display_name || authStore.currentWorkspace?.name || '未选择工作区')
 const deleteTitle = computed(() => manager.pendingDelete.value ? `删除群组「${manager.pendingDelete.value.name}」？` : '删除群组？')
+const deleteConfirmDisabled = computed(() => Boolean(manager.deleteBlockers.value && manager.deleteBlockers.value.memberCount > 0))
 
 function goToCreate() {
   void router.push({ name: 'group-create' })
@@ -47,6 +57,11 @@ function goToDetail(item: GroupResponse) {
 
 function goToEdit(item: GroupResponse) {
   void router.push({ name: 'group-edit', params: { id: String(item.id) } })
+}
+
+function goToDeleteDetail() {
+  const target = manager.pendingDelete.value
+  if (target) goToDetail(target)
 }
 
 /** 行操作「加入/退出」按 isMine 切换，loading 绑定到 manager.membershipBusyId 对应行。 */
@@ -61,7 +76,7 @@ async function onRefresh() {
 }
 
 function onApplyFilters() {
-  // 搜索/筛选：只更新 keyword 与 enabledFilter；page 由 useListUrlState 复位。
+  // 搜索/筛选：只更新 keyword 与 type 等；page 由 useListUrlState 复位。
   void manager.loadAll(workspaceId.value)
 }
 
@@ -97,26 +112,21 @@ watch(
       @reset="onResetFilters"
     >
       <template #default>
-        <div :class="styles.filterRow">
-          <UInput
-            v-model="manager.state.keyword"
-            :class="styles.search"
-            icon="i-lucide-search"
-            placeholder="搜索群组名称、标识或描述（服务端搜索）"
-            aria-label="搜索群组"
-          >
-            <template v-if="manager.state.keyword" #trailing>
-              <UButton icon="i-lucide-x" color="neutral" variant="ghost" square size="xs" aria-label="清空搜索" @click="manager.state.keyword = ''" />
-            </template>
-          </UInput>
-          <UTabs
-            v-model="manager.state.enabledFilter"
-            :class="styles.filterTabs"
-            :items="enabledOptions"
-            :content="false"
-            size="sm"
-            aria-label="启用状态筛选"
-          />
+        <div :class="styles.filterForms">
+          <UFormField label="群组名称"><UInput v-model="manager.state.keyword" icon="i-lucide-search" placeholder="搜索群组名称、标识或描述（服务端搜索）" aria-label="搜索群组" @keydown.enter="onApplyFilters" /></UFormField>
+          <UFormField label="类型">
+            <USelect :model-value="manager.state.groupType" :items="typeOptions" aria-label="类型" @update:model-value="(value: unknown) => { manager.state.groupType = String(value ?? 'all') }" />
+          </UFormField>
+          <UFormField label="创建时间">
+            <div :class="styles.dateRange">
+              <UInput :model-value="manager.state.dateRange[0]" type="date" aria-label="开始日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [String(value ?? ''), manager.state.dateRange[1]] }" />
+              <span>~</span>
+              <UInput :model-value="manager.state.dateRange[1]" type="date" aria-label="结束日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [manager.state.dateRange[0], String(value ?? '')] }" />
+            </div>
+          </UFormField>
+        </div>
+        <div :class="styles.filterTabsRow">
+          <UTabs v-model="manager.state.enabledFilter" :class="styles.filterTabs" :items="enabledOptions" :content="false" size="sm" aria-label="启用状态筛选" />
           <span :class="styles.workspaceName"><UIcon name="i-lucide-panels-top-left" />{{ workspaceName }}</span>
         </div>
       </template>
@@ -157,12 +167,17 @@ watch(
         <template #visibility-cell="{ row }"><UBadge color="neutral" variant="subtle" size="xs" :class="styles.statusBadge">{{ groupVisibilityLabel(row.original.visibility) }}</UBadge></template>
         <template #joinMode-cell="{ row }"><span :class="styles.joinModeText">{{ groupJoinModeLabel(row.original.join_mode) }}</span></template>
         <template #state-cell="{ row }"><UBadge :class="styles.statusBadge" :color="row.original.is_active ? 'success' : 'neutral'" variant="subtle" size="xs">{{ row.original.is_active ? '启用' : '停用' }}</UBadge></template>
+        <template #createdAt-cell="{ row }"><RelativeTime :value="row.original.created_at" /></template>
         <template #actions-cell="{ row }">
           <div :class="styles.rowActions">
-            <UTooltip text="详情"><UButton icon="i-lucide-eye" color="neutral" variant="ghost" square :aria-label="`查看 ${row.original.name} 详情`" @click.stop="goToDetail(row.original)" /></UTooltip>
             <UTooltip text="编辑"><UButton icon="i-lucide-pencil" color="neutral" variant="ghost" square :aria-label="`编辑 ${row.original.name}`" @click.stop="goToEdit(row.original)" /></UTooltip>
             <UTooltip :text="manager.isMine(row.original.id) ? '退出群组' : '加入群组'"><UButton :icon="manager.isMine(row.original.id) ? 'i-lucide-log-out' : 'i-lucide-log-in'" color="neutral" variant="ghost" square :aria-label="`${manager.isMine(row.original.id) ? '退出' : '加入'} ${row.original.name}`" :loading="manager.membershipBusyId.value === row.original.id" :disabled="manager.membershipBusyId.value != null" @click.stop="toggleMembership(row.original)" /></UTooltip>
-            <UTooltip text="删除"><UButton icon="i-lucide-trash-2" color="error" variant="ghost" square :aria-label="`删除 ${row.original.name}`" @click.stop="manager.requestDelete(row.original)" /></UTooltip>
+            <UDropdownMenu :items="[
+              { label: '查看详情', icon: 'i-lucide-eye', onSelect: () => goToDetail(row.original) },
+              { label: '删除', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => manager.requestDelete(row.original) },
+            ]">
+              <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square :aria-label="`${row.original.name} 更多操作`" />
+            </UDropdownMenu>
           </div>
         </template>
       </ResourceTable>
@@ -180,8 +195,26 @@ watch(
     </ListCard>
 
     <UModal :open="Boolean(manager.pendingDelete.value)" :title="deleteTitle" description="此操作会直接调用后端删除接口，无法在当前页面撤销。" @update:open="(open) => { if (!open) manager.cancelDelete() }">
-      <template #body><UAlert color="error" variant="subtle" icon="i-lucide-triangle-alert" title="请确认该群组没有仍需保留的成员或引用。" /></template>
-      <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="manager.deleting.value" @click="manager.cancelDelete" /><UButton label="确认删除" icon="i-lucide-trash-2" color="error" :loading="manager.deleting.value" :disabled="manager.deleting.value" @click="manager.confirmDelete" /></template>
+      <template #body>
+        <div v-if="manager.blockerBusyId.value != null" :class="styles.blockerBusy">
+          <UIcon name="i-lucide-loader-circle" class="animate-spin" />
+          <span>正在检查群组成员…</span>
+        </div>
+        <UAlert v-else-if="manager.deleteBlockers.value" color="error" variant="subtle" icon="i-lucide-triangle-alert" title="该群组仍有成员，无法删除">
+          <template #description>
+            <ul :class="styles.blockerList">
+              <li v-if="manager.deleteBlockers.value.memberCount > 0">存在成员 {{ manager.deleteBlockers.value.memberCount }} 人</li>
+              <li v-if="manager.deleteBlockers.value.reason">{{ manager.deleteBlockers.value.reason }}</li>
+            </ul>
+            <UButton label="前往群组详情处理" color="neutral" variant="link" size="sm" @click="goToDeleteDetail" />
+          </template>
+        </UAlert>
+        <UAlert v-else color="error" variant="subtle" icon="i-lucide-triangle-alert" title="删除后该群组的成员关系与引用一并失效，请确认没有仍需保留的引用。" />
+      </template>
+      <template #footer>
+        <UButton label="取消" color="neutral" variant="outline" :disabled="manager.deleting.value" @click="manager.cancelDelete" />
+        <UButton label="确认删除" icon="i-lucide-trash-2" color="error" :loading="manager.deleting.value" :disabled="manager.deleting.value || deleteConfirmDisabled" @click="manager.confirmDelete" />
+      </template>
     </UModal>
   </main>
   <Transition name="dept-toast"><div v-if="manager.toast.value" :class="styles.toast" role="status"><i class="icon icon-circle-check-big"></i>{{ manager.toast.value }}</div></Transition>
