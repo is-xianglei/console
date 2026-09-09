@@ -2,7 +2,9 @@
 import type { FormError } from '@nuxt/ui'
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { authErrorMessage } from '@/http'
 import { useAuthStore } from '@/stores/auth'
+import { safeRedirect } from '@/routes'
 
 defineOptions({ name: 'RegisterPage' })
 
@@ -13,6 +15,7 @@ const form = reactive({
   email: '',
   username: '',
   password: '',
+  confirmPassword: '',
   fullName: '',
 })
 const error = ref('')
@@ -27,20 +30,19 @@ function validate(values: Partial<typeof form>): FormError[] {
   else if (values.username.length < 3) errors.push({ name: 'username', message: '用户名至少 3 个字符' })
   if (!values.password) errors.push({ name: 'password', message: '请输入密码' })
   else if (values.password.length < 6) errors.push({ name: 'password', message: '密码至少 6 个字符' })
+  else if (values.password.length < 8 || !/[A-Za-z]/.test(values.password) || !/\d/.test(values.password)) {
+    errors.push({ name: 'password', message: '密码至少 8 位，且需同时包含字母和数字' })
+  }
+  if (!values.confirmPassword) {
+    errors.push({ name: 'confirmPassword', message: '请再次输入密码' })
+  } else if (values.confirmPassword !== values.password) {
+    errors.push({ name: 'confirmPassword', message: '两次输入的密码不一致' })
+  }
   return errors
 }
 
 function resolveAuthTarget(): string {
-  const redirect = route.query.redirect
-  if (
-    typeof redirect === 'string' &&
-    redirect.startsWith('/') &&
-    !redirect.startsWith('//') &&
-    !/^\/(login|register)(?:[/?#]|$)/.test(redirect)
-  ) {
-    return redirect
-  }
-  return '/chat'
+  return safeRedirect(route.query.redirect) ?? '/chat'
 }
 
 async function onRegister() {
@@ -56,7 +58,7 @@ async function onRegister() {
     })
     await router.replace(resolveAuthTarget())
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '注册失败，请稍后重试'
+    error.value = authErrorMessage(cause, '注册失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -82,6 +84,7 @@ function onLogin() {
         :class="$style.authForm"
         :state="form"
         :validate="validate"
+        :validate-on="['blur']"
         :disabled="loading"
         @submit="onRegister"
       >
@@ -111,7 +114,18 @@ function onLogin() {
             :class="$style.authInput"
             type="password"
             size="lg"
-            placeholder="至少 6 个字符"
+            placeholder="至少 8 位，含字母和数字"
+            autocomplete="new-password"
+          />
+        </UFormField>
+
+        <UFormField :class="$style.authField" label="确认密码" name="confirmPassword" required>
+          <UInput
+            v-model="form.confirmPassword"
+            :class="$style.authInput"
+            type="password"
+            size="lg"
+            placeholder="再次输入密码"
             autocomplete="new-password"
           />
         </UFormField>

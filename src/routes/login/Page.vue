@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { FormError } from '@nuxt/ui'
-import { reactive, ref } from 'vue'
+import { nextTick, reactive, ref, useTemplateRef, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ApiError, authErrorMessage } from '@/http'
 import { useAuthStore } from '@/stores/auth'
+import { safeRedirect } from '@/routes'
+import { focusFirstError } from '@/hooks'
 
 defineOptions({ name: 'LoginPage' })
 
@@ -15,6 +18,9 @@ const form = reactive({
 })
 const error = ref('')
 const loading = ref(false)
+// UForm 实例类型由 Nuxt UI 全局组件推导；此处仅用其 setErrors，故收窄为最小接口。
+const formRef = useTemplateRef('formRef') as Ref<{ setErrors: (errors: FormError[], name?: string) => void } | null>
+const formRoot = ref<HTMLElement | null>(null)
 function validate(values: Partial<typeof form>): FormError[] {
   const errors: FormError[] = []
   if (!values.email) errors.push({ name: 'email', message: '请输入邮箱' })
@@ -26,16 +32,7 @@ function validate(values: Partial<typeof form>): FormError[] {
 }
 
 function resolveAuthTarget(): string {
-  const redirect = route.query.redirect
-  if (
-    typeof redirect === 'string' &&
-    redirect.startsWith('/') &&
-    !redirect.startsWith('//') &&
-    !/^\/(login|register)(?:[/?#]|$)/.test(redirect)
-  ) {
-    return redirect
-  }
-  return '/chat'
+  return safeRedirect(route.query.redirect) ?? '/chat'
 }
 
 async function onLogin() {
@@ -46,7 +43,16 @@ async function onLogin() {
     await authStore.login(form.email, form.password)
     await router.replace(resolveAuthTarget())
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '登录失败，请检查邮箱和密码'
+    const message = authErrorMessage(cause, '登录失败，请检查邮箱和密码')
+    if (cause instanceof ApiError && cause.status === 401) {
+      // 401 落到密码字段并聚焦，用户无需在全局提示里猜错在哪个字段。
+      error.value = ''
+      formRef.value?.setErrors([{ name: 'password', message: '邮箱或密码错误' }])
+      await nextTick()
+      if (formRoot.value) focusFirstError(formRoot.value)
+      return
+    }
+    error.value = message
   } finally {
     loading.value = false
   }
@@ -58,7 +64,7 @@ function onRegister() {
 </script>
 
 <template>
-  <div :class="$style.authContainer">
+  <div ref="formRoot" :class="$style.authContainer">
     <div :class="$style.authCard">
       <div :class="$style.authHeader">
         <svg :class="$style.authHex" viewBox="0 0 20 22" fill="none">
@@ -69,9 +75,11 @@ function onRegister() {
       </div>
 
       <UForm
+        ref="formRef"
         :class="$style.authForm"
         :state="form"
         :validate="validate"
+        :validate-on="['blur']"
         :disabled="loading"
         @submit="onLogin"
       >
