@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
+- **Total Sessions**: 5
 - **Last Active**: 2026-09-09
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~106 | Active |
+| `journal-1.md` | ~131 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-09-09 | p5 登录注册/个人资料/设置/应用中心补齐 | `70c8933`, `a091603`, `7c318ac`, `80c1fe7`, `41afa60` | `main` |
 | 4 | 2026-09-09 | p3 memories 与 skills 页面标准化 | `0b8ebd9`, `5141e88`, `97c7174`, `a32c58b` | `main` |
 | 3 | 2026-09-09 | p2 build 模块列表与编辑闭环 | `3cb8549`, `8c22bf9`, `88cd865`, `8f5d324`, `f5e8470` | `main` |
 | 2 | 2026-09-08 | p1 organization 模块改造 | `4abb687`, `22255cb`, `03f22dc`, `e1b8ad7`, `b7bae41` | `main` |

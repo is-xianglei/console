@@ -104,3 +104,28 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: p5 登录注册/个人资料/设置/应用中心补齐
+
+**Date**: 2026-09-09
+**Task**: p5 登录注册/个人资料/设置/应用中心补齐
+**Branch**: `main`
+
+### Summary
+
+完成 p5 并归档：HTTP 认证层错误透传(message/detail/code，非 JSON 回落 HTTP status)+authErrorMessage 分场景+withRetry(status0 重试/401 不重试，只套无副作用请求)+safeRedirect 收敛一处 export；login/register 401 定位 password 字段+确认密码+密码≥8位含字母数字+validate-on=['blur']；apps 打通 openApp 先 openApp(id) 再 launchApp+AppTile.tag→id 并对齐 WorkbenchApp.id(修复 7/8 应用点击切不到视图的真实缺陷)+mock 标注+getApps() 统一取数+enabled/permission 置灰；profile 弹窗脏检查 useSnapshotDirty+删除后果文案写实+错误载体统一(toast/inline);settings 真实错误消息+删除规则带 tool_name；error-boundary 加返回首页。validate-on 用 ['blur'](Nuxt UI 4.10 类型不含 submit)；210 用例全绿。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `70c8933` | (see git log) |
+| `a091603` | (see git log) |
+| `7c318ac` | (see git log) |
+| `80c1fe7` | (see git log) |
+| `41afa60` | (see git log) |
+
+### Status
+
+[OK] **Completed**
