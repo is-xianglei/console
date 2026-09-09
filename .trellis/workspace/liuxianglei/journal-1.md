@@ -80,3 +80,27 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: p3 memories 与 skills 页面标准化
+
+**Date**: 2026-09-09
+**Task**: p3 memories 与 skills 页面标准化
+**Branch**: `main`
+
+### Summary
+
+完成 p3 并归档：memories 列表标准化(URL 即状态 keyword/memoryType/page/pageSize、空态分型三态、骨架屏、RelativeTime、长文本 tooltip、删除回退页码+对象名、useSaveFeedback 闭环含从详情编辑留详情)；skills 标准 CRUD 化(FilterPanel+ListCard+ResourceTable 列表、/skills/:name 详情路由、/skills/:name/edit 编辑页接 useUnsavedGuard、页头上传主按钮、删除失败真实 message、选中态走 route.params.name 避免双状态源)；后端无 update/搜索/分页/type，按 prd 风险条款退化为只读+上传覆盖/前端过滤内存分页/scope 筛选并标注接口化 TODO；200 用例全绿。skills 编辑落地方式/类型筛选用 scope/searchMemory 单次拉取为接口化后续项。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0b8ebd9` | (see git log) |
+| `5141e88` | (see git log) |
+| `97c7174` | (see git log) |
+| `a32c58b` | (see git log) |
+
+### Status
+
+[OK] **Completed**
