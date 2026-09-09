@@ -7,6 +7,7 @@ import type {
 } from '@/interfaces/orchestration-plan/model'
 import { useAgentsStore } from '@/stores/agents'
 import { useOrchestrationPlansStore } from '@/stores/orchestrationPlans'
+import { inDateRange, useListUrlState } from './useListUrlState'
 
 /** 后端成员数量约束：一个方案 2-5 个成员。 */
 export const MIN_MEMBERS = 2
@@ -15,6 +16,11 @@ export const MAX_MEMBERS = 5
 /** 循环模式轮数约束：1-10。 */
 export const MIN_ITERATIONS = 1
 export const MAX_ITERATIONS = 10
+
+/** 启用状态筛选值（与 URL 里 enabled 字段共用）。 */
+export type PlanEnabledFilter = 'all' | 'enabled' | 'disabled'
+
+const DEFAULT_PAGE_SIZE = 20
 
 /** 编排模式选项：中文标签、一句话说明与 lucide 字体图标名。 */
 export const PLAN_MODE_OPTIONS: Array<{ value: PlanMode; label: string; hint: string; icon: string }> = [
@@ -127,12 +133,44 @@ export function validatePlan(plan: PlanFormModel): PlanValidationIssue[] {
 export function useOrchestrationPlanManager() {
   const plansStore = useOrchestrationPlansStore()
   const agentsStore = useAgentsStore()
-  const search = ref('')
-  const enabledFilter = ref<'all' | 'enabled' | 'disabled'>('all')
-  const modeFilter = ref<'all' | PlanMode>('all')
+
+  // 筛选/分页状态写入 route.query（useListUrlState）；state 为真源。
+  // URL 键统一叫 enabled（prd A-3），对外仍暴露 enabledFilter 兼容既有绑定。
+  const { state, apply, reset, isDefault } = useListUrlState({
+    defaults: {
+      keyword: '',
+      enabled: 'all' as PlanEnabledFilter,
+      mode: 'all' as 'all' | PlanMode,
+      dateRange: [] as string[],
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+    },
+    resetPageOn: ['keyword', 'enabled', 'mode', 'dateRange', 'pageSize'],
+  })
+
+  // 兼容模板既有绑定名（v-model="search" / enabledFilter / modeFilter），实际读写 state。
+  const search = computed({
+    get: () => state.keyword,
+    set: (v) => { state.keyword = v },
+  })
+  const enabledFilter = computed({
+    get: () => state.enabled,
+    set: (v) => { state.enabled = v as PlanEnabledFilter },
+  })
+  const modeFilter = computed({
+    get: () => state.mode,
+    set: (v) => { state.mode = v as 'all' | PlanMode },
+  })
+  const page = computed({ get: () => state.page, set: (v) => { state.page = v } })
+  const pageSize = computed({ get: () => state.pageSize, set: (v) => { state.pageSize = v } })
+
   const pendingDelete = ref<PlanResponse | null>(null)
   /** 正在启停的方案 ID，供列表只在对应行展示 loading。 */
   const togglingId = ref<number | null>(null)
+  /** 多选：勾选行的 id 集合（供批量操作；点击表头全选当前页）。 */
+  const selectedIds = ref<string[]>([])
+  /** 批量启用/停用/删除处理中。 */
+  const batchBusy = ref(false)
   const loadingError = ref('')
   const toast = ref('')
   let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -144,11 +182,13 @@ export function useOrchestrationPlanManager() {
   const saving = computed(() => plansStore.state.saving)
   const deleting = computed(() => plansStore.state.deleting)
   const filteredPlans = computed(() => {
-    const query = search.value.trim().toLowerCase()
+    const query = state.keyword.trim().toLowerCase()
+    const [start, end] = state.dateRange
     return plans.value.filter((plan) => {
-      const enabledMatches = enabledFilter.value === 'all'
-        || (enabledFilter.value === 'enabled' ? plan.is_enabled : !plan.is_enabled)
-      const modeMatches = modeFilter.value === 'all' || plan.mode === modeFilter.value
+      const enabledMatches = state.enabled === 'all'
+        || (state.enabled === 'enabled' ? plan.is_enabled : !plan.is_enabled)
+      const modeMatches = state.mode === 'all' || plan.mode === state.mode
+      const dateMatches = !start || !end || inDateRange(plan.created_at, start, end)
       const searchText = [
         plan.id,
         plan.name,
@@ -156,9 +196,25 @@ export function useOrchestrationPlanManager() {
         plan.mode,
         ...plan.members.map((member) => member.agent_name),
       ].join(' ').toLowerCase()
-      return enabledMatches && modeMatches && (!query || searchText.includes(query))
+      return enabledMatches && modeMatches && dateMatches && (!query || searchText.includes(query))
     })
   })
+
+  const total = computed(() => filteredPlans.value.length)
+  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, state.pageSize))))
+  const clampedPage = computed(() => Math.min(Math.max(1, state.page), pageCount.value))
+  /** 当前页切片（供 ResourceTable.data）。 */
+  const pagedItems = computed(() => {
+    const start = (clampedPage.value - 1) * state.pageSize
+    return filteredPlans.value.slice(start, start + state.pageSize)
+  })
+  /** 选中项对应的 Plan 行（供批量操作）。 */
+  const selectedPlans = computed(() => {
+    const set = new Set(selectedIds.value)
+    return filteredPlans.value.filter((item) => set.has(String(item.id)))
+  })
+  const selectedCount = computed(() => selectedPlans.value.length)
+
   const stats = computed(() => ({
     all: plansStore.state.total,
     enabled: plans.value.filter((plan) => plan.is_enabled).length,
@@ -184,8 +240,11 @@ export function useOrchestrationPlanManager() {
 
   function resetView() {
     loadRequest += 1
+    reset()
     pendingDelete.value = null
     togglingId.value = null
+    selectedIds.value = []
+    batchBusy.value = false
     loadingError.value = ''
     toast.value = ''
     if (toastTimer) clearTimeout(toastTimer)
@@ -193,11 +252,14 @@ export function useOrchestrationPlanManager() {
 
   onBeforeUnmount(() => { if (toastTimer) clearTimeout(toastTimer) })
 
-  /** 只翻转启用状态，其余字段与成员顺序原样回传（savePlan 提供完整载荷）。 */
+  /** 只翻转启用状态，其余字段与成员顺序原样回传（savePlan 提供完整载荷）。
+   *  乐观更新：先翻转本地行的 is_enabled，接口失败时 store 在 savePlan 的 catch 里重拉
+   *  列表把该行回滚到服务端真实状态（对齐 useWorkflowManager 的乐观语义）。 */
   async function toggleEnabled(plan: PlanResponse) {
     if (togglingId.value != null) return false
     const enabled = !plan.is_enabled
     togglingId.value = plan.id
+    plan.is_enabled = enabled
     try {
       const result = await plansStore.savePlan({
         id: plan.id,
@@ -233,6 +295,77 @@ export function useOrchestrationPlanManager() {
     pendingDelete.value = plan
   }
 
+  /** 批量操作的公共骨架：逐条串行调用 action，汇总成功/失败并保留失败项待重试。 */
+  async function runBatch(
+    ids: string[],
+    action: (item: PlanResponse) => Promise<boolean>,
+    successText: (n: number) => string,
+  ): Promise<void> {
+    if (batchBusy.value) return
+    const targets = ids.map((id) => filteredPlans.value.find((item) => String(item.id) === id)).filter((item): item is PlanResponse => Boolean(item))
+    if (!targets.length) return
+    batchBusy.value = true
+    const failed: string[] = []
+    let ok = 0
+    try {
+      for (const item of targets) {
+        const success = await action(item)
+        if (success) { ok += 1 } else { failed.push(String(item.id)) }
+      }
+      if (failed.length) selectedIds.value = failed
+      else selectedIds.value = []
+      loadingError.value = ''
+      const base = successText(ok)
+      if (failed.length) showToast(`${base}，失败 ${failed.length} 个（已保留选中可重试）`)
+      else showToast(base)
+    } finally {
+      batchBusy.value = false
+    }
+  }
+
+  /** 批量启用：把选中项的 is_enabled 翻成 true。 */
+  function batchEnable() {
+    if (!selectedPlans.value.length) return
+    return runBatch(
+      selectedIds.value,
+      async (item) => (item.is_enabled ? true : toggleEnabled(item)),
+      (n) => `已启用 ${n} 个编排方案`,
+    )
+  }
+
+  /** 批量停用：把选中项的 is_enabled 翻成 false。 */
+  function batchDisable() {
+    if (!selectedPlans.value.length) return
+    return runBatch(
+      selectedIds.value,
+      async (item) => (item.is_enabled ? toggleEnabled(item) : true),
+      (n) => `已停用 ${n} 个编排方案`,
+    )
+  }
+
+  /** 批量删除：逐条调用 removePlan，成功数/失败数汇总。 */
+  async function batchDelete() {
+    if (batchBusy.value || !selectedPlans.value.length) return
+    const targets = [...selectedPlans.value]
+    batchBusy.value = true
+    const failed: string[] = []
+    let ok = 0
+    try {
+      for (const item of targets) {
+        const error = await plansStore.removePlan(item.id)
+        if (error === undefined) continue
+        if (error) { failed.push(String(item.id)) } else { ok += 1 }
+      }
+      if (failed.length) selectedIds.value = failed
+      else selectedIds.value = []
+      loadingError.value = ''
+      if (failed.length) showToast(`已删除 ${ok} 个，失败 ${failed.length} 个（已保留选中可重试）`)
+      else showToast(`已删除 ${ok} 个编排方案`)
+    } finally {
+      batchBusy.value = false
+    }
+  }
+
   function cancelDelete() {
     pendingDelete.value = null
   }
@@ -253,24 +386,41 @@ export function useOrchestrationPlanManager() {
   }
 
   return {
+    state,
+    apply,
+    reset,
+    isDefault,
     plans,
     agents,
     loading,
     saving,
     deleting,
     togglingId,
+    batchBusy,
     search,
     enabledFilter,
     modeFilter,
+    page,
+    pageSize,
+    selectedIds,
+    selectedCount,
+    selectedPlans,
     pendingDelete,
     loadingError,
     toast,
+    total,
+    pageCount,
+    clampedPage,
+    pagedItems,
     filteredPlans,
     stats,
     validatePlan,
     showToast,
     loadAll,
     toggleEnabled,
+    batchEnable,
+    batchDisable,
+    batchDelete,
     requestDelete,
     confirmDelete,
     cancelDelete,

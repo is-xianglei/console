@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import type { AgentResponse } from '@/interfaces/agent/api'
 import type { WorkflowResponse } from '@/interfaces/workflow/api'
@@ -11,6 +12,21 @@ import {
   validateWorkflow,
   workflowResponseToForm,
 } from './useWorkflowManager'
+
+const routeState = reactive({
+  name: 'platform-resource',
+  params: { module: 'build', resource: 'workflows' },
+  query: {} as Record<string, unknown>,
+})
+const router = {
+  push: vi.fn(async (to: { query: Record<string, unknown> }) => { routeState.query = { ...to.query } }),
+  replace: vi.fn(async (to: { query: Record<string, unknown> }) => { routeState.query = { ...to.query } }),
+}
+
+vi.mock('vue-router', () => ({
+  useRoute: () => routeState,
+  useRouter: () => router,
+}))
 
 function agent(id: number, name: string, isEnabled = true): AgentResponse {
   return {
@@ -141,6 +157,8 @@ describe('validateWorkflow', () => {
 
 describe('useWorkflowManager', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
+    routeState.query = {}
     vi.stubGlobal('localStorage', {
       getItem: vi.fn(() => null),
       setItem: vi.fn(),

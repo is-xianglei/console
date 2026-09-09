@@ -13,12 +13,18 @@ import type {
 } from '@/interfaces/workflow/model'
 import { useAgentsStore } from '@/stores/agents'
 import { useWorkflowsStore } from '@/stores/workflows'
+import { inDateRange, useListUrlState } from './useListUrlState'
 
 /** 名称长度上限，与后端 Schema 约束一致。 */
 export const MAX_WORKFLOW_NAME_LENGTH = 128
 
 /** 成员 Agent 已被软删除（agent_name 为 null）时的展示名。 */
 export const DELETED_AGENT_LABEL = '已删除的 Agent'
+
+/** 启用状态筛选值（与 URL 里 enabled 字段共用）。 */
+export type WorkflowEnabledFilter = 'all' | 'enabled' | 'disabled'
+
+const DEFAULT_PAGE_SIZE = 20
 
 export function emptyWorkflowForm(): WorkflowFormModel {
   return {
@@ -130,13 +136,45 @@ export function validateWorkflow(form: WorkflowFormModel): WorkflowValidationIss
 export function useWorkflowManager() {
   const workflowsStore = useWorkflowsStore()
   const agentsStore = useAgentsStore()
-  const search = ref('')
-  const enabledFilter = ref<'all' | 'enabled' | 'disabled'>('all')
-  const modeFilter = ref<'all' | WorkflowMode>('all')
+
+  // 筛选/分页状态写入 route.query（useListUrlState）；state 为真源。
+  // 注意：URL 键统一叫 enabled（prd A-3），对外仍暴露 enabledFilter 兼容既有绑定。
+  const { state, apply, reset, isDefault } = useListUrlState({
+    defaults: {
+      keyword: '',
+      enabled: 'all' as WorkflowEnabledFilter,
+      mode: 'all' as 'all' | WorkflowMode,
+      dateRange: [] as string[],
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+    },
+    resetPageOn: ['keyword', 'enabled', 'mode', 'dateRange', 'pageSize'],
+  })
+
+  // 兼容模板既有绑定名（v-model="search" / enabledFilter / modeFilter），实际读写 state。
+  const search = computed({
+    get: () => state.keyword,
+    set: (v) => { state.keyword = v },
+  })
+  const enabledFilter = computed({
+    get: () => state.enabled,
+    set: (v) => { state.enabled = v as WorkflowEnabledFilter },
+  })
+  const modeFilter = computed({
+    get: () => state.mode,
+    set: (v) => { state.mode = v as 'all' | WorkflowMode },
+  })
+  const page = computed({ get: () => state.page, set: (v) => { state.page = v } })
+  const pageSize = computed({ get: () => state.pageSize, set: (v) => { state.pageSize = v } })
+
   const selectedId = ref<number | null>(null)
+  /** 多选：勾选行的 id 集合（供批量操作；点击表头全选当前页）。 */
+  const selectedIds = ref<string[]>([])
   const pendingDelete = ref<WorkflowResponse | null>(null)
   /** 正在启停的 Workflow ID，供列表只在对应行展示 loading。 */
   const togglingId = ref<number | null>(null)
+  /** 批量启用/停用/删除处理中。 */
+  const batchBusy = ref(false)
   const loadingError = ref('')
   const toast = ref('')
   let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -157,11 +195,13 @@ export function useWorkflowManager() {
   }
 
   const filteredWorkflows = computed(() => {
-    const query = search.value.trim().toLowerCase()
+    const query = state.keyword.trim().toLowerCase()
+    const [start, end] = state.dateRange
     return workflows.value.filter((workflow) => {
-      const enabledMatches = enabledFilter.value === 'all'
-        || (enabledFilter.value === 'enabled' ? workflow.is_enabled : !workflow.is_enabled)
-      const modeMatches = modeFilter.value === 'all' || workflow.mode === modeFilter.value
+      const enabledMatches = state.enabled === 'all'
+        || (state.enabled === 'enabled' ? workflow.is_enabled : !workflow.is_enabled)
+      const modeMatches = state.mode === 'all' || workflow.mode === state.mode
+      const dateMatches = !start || !end || inDateRange(workflow.created_at, start, end)
       const searchText = [
         workflow.id,
         workflow.name,
@@ -170,12 +210,28 @@ export function useWorkflowManager() {
         WORKFLOW_MODE_LABEL[workflow.mode],
         ...workflow.agents.map((member) => member.agent_name ?? ''),
       ].join(' ').toLowerCase()
-      return enabledMatches && modeMatches && (!query || searchText.includes(query))
+      return enabledMatches && modeMatches && dateMatches && (!query || searchText.includes(query))
     })
   })
   const selectedWorkflow = computed(
     () => workflows.value.find((workflow) => workflow.id === selectedId.value) ?? null,
   )
+
+  const total = computed(() => filteredWorkflows.value.length)
+  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, state.pageSize))))
+  const clampedPage = computed(() => Math.min(Math.max(1, state.page), pageCount.value))
+  /** 当前页切片（供 ResourceTable.data）。 */
+  const pagedItems = computed(() => {
+    const start = (clampedPage.value - 1) * state.pageSize
+    return filteredWorkflows.value.slice(start, start + state.pageSize)
+  })
+  /** 选中项对应的 Workflow 行（供批量操作）。 */
+  const selectedWorkflows = computed(() => {
+    const set = new Set(selectedIds.value)
+    return filteredWorkflows.value.filter((item) => set.has(String(item.id)))
+  })
+  const selectedCount = computed(() => selectedWorkflows.value.length)
+
   const stats = computed(() => ({
     all: workflowsStore.state.total,
     enabled: workflows.value.filter((workflow) => workflow.is_enabled).length,
@@ -201,12 +257,86 @@ export function useWorkflowManager() {
 
   function resetView() {
     loadRequest += 1
+    reset()
     selectedId.value = null
+    selectedIds.value = []
     pendingDelete.value = null
     togglingId.value = null
+    batchBusy.value = false
     loadingError.value = ''
     toast.value = ''
     if (toastTimer) clearTimeout(toastTimer)
+  }
+
+  /** 批量操作的公共骨架：逐条串行调用 action，汇总成功/失败并保留失败项待重试。 */
+  async function runBatch(
+    ids: string[],
+    action: (item: WorkflowResponse) => Promise<boolean>,
+    successText: (n: number) => string,
+  ): Promise<void> {
+    if (batchBusy.value) return
+    const targets = ids.map((id) => filteredWorkflows.value.find((item) => String(item.id) === id)).filter((item): item is WorkflowResponse => Boolean(item))
+    if (!targets.length) return
+    batchBusy.value = true
+    const failed: string[] = []
+    let ok = 0
+    try {
+      for (const item of targets) {
+        const success = await action(item)
+        if (success) { ok += 1 } else { failed.push(String(item.id)) }
+      }
+      if (failed.length) selectedIds.value = failed
+      else selectedIds.value = []
+      loadingError.value = ''
+      const base = successText(ok)
+      if (failed.length) showToast(`${base}，失败 ${failed.length} 个（已保留选中可重试）`)
+      else showToast(base)
+    } finally {
+      batchBusy.value = false
+    }
+  }
+
+  /** 批量启用：把选中项的 is_enabled 翻成 true。 */
+  function batchEnable() {
+    if (!selectedWorkflows.value.length) return
+    return runBatch(
+      selectedIds.value,
+      async (item) => (item.is_enabled ? true : toggleEnabled(item)),
+      (n) => `已启用 ${n} 个 Workflow`,
+    )
+  }
+
+  /** 批量停用：把选中项的 is_enabled 翻成 false。 */
+  function batchDisable() {
+    if (!selectedWorkflows.value.length) return
+    return runBatch(
+      selectedIds.value,
+      async (item) => (item.is_enabled ? toggleEnabled(item) : true),
+      (n) => `已停用 ${n} 个 Workflow`,
+    )
+  }
+
+  /** 批量删除：逐条调用 removeWorkflow，成功数/失败数汇总。 */
+  async function batchDelete() {
+    if (batchBusy.value || !selectedWorkflows.value.length) return
+    const targets = [...selectedWorkflows.value]
+    batchBusy.value = true
+    const failed: string[] = []
+    let ok = 0
+    try {
+      for (const item of targets) {
+        const error = await workflowsStore.removeWorkflow(item.id)
+        if (error === undefined) continue
+        if (error) { failed.push(String(item.id)) } else { ok += 1 }
+      }
+      if (failed.length) selectedIds.value = failed
+      else selectedIds.value = []
+      loadingError.value = ''
+      if (failed.length) showToast(`已删除 ${ok} 个，失败 ${failed.length} 个（已保留选中可重试）`)
+      else showToast(`已删除 ${ok} 个 Workflow`)
+    } finally {
+      batchBusy.value = false
+    }
   }
 
   onBeforeUnmount(() => { if (toastTimer) clearTimeout(toastTimer) })
@@ -264,19 +394,33 @@ export function useWorkflowManager() {
   }
 
   return {
+    state,
+    apply,
+    reset,
+    isDefault,
     workflows,
     agents,
     loading,
     saving,
     deleting,
     togglingId,
+    batchBusy,
     search,
     enabledFilter,
     modeFilter,
+    page,
+    pageSize,
     selectedId,
+    selectedIds,
+    selectedCount,
+    selectedWorkflows,
     pendingDelete,
     loadingError,
     toast,
+    total,
+    pageCount,
+    clampedPage,
+    pagedItems,
     filteredWorkflows,
     selectedWorkflow,
     stats,
@@ -286,6 +430,9 @@ export function useWorkflowManager() {
     showToast,
     loadAll,
     toggleEnabled,
+    batchEnable,
+    batchDisable,
+    batchDelete,
     requestDelete,
     confirmDelete,
     cancelDelete,
