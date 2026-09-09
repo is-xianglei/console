@@ -55,3 +55,28 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: p2 build 模块列表与编辑闭环
+
+**Date**: 2026-09-09
+**Task**: p2 build 模块列表与编辑闭环
+**Branch**: `main`
+
+### Summary
+
+完成 p2 build 模块并归档：三个资源(agents/workflows/plans)列表统一套共享层(useListUrlState/FilterPanel/ListCard/真分页/emptyMode 分型/操作列更多下拉三资源一致/agents 补行内启停)；Builder 双守卫合一(五条离开路径同一弹窗、快照三处重置)+create 脏检查+校验聚焦 focusFirstError+PlanBuilder 字段级错误；详情页 section 改 UTabs(?tab 直达)+删除后回退(useSaveFeedback.afterDelete)+时间 RelativeTime；plans 启停乐观更新；E-2 store 补 loadPage 默认不启用；196 用例全绿。agents 模型筛选/服务端分页因后端不支持/保留全量按 prd 风险条款淡化。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3cb8549` | (see git log) |
+| `8c22bf9` | (see git log) |
+| `88cd865` | (see git log) |
+| `8f5d324` | (see git log) |
+| `f5e8470` | (see git log) |
+
+### Status
+
+[OK] **Completed**
