@@ -10,6 +10,10 @@ const routerPush = vi.fn()
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush, replace: vi.fn() }),
 }))
+const toastAdd = vi.fn()
+vi.mock('@nuxt/ui/composables', () => ({
+  useToast: () => ({ add: toastAdd }),
+}))
 
 function agent(id: number, name: string, isEnabled = true): AgentResponse {
   return {
@@ -86,13 +90,13 @@ describe('useWorkflowEditor', () => {
     expect(editor.draft.value.mode).toBe('parallel')
   })
 
-  it('openEdit 详情缺失时返回 false 并设置错误', async () => {
+  it('openEdit 详情缺失时返回 false 并设置 notFound', async () => {
     const workflowsStore = useWorkflowsStore()
     ;(workflowsStore.loadWorkflowDetail as ReturnType<typeof vi.fn>).mockResolvedValue(null)
     const editor = useWorkflowEditor()
     const ok = await editor.openEdit(5)
     expect(ok).toBe(false)
-    expect(editor.error.value).toContain('加载失败')
+    expect(editor.notFound.value).toBe(true)
   })
 
   it('saveDraft 校验失败不提交', async () => {
@@ -106,7 +110,7 @@ describe('useWorkflowEditor', () => {
     expect(saveMock).not.toHaveBeenCalled()
   })
 
-  it('saveDraft 成功跳转详情页', async () => {
+  it('saveDraft 成功后 toast 并回列表带 highlight', async () => {
     const workflowsStore = useWorkflowsStore()
     const saveMock = (workflowsStore.saveWorkflow as ReturnType<typeof vi.fn>)
     saveMock.mockResolvedValue({ item: workflow(), error: null })
@@ -116,8 +120,11 @@ describe('useWorkflowEditor', () => {
     editor.draft.value.members = [{ agentId: 7, agentName: '设备诊断', isAvailable: true }]
     const ok = await editor.saveDraft()
     expect(ok).toBe(true)
+    expect(toastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ color: 'success' }),
+    )
     expect(routerPush).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'workflow-detail' }),
+      expect.objectContaining({ name: 'platform-resource', query: { highlight: '5' } }),
     )
   })
 })

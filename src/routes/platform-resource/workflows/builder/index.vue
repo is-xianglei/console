@@ -132,8 +132,7 @@ function onSave() {
 }
 
 function onCancel() {
-  closeConfirmOpen.value = false
-  emit('close')
+  onCloseRequest()
 }
 
 function handleKeydown(event: KeyboardEvent) {

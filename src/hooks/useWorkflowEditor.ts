@@ -10,6 +10,7 @@ import {
   validateWorkflow,
   workflowResponseToForm,
 } from './useWorkflowManager'
+import { useSaveFeedback } from './useSaveFeedback'
 
 /**
  * 详情 + 编辑 + 保存：与列表逻辑(useWorkflowManager)分离，
@@ -19,10 +20,16 @@ export function useWorkflowEditor() {
   const router = useRouter()
   const workflowsStore = useWorkflowsStore()
   const agentsStore = useAgentsStore()
+  const feedback = useSaveFeedback({
+    listRoute: { name: 'platform-resource', params: { module: 'build', resource: 'workflows' } },
+    detailRoute: { name: 'workflow-detail' },
+  })
   const draft = ref<WorkflowFormModel>(emptyWorkflowForm())
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
+  /** 详情缺失或加载失败时为 true，编辑页据此渲染「未找到」空态（B-1）。 */
+  const notFound = ref(false)
 
   const agents = computed<AgentResponse[]>(() => agentsStore.state.items)
   const issues = computed<WorkflowValidationIssue[]>(() => validateWorkflow(draft.value))
@@ -46,10 +53,11 @@ export function useWorkflowEditor() {
     draft.value = emptyWorkflowForm()
     loadingDetail.value = true
     error.value = ''
+    notFound.value = false
     return id
   }
 
-  /** 打开编辑页：拉详情并转表单模型；失败把错误留到页面，不进入编辑。 */
+  /** 打开编辑页：拉详情并转表单模型；失败置 notFound，由编辑页渲染「未找到」空态。 */
   async function openEdit(id: number): Promise<boolean> {
     startEdit(id)
     await ensureAgents()
@@ -57,7 +65,8 @@ export function useWorkflowEditor() {
     loadingDetail.value = false
     if (detail === undefined) return false
     if (!detail) {
-      error.value = 'Workflow 详情加载失败，未进入编辑模式。请刷新后重试。'
+      error.value = ''
+      notFound.value = true
       return false
     }
     draft.value = workflowResponseToForm(detail, agents.value)
@@ -70,6 +79,7 @@ export function useWorkflowEditor() {
    */
   async function openCreate(sourceId?: number): Promise<void> {
     error.value = ''
+    notFound.value = false
     await ensureAgents()
     if (sourceId == null) {
       draft.value = emptyWorkflowForm()
@@ -89,7 +99,7 @@ export function useWorkflowEditor() {
     draft.value = form
   }
 
-  /** 校验通过后提交草稿；成功跳详情页，失败把错误留在页面顶部。 */
+  /** 校验通过后提交草稿；成功 toast + 回列表并带 ?highlight=<id>，失败把错误留在页面顶部。 */
   async function saveDraft(): Promise<boolean> {
     if (validateWorkflow(draft.value).length) return false
     if (saving.value) return false
@@ -110,7 +120,7 @@ export function useWorkflowEditor() {
       // item 与 error 同时为空表示工作区已切换，本次结果直接放弃。
       if (!result.item) return false
       error.value = ''
-      goToDetail(result.item)
+      await feedback.afterSave({ id: result.item.id, message: `Workflow「${result.item.name}」已保存` })
       return true
     } finally {
       saving.value = false
@@ -124,6 +134,7 @@ export function useWorkflowEditor() {
     loadingDetail,
     saving,
     error,
+    notFound,
     openEdit,
     openCreate,
     saveDraft,

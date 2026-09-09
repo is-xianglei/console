@@ -20,10 +20,17 @@ const savedSnapshot = ref('')
 const confirmLeave = ref(false)
 const pendingTarget = ref<Parameters<typeof router.replace>[0] | null>(null)
 const dirty = computed(() =>
-  editor.loadingDetail.value ? false : JSON.stringify(editor.draft.value) !== savedSnapshot.value,
+  editor.loadingDetail.value || editor.notFound.value
+    ? false
+    : JSON.stringify(editor.draft.value) !== savedSnapshot.value,
 )
 
 async function load() {
+  // 非法 id（NaN 或空）不发起详情请求，直接走「未找到」空态（B-6）。
+  if (Number.isNaN(workflowId.value)) {
+    editor.notFound.value = true
+    return
+  }
   const ok = await editor.openEdit(workflowId.value)
   if (ok) savedSnapshot.value = JSON.stringify(editor.draft.value)
 }
@@ -66,7 +73,7 @@ function onSave() {
 
 <template>
   <WorkflowBuilder
-    v-if="!editor.loadingDetail.value"
+    v-if="!editor.loadingDetail.value && !editor.notFound.value"
     :workflow="editor.draft.value"
     :mode="'edit'"
     :issues="editor.issues.value"
@@ -76,8 +83,11 @@ function onSave() {
     @close="editor.goToList"
     @save="onSave"
   />
-  <main v-else :class="styles['wf-loading']">
+  <main v-else-if="editor.loadingDetail.value" :class="styles['wf-loading']">
     <div :class="styles['wf-loading-inner']"><UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" :class="styles['wf-loading-back']" aria-label="返回列表" @click="editor.goToList" /><span class="mono">正在加载 Workflow 定义…</span></div>
+  </main>
+  <main v-else :class="styles['wf-not-found']">
+    <UAlert color="error" variant="subtle" icon="i-lucide-circle-alert" title="Workflow 详情加载失败" description="未找到该 Workflow，可能已被删除或工作区已切换。" :actions="[{ label: '返回列表', color: 'neutral', variant: 'outline', onClick: editor.goToList }]" />
   </main>
 
   <UModal :open="confirmLeave" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存到后端，离开后将丢失。">

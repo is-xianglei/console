@@ -8,15 +8,22 @@ import {
   emptyAgentForm,
   validateAgent,
 } from './useAgentManager'
+import { useSaveFeedback } from './useSaveFeedback'
 
 /** 新建/编辑/复制/保存：与列表逻辑(useAgentManager)分离，供 create/edit 路由页实例化。 */
 export function useAgentEditor() {
   const router = useRouter()
   const agentsStore = useAgentsStore()
+  const feedback = useSaveFeedback({
+    listRoute: { name: 'platform-resource', params: { module: 'build', resource: 'agents' } },
+    detailRoute: { name: 'agent-detail' },
+  })
   const draft = ref<AgentFormModel>(emptyAgentForm())
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
+  /** 详情缺失或加载失败时为 true，编辑页据此渲染「未找到」空态（B-1）。 */
+  const notFound = ref(false)
 
   const tools = computed(() => agentsStore.state.tools)
   const skills = computed(() => agentsStore.state.skills)
@@ -34,6 +41,7 @@ export function useAgentEditor() {
     draft.value = emptyAgentForm()
     loadingDetail.value = true
     error.value = ''
+    notFound.value = false
     return id
   }
 
@@ -43,7 +51,8 @@ export function useAgentEditor() {
     loadingDetail.value = false
     if (detail === undefined) return false
     if (!detail) {
-      error.value = 'Agent 详情加载失败，未进入编辑模式。请刷新后重试。'
+      error.value = ''
+      notFound.value = true
       return false
     }
     draft.value = agentResponseToForm(detail)
@@ -53,6 +62,7 @@ export function useAgentEditor() {
   /** sourceId 非空时复制一个 Agent 为新草稿(URL ?duplicate=<id>)；为空建空草稿。 */
   async function openCreate(sourceId?: number): Promise<void> {
     error.value = ''
+    notFound.value = false
     if (sourceId == null) {
       draft.value = emptyAgentForm()
       return
@@ -107,7 +117,7 @@ export function useAgentEditor() {
     saving.value = true
     try {
       const saved = await persist(draft.value.isEnabled)
-      if (saved) goToDetail(saved)
+      if (saved) await feedback.afterSave({ id: saved.id, message: `Agent「${saved.name}」已保存` })
       return Boolean(saved)
     } finally {
       saving.value = false
@@ -119,7 +129,7 @@ export function useAgentEditor() {
     saving.value = true
     try {
       const saved = await persist(true)
-      if (saved) goToDetail(saved)
+      if (saved) await feedback.afterSave({ id: saved.id, message: `Agent「${saved.name}」已发布` })
       return Boolean(saved)
     } finally {
       saving.value = false
@@ -134,6 +144,7 @@ export function useAgentEditor() {
     loadingDetail,
     saving,
     error,
+    notFound,
     openEdit,
     openCreate,
     saveDraft,

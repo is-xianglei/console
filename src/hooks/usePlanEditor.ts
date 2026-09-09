@@ -10,6 +10,7 @@ import {
   planResponseToForm,
   validatePlan,
 } from './useOrchestrationPlanManager'
+import { useSaveFeedback } from './useSaveFeedback'
 
 /**
  * 详情 + 编辑 + 保存：与列表逻辑(useOrchestrationPlanManager)分离，
@@ -19,10 +20,16 @@ export function usePlanEditor() {
   const router = useRouter()
   const plansStore = useOrchestrationPlansStore()
   const agentsStore = useAgentsStore()
+  const feedback = useSaveFeedback({
+    listRoute: { name: 'platform-resource', params: { module: 'build', resource: 'plans' } },
+    detailRoute: { name: 'plan-detail' },
+  })
   const draft = ref<PlanFormModel>(emptyPlanForm())
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
+  /** 详情缺失或加载失败时为 true，编辑页据此渲染「未找到」空态（B-1）。 */
+  const notFound = ref(false)
 
   const agents = computed<AgentResponse[]>(() => agentsStore.state.items)
   const issues = computed<PlanValidationIssue[]>(() => validatePlan(draft.value))
@@ -46,10 +53,11 @@ export function usePlanEditor() {
     draft.value = emptyPlanForm()
     loadingDetail.value = true
     error.value = ''
+    notFound.value = false
     return id
   }
 
-  /** 打开编辑页：拉详情并转表单模型；失败把错误留到页面，不进入编辑。 */
+  /** 打开编辑页：拉详情并转表单模型；失败置 notFound，由编辑页渲染「未找到」空态。 */
   async function openEdit(id: number): Promise<boolean> {
     startEdit(id)
     await ensureAgents()
@@ -57,7 +65,8 @@ export function usePlanEditor() {
     loadingDetail.value = false
     if (detail === undefined) return false
     if (!detail) {
-      error.value = '编排方案详情加载失败，未进入编辑模式。请刷新后重试。'
+      error.value = ''
+      notFound.value = true
       return false
     }
     draft.value = planResponseToForm(detail)
@@ -70,6 +79,7 @@ export function usePlanEditor() {
    */
   async function openCreate(sourceId?: number): Promise<void> {
     error.value = ''
+    notFound.value = false
     await ensureAgents()
     if (sourceId == null) {
       draft.value = emptyPlanForm()
@@ -124,14 +134,14 @@ export function usePlanEditor() {
       // item 与 error 同时为空表示工作区已切换，本次结果直接放弃。
       if (!result.item) return false
       error.value = ''
-      goToDetail(result.item)
+      await feedback.afterSave({ id: result.item.id, message: `编排方案「${result.item.name}」已保存` })
       return true
     } finally {
       saving.value = false
     }
   }
 
-  /** 校验通过后以启用态提交，立即对会话开放；成功跳详情页。 */
+  /** 校验通过后以启用态提交，立即对会话开放；成功 toast + 回列表并带 ?highlight=<id>。 */
   async function publish(): Promise<boolean> {
     if (validatePlan(draft.value).length) return false
     if (saving.value) return false
@@ -157,7 +167,7 @@ export function usePlanEditor() {
       }
       if (!result.item) return false
       error.value = ''
-      goToDetail(result.item)
+      await feedback.afterSave({ id: result.item.id, message: `编排方案「${result.item.name}」已发布` })
       return true
     } finally {
       saving.value = false
@@ -171,6 +181,7 @@ export function usePlanEditor() {
     loadingDetail,
     saving,
     error,
+    notFound,
     openEdit,
     openCreate,
     saveDraft,

@@ -10,6 +10,10 @@ const routerPush = vi.fn()
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush, replace: vi.fn() }),
 }))
+const toastAdd = vi.fn()
+vi.mock('@nuxt/ui/composables', () => ({
+  useToast: () => ({ add: toastAdd }),
+}))
 
 function agent(id: number, name: string, isEnabled = true): AgentResponse {
   return {
@@ -91,13 +95,13 @@ describe('usePlanEditor', () => {
     expect(editor.draft.value.mode).toBe('sequential')
   })
 
-  it('openEdit 详情缺失时返回 false 并设置错误', async () => {
+  it('openEdit 详情缺失时返回 false 并设置 notFound', async () => {
     const plansStore = useOrchestrationPlansStore()
     ;(plansStore.loadPlanDetail as ReturnType<typeof vi.fn>).mockResolvedValue(null)
     const editor = usePlanEditor()
     const ok = await editor.openEdit(5)
     expect(ok).toBe(false)
-    expect(editor.error.value).toContain('加载失败')
+    expect(editor.notFound.value).toBe(true)
   })
 
   it('saveDraft 校验失败不提交', async () => {
@@ -111,7 +115,7 @@ describe('usePlanEditor', () => {
     expect(saveMock).not.toHaveBeenCalled()
   })
 
-  it('saveDraft 成功跳转详情页', async () => {
+  it('saveDraft 成功后 toast 并回列表带 highlight', async () => {
     const plansStore = useOrchestrationPlansStore()
     const saveMock = (plansStore.savePlan as ReturnType<typeof vi.fn>)
     saveMock.mockResolvedValue({ item: plan(), error: null })
@@ -125,11 +129,11 @@ describe('usePlanEditor', () => {
     const ok = await editor.saveDraft()
     expect(ok).toBe(true)
     expect(routerPush).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'plan-detail' }),
+      expect.objectContaining({ name: 'platform-resource', query: { highlight: '5' } }),
     )
   })
 
-  it('publish 以启用态提交并跳转详情页', async () => {
+  it('publish 以启用态提交并 toast 回列表带 highlight', async () => {
     const plansStore = useOrchestrationPlansStore()
     const saveMock = (plansStore.savePlan as ReturnType<typeof vi.fn>)
     saveMock.mockResolvedValue({ item: plan(), error: null })
@@ -146,7 +150,7 @@ describe('usePlanEditor', () => {
     const payload = saveMock.mock.calls[0]![0]
     expect(payload.isEnabled).toBe(true)
     expect(routerPush).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'plan-detail' }),
+      expect.objectContaining({ name: 'platform-resource', query: { highlight: '5' } }),
     )
   })
 })

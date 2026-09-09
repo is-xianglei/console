@@ -8,6 +8,10 @@ const routerPush = vi.fn()
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush, replace: vi.fn() }),
 }))
+const toastAdd = vi.fn()
+vi.mock('@nuxt/ui/composables', () => ({
+  useToast: () => ({ add: toastAdd }),
+}))
 
 function agent(): AgentResponse {
   return {
@@ -66,13 +70,13 @@ describe('useAgentEditor', () => {
     expect(editor.draft.value.modelName).toBe('Qwen3-32B')
   })
 
-  it('openEdit 详情缺失时返回 false 并设置错误', async () => {
+  it('openEdit 详情缺失时返回 false 并设置 notFound', async () => {
     const agentsStore = useAgentsStore()
     ;(agentsStore.loadAgentDetail as ReturnType<typeof vi.fn>).mockResolvedValue(null)
     const editor = useAgentEditor()
     const ok = await editor.openEdit(5)
     expect(ok).toBe(false)
-    expect(editor.error.value).toContain('加载失败')
+    expect(editor.notFound.value).toBe(true)
   })
 
   it('saveDraft 名称或提示词为空不提交', async () => {
@@ -86,7 +90,7 @@ describe('useAgentEditor', () => {
     expect(saveMock).not.toHaveBeenCalled()
   })
 
-  it('saveDraft 成功跳详情页', async () => {
+  it('saveDraft 成功后 toast 并回列表带 highlight', async () => {
     const agentsStore = useAgentsStore()
     const saveMock = (agentsStore.saveAgent as ReturnType<typeof vi.fn>)
     saveMock.mockResolvedValue({ item: agent(), error: null })
@@ -97,7 +101,7 @@ describe('useAgentEditor', () => {
     const ok = await editor.saveDraft()
     expect(ok).toBe(true)
     expect(routerPush).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'agent-detail' }),
+      expect.objectContaining({ name: 'platform-resource', query: { highlight: '5' } }),
     )
   })
 })
