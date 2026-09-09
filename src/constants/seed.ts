@@ -1,25 +1,35 @@
 import type { AppTile } from '../interfaces/app/model'
 import type { Session, SubAgentTemplate } from '../interfaces/console/model'
 
+// mock 数据，待 apps 接口就绪后替换（C8）。用 getApps() 作为统一取数入口，
+// 后续只需把返回值换成后端列表即可，apps 页面无需改动。
 export const APPS: AppTile[] = [
-  { name: '健康巡检', tag: 'inspector', icon: 'activity', color: '#34d399', desc: '实时评估资产健康度与剩余寿命', category: '运维' },
-  { name: '时序预测', tag: 'forecast', icon: 'trending-up', color: '#60a5fa', desc: '多变量时序趋势与负荷预测', category: '分析' },
-  { name: '异常侦探', tag: 'anomaly', icon: 'search-code', color: '#a78bfa', desc: '定位异常根因并生成诊断报告', category: '分析' },
-  { name: '孪生仿真', tag: 'twin', icon: 'box', color: '#2dd4bf', desc: '构建设备数字孪生与工况推演', category: '仿真' },
-  { name: '能耗优化', tag: 'energy', icon: 'zap', color: '#fbbf24', desc: '识别能耗瓶颈并给出节能方案', category: '运维' },
-  { name: '工单助手', tag: 'workorder', icon: 'clipboard-list', color: '#fb923c', desc: '自动起草、分派与跟踪维修工单', category: '运维' },
-  { name: '知识图谱', tag: 'graph', icon: 'share-2', color: '#f87171', desc: '检索历史工单与设备知识库', category: '分析' },
-  { name: '报表生成', tag: 'report', icon: 'file-text', color: '#5eead4', desc: '一键汇总运行指标生成日报', category: '协作' },
+  { id: 'health', name: '健康巡检', icon: 'activity', color: '#34d399', desc: '实时评估资产健康度与剩余寿命', category: '运维' },
+  { id: 'forecast', name: '时序预测', icon: 'trending-up', color: '#60a5fa', desc: '多变量时序趋势与负荷预测', category: '分析' },
+  { id: 'anomaly', name: '异常侦探', icon: 'search-code', color: '#a78bfa', desc: '定位异常根因并生成诊断报告', category: '分析' },
+  { id: 'twin', name: '孪生仿真', icon: 'box', color: '#2dd4bf', desc: '构建设备数字孪生与工况推演', category: '仿真' },
+  { id: 'energy', name: '能耗优化', icon: 'zap', color: '#fbbf24', desc: '识别能耗瓶颈并给出节能方案', category: '运维' },
+  { id: 'workorder', name: '工单助手', icon: 'clipboard-list', color: '#fb923c', desc: '自动起草、分派与跟踪维修工单', category: '运维' },
+  { id: 'graph', name: '知识图谱', icon: 'share-2', color: '#f87171', desc: '检索历史工单与设备知识库', category: '分析' },
+  { id: 'report', name: '报表生成', icon: 'file-text', color: '#5eead4', desc: '一键汇总运行指标生成日报', category: '协作' },
 ]
 
-/** 应用中心顶部推荐卡 */
+/** 应用中心顶部推荐卡。 */
 export const FEATURED_APP = {
+  id: 'anomaly',
   name: '异常侦探',
-  tag: 'anomaly',
   icon: 'search-code',
+  color: '#a78bfa',
+  category: '分析',
   title: '用异常侦探定位根因',
   desc: '派发多个子代理并行诊断,自动锁定设备故障根因',
   prompt: '@异常侦探 分析 pump-01 振动告警',
+  enabled: true,
+} satisfies AppTile & { title: string; prompt: string }
+
+/** 统一取数入口：当前返回 mock 数据；待后端列表接口就绪后改为真实请求。 */
+export function getApps(): AppTile[] {
+  return APPS
 }
 
 export const SESSIONS: Session[] = [
