@@ -1,7 +1,8 @@
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { MemoryDetail, MemoryType } from '@/interfaces/memory/model'
 import type { CreateMemoryRequest, UpdateMemoryRequest } from '@/interfaces/memory/api'
+import { useSaveFeedback } from '@/hooks/useSaveFeedback'
 import { useMemoriesStore } from '@/stores/memories'
 
 /** 新建/编辑/复制/删除/保存的独立表单模型，与列表逻辑(store)分离。 */
@@ -87,11 +88,20 @@ function buildUpdatePayload(form: MemoryFormModel): UpdateMemoryRequest {
  */
 export function useMemoryEditor() {
   const router = useRouter()
+  const route = useRoute()
   const memoriesStore = useMemoriesStore()
   const draft = ref<MemoryFormModel>(emptyMemoryForm())
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
+
+  /** 保存/删除后的反馈闭环：toast + 回列表并高亮 / 详情页删除后回列表。 */
+  const feedback = useSaveFeedback({
+    listRoute: { name: 'memories' },
+    detailRoute: { name: 'memory-detail' },
+  })
+  /** 是否从详情页进入编辑（route.query.from === 'detail'），保存后留在详情。 */
+  const fromDetail = computed(() => route.query.from === 'detail')
 
   const detail = computed<MemoryDetail | null>(() => memoriesStore.state.detail)
   const issues = computed<MemoryValidationIssue[]>(() => validateMemory(draft.value))
@@ -155,7 +165,7 @@ export function useMemoryEditor() {
     draft.value = form
   }
 
-  /** 校验通过后提交草稿；成功跳详情页，失败把错误留在页面顶部。 */
+  /** 校验通过后提交草稿；成功走反馈闭环（toast + 回列表高亮 / from 详情则留详情），失败把错误留在页面顶部。 */
   async function saveDraft(): Promise<boolean> {
     if (validateMemory(draft.value).length) return false
     if (saving.value) return false
@@ -169,7 +179,13 @@ export function useMemoryEditor() {
         return false
       }
       error.value = ''
-      goToDetail(memoriesStore.state.detail?.id ?? draft.value.id ?? 0)
+      const id = memoriesStore.state.detail?.id ?? draft.value.id
+      if (id == null) return false
+      if (fromDetail.value) {
+        await feedback.afterSaveToDetail({ id, message: draft.value.id == null ? 'Memory 已创建' : 'Memory 已保存' })
+      } else {
+        await feedback.afterSave({ id, message: draft.value.id == null ? 'Memory 已创建' : 'Memory 已保存' })
+      }
       return true
     } finally {
       saving.value = false
@@ -184,7 +200,7 @@ export function useMemoryEditor() {
       return false
     }
     error.value = ''
-    goToList()
+    await feedback.afterDelete({ message: 'Memory 已删除' })
     return true
   }
 

@@ -27,6 +27,12 @@ const typeLabel: Record<MemoryType, string> = {
   project: '项目',
   reference: '参考',
 }
+/** 删除弹窗标题含记忆名（超过 30 字截断）。 */
+const deleteTitle = computed(() => {
+  const name = detail.value?.name ?? ''
+  const truncated = name.length > 30 ? `${name.slice(0, 30)}…` : name
+  return truncated ? `删除 Memory「${truncated}」？` : '删除 Memory？'
+})
 const tabItems = [
   { value: 'content', label: '正文' },
   { value: 'revisions', label: '修订' },
@@ -51,7 +57,7 @@ function goToList() {
 }
 
 function goToEdit() {
-  void router.push({ name: 'memory-edit', params: { id: String(memoryId.value) } })
+  void router.push({ name: 'memory-edit', params: { id: String(memoryId.value) }, query: { from: 'detail' } })
 }
 
 function requestDelete() {
@@ -138,7 +144,7 @@ async function confirmDelete() {
       </div>
     </section>
 
-    <UModal v-model:open="pendingDelete" title="删除 Memory" description="该操作会创建删除版本并从活动目录移除，仍可在数据导出中审计。">
+    <UModal v-model:open="pendingDelete" :title="deleteTitle" description="该操作会创建删除版本并从活动目录移除，仍可在数据导出中审计。">
       <template #footer>
         <UButton color="neutral" variant="outline" label="取消" :disabled="deleting" @click="pendingDelete = false" />
         <UButton color="error" label="确认删除" :loading="deleting" :disabled="deleting" @click="confirmDelete" />

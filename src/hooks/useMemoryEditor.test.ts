@@ -5,8 +5,15 @@ import { useMemoriesStore } from '@/stores/memories'
 import { useMemoryEditor } from './useMemoryEditor'
 
 const routerPush = vi.fn()
+const routeState = { query: {} as Record<string, string | undefined> }
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: routerPush, replace: vi.fn() }),
+  useRouter: () => ({ push: routerPush, replace: vi.fn(), back: vi.fn() }),
+  useRoute: () => routeState,
+}))
+
+const toastAdd = vi.fn()
+vi.mock('@nuxt/ui/composables', () => ({
+  useToast: () => ({ add: toastAdd }),
 }))
 
 function detail(
@@ -39,6 +46,8 @@ function detail(
 describe('useMemoryEditor', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    routeState.query = {}
+    vi.clearAllMocks()
     const store = useMemoriesStore()
     store.selectMemory = vi.fn().mockResolvedValue(null)
     store.createMemory = vi.fn().mockResolvedValue(null)
@@ -98,7 +107,7 @@ describe('useMemoryEditor', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
-  it('saveDraft 新建成功跳详情页', async () => {
+  it('saveDraft 新建成功回列表并高亮', async () => {
     const store = useMemoriesStore()
     store.createMemory = vi.fn().mockImplementation(async () => {
       store.state.detail = detail(5, '故障诊断')
@@ -112,8 +121,9 @@ describe('useMemoryEditor', () => {
     editor.draft.value.body = '依据证据分析。'
     const ok = await editor.saveDraft()
     expect(ok).toBe(true)
+    expect(toastAdd).toHaveBeenCalled()
     expect(routerPush).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'memory-detail', params: { id: '5' } }),
+      expect.objectContaining({ name: 'memories', query: { highlight: '5' } }),
     )
   })
 

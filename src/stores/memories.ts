@@ -76,24 +76,32 @@ export const useMemoriesStore = defineStore('memories', () => {
   /**
    * 加载 Memory 列表。传入 page 时用真分页（按 offset = (page-1)*pageSize 拉取）;
    * 搜索态后端不支持 offset,退化为按 limit 单次拉取。缺省用当前 state.page/pageSize。
+   * query/memoryType 由 useMemoryListManager 从 URL 读入后传入，保持 URL 即状态。
    */
-  async function loadMemories(params?: GetMemoryListParams & { page?: number }): Promise<string | null> {
+  async function loadMemories(
+    params?: GetMemoryListParams & { page?: number; pageSize?: number; query?: string; memoryType?: MemoryType | 'all' },
+  ): Promise<string | null> {
     const generation = dataGeneration
     const requestId = ++listRequestId
     const isCurrent = () => generation === dataGeneration && requestId === listRequestId
     state.loading = true
+    // URL 驱动：query/memoryType/page/pageSize 优先取参数，缺省回退到内部 state（兼容旧调用）。
+    const query = (params?.query ?? state.query).trim()
+    const memoryType = params?.memoryType ?? state.memoryType
     const page = Math.max(1, params?.page ?? state.page)
-    const pageSize = Math.max(1, state.pageSize)
+    // pageSize 同步到 state，保证面板选中的每页条数在真分页拉取时被使用。
+    const pageSize = Math.max(1, params?.pageSize ?? state.pageSize)
+    if (pageSize !== state.pageSize) state.pageSize = pageSize
     try {
-      const response = state.query.trim()
+      const response = query
         ? await searchMemory({
-            query: state.query.trim(),
-            memory_type: state.memoryType === 'all' ? undefined : state.memoryType,
+            query,
+            memory_type: memoryType === 'all' ? undefined : memoryType,
             limit: pageSize,
           })
         : await getMemoryList({
             status: params?.status ?? 'active',
-            memory_type: state.memoryType === 'all' ? undefined : state.memoryType,
+            memory_type: memoryType === 'all' ? undefined : memoryType,
             limit: pageSize,
             offset: (page - 1) * pageSize,
           })
@@ -101,6 +109,9 @@ export const useMemoriesStore = defineStore('memories', () => {
       state.items = response.items
       state.total = response.total
       state.page = page
+      // 保持内部筛选字段与 URL 一致，避免模板直接读 store 时读到旧值。
+      state.query = query
+      state.memoryType = memoryType
       if (state.selectedId && !response.items.some((item) => item.id === state.selectedId)) {
         state.selectedId = null
         state.detail = null
@@ -195,6 +206,8 @@ export const useMemoriesStore = defineStore('memories', () => {
       if (generation !== dataGeneration) return null
       state.items = state.items.filter((item) => item.id !== id)
       state.total = Math.max(0, state.total - 1)
+      // 删除后当前页若已无数据则回退到上一页（A-6）。
+      if (state.items.length === 0 && state.page > 1) state.page -= 1
       if (state.selectedId === id) {
         state.selectedId = null
         state.detail = null

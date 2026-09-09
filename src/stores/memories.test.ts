@@ -83,4 +83,22 @@ describe('memories store 请求隔离', () => {
     expect(store.state.items.map((item) => item.name)).toEqual(['new workspace'])
     expect(store.state.total).toBe(1)
   })
+
+  it('删除最后一页唯一一条后回退页码', async () => {
+    vi.mocked(getMemoryList).mockResolvedValueOnce({ items: [memory(1, '唯一')], total: 1, limit: 50, offset: 50 })
+    vi.mocked(deleteMemory).mockResolvedValueOnce({ id: 1, deleted: true, version: 2, catalog_version: 2 })
+    const store = useMemoriesStore()
+    // 先拉到第 2 页，仅含一条。
+    await store.loadMemories({ page: 2, query: '', memoryType: 'all' })
+    expect(store.state.page).toBe(2)
+    expect(store.state.items).toHaveLength(1)
+
+    const error = await store.deleteMemory(1, 1)
+
+    expect(error).toBeNull()
+    expect(store.state.items).toHaveLength(0)
+    expect(store.state.total).toBe(0)
+    // 页面因为无数据回退到上一页。
+    expect(store.state.page).toBe(1)
+  })
 })
