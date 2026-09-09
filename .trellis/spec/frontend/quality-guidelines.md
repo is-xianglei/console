@@ -52,3 +52,16 @@
 - [ ] 定时器在 `onBeforeUnmount`/`onScopeDispose` 清理。
 - [ ] 列表查询状态走 `useListUrlState`，无组件直接 `useRoute` 读列表 query。
 - [ ] `npm run build` / `npm run lint` / `npm test` 全绿。
+
+---
+
+## Auth / HTTP 层约定
+
+- **后端错误透传**：`authRequest`/`request` 非 2xx 必须透传 body 的 `message ?? detail` 与 `code`，非 JSON 回落 `HTTP ${status}`；解析前判断 content-type，解析异常**不得覆盖原始状态码**（`parsed` 标志）。禁止只抛 `HTTP ${status}` 吞掉后端消息。
+- **分场景文案**：统一用 `authErrorMessage(status)`（401 → "邮箱或密码错误"、429 → "请求过于频繁，请稍后再试"、status 0 → "网络连接失败，请检查网络"、403、其它 → 后端 message），login/register 共用，不要各写一份。
+- **网络抖动重试**：`withRetry(fn, { retries: 1, when: (e) => e.status === 0 })`——只对**无副作用**请求套用（登录、refresh、GET）；401/403 不重试；**普通 POST 不要套**（避免重复提交）。
+- **safeRedirect**：全库只保留 `src/routes/index.ts` 一份并 `export`（返回 `string | null`），login/register import 复用，不要在各页内联等价逻辑。
+- **UForm `validate-on` 取值**：Nuxt UI 4.10 的 `FormInputEvents` 类型为 `'input'|'blur'|'change'|'focus'`，**不含 `'submit'`**（submit 恒触发校验）。因此写 `['blur']` 即可同时满足"失焦 + 提交校验"，不要写会编译报错的 `['blur','submit']`（prd 字面与该类型冲突时以 `node_modules/@nuxt/ui` 类型定义为准）。
+- **表单校验**：新密码 ≥8 位且同时含字母与数字；注册/密码/个人资料等表单补 `validate-on`；401 类字段错误用 `focusFirstError` 定位到对应 `UFormField`。
+- **错误载体**：破坏性/阻断操作（删除、切换工作区、移除成员）用 toast；表单提交类（创建、保存、邀请、改角色）用 inline `UAlert`；同一页面内保持一致。
+- **mock 数据**：`constants/seed.ts` 等硬编码数据的顶部必须标注"mock 数据，待接口就绪后替换"；页面经统一取数函数（如 `getApps()`）获取而非直接渲染 seed，替换数据源无需改页面。
