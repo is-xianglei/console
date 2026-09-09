@@ -129,3 +129,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: 父任务集成评审——控制台 CRUD 页面改造完成
+
+**Date**: 2026-09-09
+**Task**: 父任务集成评审——控制台 CRUD 页面改造完成
+**Branch**: `main`
+
+### Summary
+
+父任务 09-08-console-crud-refactor 集成评审通过并归档：p0~p5 五个子任务全部完成(列表页共享层/组织左树右表&树表/build 列表编辑闭环/memories&skills 标准化/认证认证层),9 条跨子任务验收全部勾选,210 用例全绿。已知限制(people 200 截断、skills 编辑 zip 覆盖、skills 类型筛选 scope、memories 搜索单次拉取)按 prd 风险条款处理并标注接口化 TODO。chat 工作台已按用户要求移出本期(见后续事项)。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2750ad2` | (see git log) |
+| `a68ae74` | (see git log) |
+
+### Status
+
+[OK] **Completed**
