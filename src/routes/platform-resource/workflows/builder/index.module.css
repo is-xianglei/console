@@ -498,11 +498,6 @@
   gap: 2px;
 }
 
-.wf-modal-copy {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.65;
-}
 
 /* 底部检查清单：校验问题按区块分组展示。 */
 .wf-issue-groups {

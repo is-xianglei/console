@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { WORKFLOW_MODE_OPTIONS, minWorkflowMembers } from '@/constants/workflow'
 import type { AgentResponse } from '@/interfaces/agent/api'
 import type {
   WorkflowFormModel,
   WorkflowValidationIssue,
 } from '@/interfaces/workflow/model'
+import { focusFirstError } from '@/hooks/useFormHelpers'
 
 defineOptions({ name: 'WorkflowBuilder' })
 
@@ -20,13 +21,20 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; save: [] }>()
 
 const saveAttempted = ref(false)
-const closeConfirmOpen = ref(false)
+const builderRoot = ref<HTMLElement | null>(null)
 const agentSearch = ref('')
+
+/** 把校验问题映射到 UFormField 的 name 上（B-8）：名称 / 成员数落到对应字段下方。 */
+const formErrors = computed(() =>
+  props.issues.map((issue) => ({
+    name: issue.section === 'members' ? 'members' : 'name',
+    message: issue.message,
+  })),
+)
 // 拖拽排序状态：仅当从把手按下后行才可拖动，避免输入框内选中文本触发拖拽。
 const dragArmedIndex = ref<number | null>(null)
 const dragIndex = ref<number | null>(null)
 const dragOverIndex = ref<number | null>(null)
-let savedSnapshot = ''
 
 const filteredAgents = computed(() => {
   const query = agentSearch.value.trim().toLowerCase()
@@ -121,13 +129,28 @@ function onDragEnd() {
 }
 
 function onCloseRequest() {
-  if (JSON.stringify(props.workflow) !== savedSnapshot) closeConfirmOpen.value = true
-  else emit('close')
+  emit('close')
 }
 
-function onSave() {
+/** section → 分区标题节点 id；用于无字段级问题的成员数告警滚到对应分区。 */
+const SECTION_ANCHOR: Record<WorkflowValidationIssue['section'], string> = {
+  basic: 'workflow-basic-title',
+  members: 'workflow-members-title',
+}
+
+/** 定位到首个问题的分区：优先字段级 aria-invalid，若整区无字段（如成员数）则滚到分区标题。 */
+function focusIssueSection(section: WorkflowValidationIssue['section']) {
+  if (builderRoot.value && focusFirstError(builderRoot.value)) return
+  document.getElementById(SECTION_ANCHOR[section])?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+async function onSave() {
   saveAttempted.value = true
-  if (props.issues.length) return
+  if (props.issues.length) {
+    await nextTick()
+    focusIssueSection(props.issues[0]!.section)
+    return
+  }
   emit('save')
 }
 
@@ -136,10 +159,10 @@ function onCancel() {
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && !closeConfirmOpen.value) onCloseRequest()
+  if (event.key === 'Escape') onCloseRequest()
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
     event.preventDefault()
-    onSave()
+    void onSave()
   }
 }
 
@@ -148,12 +171,7 @@ function handlePointerUp() {
   dragArmedIndex.value = null
 }
 
-watch(() => props.workflow, () => {
-  savedSnapshot = JSON.stringify(props.workflow)
-})
-
 onMounted(() => {
-  savedSnapshot = JSON.stringify(props.workflow)
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('pointerup', handlePointerUp)
 })
@@ -164,14 +182,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main :class="$style['wf-builder']">
+  <main ref="builderRoot" :class="$style['wf-builder']">
     <header :class="$style['wf-builder-head']">
       <UTooltip text="返回 Workflows"><UButton :class="$style['wf-icon-button']" icon="i-lucide-arrow-left" color="neutral" variant="ghost" square aria-label="返回 Workflows" @click="onCloseRequest" /></UTooltip>
       <div :class="$style['wf-builder-title']"><nav><span>构建资源</span><i class="icon icon-chevron-right"></i><strong>Workflows</strong></nav><h1>{{ mode === 'create' ? '创建 Workflow' : `编辑：${workflow.name}` }}<span class="mono">API CONFIG</span></h1></div>
       <div :class="$style['wf-builder-actions']"><UButton :class="$style['wf-primary-button']" icon="i-lucide-save" label="保存" :loading="saving" :disabled="saving" @click="onSave" /></div>
     </header>
     <UAlert v-if="error" :class="$style['wf-validation-banner']" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="error" />
-    <UAlert v-else-if="saveAttempted && issues.length" :class="$style['wf-validation-banner']" color="warning" variant="subtle" icon="i-lucide-triangle-alert" :title="issues[0]!.message" />
+    <UAlert v-else-if="saveAttempted && issues.length" :class="$style['wf-validation-banner']" color="warning" variant="subtle" icon="i-lucide-triangle-alert" :title="`共 ${issues.length} 处问题，已定位并滚动到首个错误字段。`" />
 
     <div :class="$style['wf-builder-body']">
       <section :class="$style['wf-section']" aria-labelledby="workflow-basic-title">
@@ -179,7 +197,7 @@ onBeforeUnmount(() => {
           <span :class="$style['wf-section-icon']"><i class="icon icon-id-card"></i></span>
           <div><span>01</span><h2 id="workflow-basic-title">基本信息</h2><p>设置 Workflow 名称、用途描述和启用状态；名称在工作区内唯一。</p></div>
         </header>
-        <UForm :class="$style['wf-form-grid']" :state="workflow">
+        <UForm :class="$style['wf-form-grid']" :state="workflow" :validate="() => formErrors">
           <UFormField :class="$style['wf-field']" label="名称" name="name" required>
             <UInput v-model="workflow.name" autocomplete="off" maxlength="128" placeholder="例如：故障诊断三段式 Workflow" />
           </UFormField>
@@ -300,11 +318,6 @@ onBeforeUnmount(() => {
         </footer>
       </section>
     </div>
-
-    <UModal v-model:open="closeConfirmOpen" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存到后端，离开后将丢失。">
-      <template #body><p :class="$style['wf-modal-copy']">当前修改尚未保存到后端，离开后将丢失。</p></template>
-      <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="closeConfirmOpen = false" /><UButton label="放弃修改" color="error" @click="emit('close')" /></template>
-    </UModal>
   </main>
 </template>
 

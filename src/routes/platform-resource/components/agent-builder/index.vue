@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { AgentFormModel, AgentValidationIssue } from '@/interfaces/agent/model'
 import type { SkillResponse } from '@/interfaces/skill/model'
 import type { ToolResponse } from '@/interfaces/tool/model'
@@ -8,6 +8,7 @@ import AgentCapabilitiesPanel from '../agent-capabilities-panel/index.vue'
 import AgentIdentityPanel from '../agent-identity-panel/index.vue'
 import AgentModelPanel from '../agent-model-panel/index.vue'
 import AgentPromptPanel from '../agent-prompt-panel/index.vue'
+import { focusFirstError } from '@/hooks/useFormHelpers'
 
 defineOptions({ name: 'AgentBuilder' })
 
@@ -32,8 +33,7 @@ const sections: Array<{ id: SectionId; label: string; icon: string }> = [
 
 const activeSection = ref<SectionId>('identity')
 const publishAttempted = ref(false)
-const closeConfirmOpen = ref(false)
-let savedSnapshot = ''
+const builderRoot = ref<HTMLElement | null>(null)
 
 const sectionIssueCount = computed(() => sections.reduce<Record<string, number>>((result, section) => {
   result[section.id] = props.issues.filter((issue) => issue.section === section.id).length
@@ -48,14 +48,21 @@ function isSectionComplete(section: SectionId) {
 }
 
 function onCloseRequest() {
-  if (JSON.stringify(props.agent) !== savedSnapshot) closeConfirmOpen.value = true
-  else emit('close')
+  emit('close')
+}
+
+function focusFirstIssueSection() {
+  if (!props.issues.length) return
+  activeSection.value = props.issues[0]!.section
+  void nextTick().then(() => {
+    if (builderRoot.value) focusFirstError(builderRoot.value)
+  })
 }
 
 function onSave() {
   publishAttempted.value = true
   if (props.issues.length) {
-    activeSection.value = props.issues[0]!.section
+    focusFirstIssueSection()
     return
   }
   emit('save')
@@ -64,33 +71,28 @@ function onSave() {
 function onPublish() {
   publishAttempted.value = true
   if (props.issues.length) {
-    activeSection.value = props.issues[0]!.section
+    focusFirstIssueSection()
     return
   }
   emit('publish')
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && !closeConfirmOpen.value) onCloseRequest()
+  if (event.key === 'Escape') onCloseRequest()
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
     event.preventDefault()
-    onSave()
+    void onSave()
   }
 }
 
-watch(() => props.agent, () => {
-  savedSnapshot = JSON.stringify(props.agent)
-})
-
 onMounted(() => {
-  savedSnapshot = JSON.stringify(props.agent)
   window.addEventListener('keydown', handleKeydown)
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 </script>
 
 <template>
-  <main :class="$style['ag-builder']">
+  <main ref="builderRoot" :class="$style['ag-builder']">
     <header :class="$style['ag-builder-head']">
       <UTooltip text="返回 Agents"><UButton :class="$style['ag-icon-button']" icon="i-lucide-arrow-left" color="neutral" variant="ghost" square aria-label="返回 Agents" @click="onCloseRequest" /></UTooltip>
       <div :class="$style['ag-builder-title']"><nav><span>Agents</span><i class="icon icon-chevron-right"></i><strong>{{ mode === 'create' ? '创建 Agent' : agent.name }}</strong></nav><h1>{{ mode === 'create' ? '创建 Agent' : '编辑 Agent' }}<span class="mono">API CONFIG</span></h1></div>
@@ -115,10 +117,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
       </div>
       <AgentBuilderSummary :agent="agent" :issues="issues" :skills="skills" :tools="tools" />
     </div>
-    <UModal v-model:open="closeConfirmOpen" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存到后端，离开后将丢失。">
-      <template #body><p :class="$style['ag-modal-copy']">当前修改尚未保存到后端，离开后将丢失。</p></template>
-      <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="closeConfirmOpen = false" /><UButton label="放弃修改" color="error" @click="emit('close')" /></template>
-    </UModal>
   </main>
 </template>
 

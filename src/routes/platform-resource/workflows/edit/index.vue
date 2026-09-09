@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, useCssModule, watch } from 'vue'
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { computed, useCssModule, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import WorkflowBuilder from '../builder/index.vue'
 import { useWorkflowEditor } from '@/hooks/useWorkflowEditor'
+import { useSnapshotDirty, useUnsavedGuard } from '@/hooks/useFormHelpers'
 
 defineOptions({ name: 'WorkflowResourceEdit' })
 
@@ -15,15 +16,19 @@ const workflowId = computed(() => {
   return Number(Array.isArray(value) ? value[0] : value)
 })
 
-/** 路由级离开守卫：浏览器退回/切侧栏等绕开 Builder 返回按钮时兜底。 */
-const savedSnapshot = ref('')
-const confirmLeave = ref(false)
-const pendingTarget = ref<Parameters<typeof router.replace>[0] | null>(null)
-const dirty = computed(() =>
-  editor.loadingDetail.value || editor.notFound.value
-    ? false
-    : JSON.stringify(editor.draft.value) !== savedSnapshot.value,
+/** 回列表的目标路由，供 Builder 返回 / Esc / 取消走外层守卫。 */
+const listTarget = { name: 'platform-resource', params: { module: 'build', resource: 'workflows' } } as const
+
+/** 页面层脏检查（B-4）：快照由编辑页持有，openEdit 完成 / 保存成功时重置。 */
+const snapshot = useSnapshotDirty(
+  () => editor.draft.value,
+  { resetOn: () => editor.loadingDetail.value || editor.notFound.value },
 )
+const guard = useUnsavedGuard(snapshot.dirty, {
+  navigate: (target) => void router.push(target as Parameters<typeof router.push>[0]),
+  onConfirm: () => snapshot.reset(),
+})
+const { pending: leavePending, requestLeave: requestGuardLeave, confirmLeave: confirmGuardLeave, cancelLeave: cancelGuardLeave } = guard
 
 async function load() {
   // 非法 id（NaN 或空）不发起详情请求，直接走「未找到」空态（B-6）。
@@ -31,8 +36,9 @@ async function load() {
     editor.notFound.value = true
     return
   }
-  const ok = await editor.openEdit(workflowId.value)
-  if (ok) savedSnapshot.value = JSON.stringify(editor.draft.value)
+  await editor.openEdit(workflowId.value)
+  // openEdit 完成（含失败）都把当前草稿作为基线，避免刚加载就判脏。
+  snapshot.reset()
 }
 
 watch(
@@ -41,32 +47,15 @@ watch(
   { immediate: true },
 )
 
-onBeforeRouteLeave((to) => {
-  if (!dirty.value) return true
-  pendingTarget.value = to
-  confirmLeave.value = true
-  return false
-})
-
-function cancelLeave() {
-  confirmLeave.value = false
-}
-
-function confirmLeaveExit() {
-  confirmLeave.value = false
-  if (pendingTarget.value) {
-    const target = pendingTarget.value
-    pendingTarget.value = null
-    // 重置快照避免守卫对目标路由再次拦截。
-    savedSnapshot.value = JSON.stringify(editor.draft.value)
-    void router.replace(target)
-  }
+/** Builder 返回键 / Esc / 取消统一声请离开；干净时直达列表，脏时弹确认。 */
+function requestListLeave() {
+  requestGuardLeave(listTarget)
 }
 
 /** Builder 内保存成功后回写基线快照，使脏检查进入已保存态。 */
 function onSave() {
   void editor.saveDraft().then((ok) => {
-    if (ok) savedSnapshot.value = JSON.stringify(editor.draft.value)
+    if (ok) snapshot.reset()
   })
 }
 </script>
@@ -80,7 +69,7 @@ function onSave() {
     :agents="editor.agents.value"
     :saving="editor.saving.value"
     :error="editor.error.value"
-    @close="editor.goToList"
+    @close="requestListLeave"
     @save="onSave"
   />
   <main v-else-if="editor.loadingDetail.value" :class="styles['wf-loading']">
@@ -90,9 +79,9 @@ function onSave() {
     <UAlert color="error" variant="subtle" icon="i-lucide-circle-alert" title="Workflow 详情加载失败" description="未找到该 Workflow，可能已被删除或工作区已切换。" :actions="[{ label: '返回列表', color: 'neutral', variant: 'outline', onClick: editor.goToList }]" />
   </main>
 
-  <UModal :open="confirmLeave" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存到后端，离开后将丢失。">
+  <UModal :open="leavePending" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存到后端，离开后将丢失。" @update:open="(open) => { if (!open) cancelGuardLeave() }">
     <template #body><p :class="styles['wf-modal-copy']">当前修改尚未保存到后端，离开后将丢失。</p></template>
-    <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="cancelLeave" /><UButton label="放弃修改" color="error" @click="confirmLeaveExit" /></template>
+    <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="cancelGuardLeave" /><UButton label="放弃修改" color="error" @click="confirmGuardLeave" /></template>
   </UModal>
 </template>
 

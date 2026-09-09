@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import type { FormError } from '@nuxt/ui'
 import type { AgentResponse } from '@/interfaces/agent/api'
 import type { PlanFormModel, PlanValidationIssue } from '@/interfaces/orchestration-plan/model'
 import {
@@ -9,6 +10,7 @@ import {
   MIN_MEMBERS,
   PLAN_MODE_OPTIONS,
 } from '@/hooks/useOrchestrationPlanManager'
+import { focusFirstError } from '@/hooks/useFormHelpers'
 
 defineOptions({ name: 'PlanBuilder' })
 
@@ -23,13 +25,31 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; save: []; publish: [] }>()
 
 const saveAttempted = ref(false)
-const closeConfirmOpen = ref(false)
+const builderRoot = ref<HTMLElement | null>(null)
 const agentSearch = ref('')
 // 拖拽排序状态：仅当从把手按下后行才可拖动，避免路由输入框内选中文本触发拖拽。
 const dragArmedIndex = ref<number | null>(null)
 const dragIndex = ref<number | null>(null)
 const dragOverIndex = ref<number | null>(null)
-let savedSnapshot = ''
+
+/**
+ * 把校验问题映射到 UFormField 的 name 上（B-8）：错误落到对应字段下方。
+ * 成员/最大值等无单字段的容器级问题走 count 徽标所属的「成员 Agent」区。
+ */
+const formErrors = computed<FormError[]>(() =>
+  props.issues.map((issue) => {
+    let name: string
+    if (issue.section === 'basic') name = 'name'
+    else if (issue.section === 'members') name = 'members'
+    else if (issue.section === 'config' && props.plan.mode === 'loop') name = 'maxIterations'
+    else if (issue.section === 'config' && props.plan.mode === 'routing') {
+      name = issue.message.includes('路由标识')
+        ? `routeKey-${props.plan.members.findIndex((member) => issue.message.includes(member.agentName))}`
+        : `when-${props.plan.members.findIndex((member) => issue.message.includes(member.agentName))}`
+    } else name = 'fallback'
+    return { name, message: issue.message }
+  }),
+)
 
 const filteredAgents = computed(() => {
   const query = agentSearch.value.trim().toLowerCase()
@@ -133,27 +153,47 @@ function onDragEnd() {
 }
 
 function onCloseRequest() {
-  if (JSON.stringify(props.plan) !== savedSnapshot) closeConfirmOpen.value = true
-  else emit('close')
+  emit('close')
 }
 
-function onSave() {
+/** section → 分区标题节点 id；用于无字段级问题的成员数告警滚到对应分区。 */
+const SECTION_ANCHOR: Record<PlanValidationIssue['section'], string> = {
+  basic: 'plan-basic-title',
+  members: 'plan-members-title',
+  config: 'plan-config-title',
+}
+
+/** 定位到首个问题的分区：优先字段级 aria-invalid，若整区无字段（如成员数）则滚到分区标题。 */
+function focusIssueSection(section: PlanValidationIssue['section']) {
+  if (builderRoot.value && focusFirstError(builderRoot.value)) return
+  document.getElementById(SECTION_ANCHOR[section])?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+async function onSave() {
   saveAttempted.value = true
-  if (props.issues.length) return
+  if (props.issues.length) {
+    await nextTick()
+    focusIssueSection(props.issues[0]!.section)
+    return
+  }
   emit('save')
 }
 
-function onPublish() {
+async function onPublish() {
   saveAttempted.value = true
-  if (props.issues.length) return
+  if (props.issues.length) {
+    await nextTick()
+    focusIssueSection(props.issues[0]!.section)
+    return
+  }
   emit('publish')
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && !closeConfirmOpen.value) onCloseRequest()
+  if (event.key === 'Escape') onCloseRequest()
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
     event.preventDefault()
-    onSave()
+    void onSave()
   }
 }
 
@@ -162,12 +202,7 @@ function handlePointerUp() {
   dragArmedIndex.value = null
 }
 
-watch(() => props.plan, () => {
-  savedSnapshot = JSON.stringify(props.plan)
-})
-
 onMounted(() => {
-  savedSnapshot = JSON.stringify(props.plan)
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('pointerup', handlePointerUp)
 })
@@ -178,22 +213,23 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main :class="$style['pl-builder']">
+  <main ref="builderRoot" :class="$style['pl-builder']">
     <header :class="$style['pl-builder-head']">
       <UTooltip text="返回编排方案"><UButton :class="$style['pl-icon-button']" icon="i-lucide-arrow-left" color="neutral" variant="ghost" square aria-label="返回编排方案" @click="onCloseRequest" /></UTooltip>
       <div :class="$style['pl-builder-title']"><nav><span>编排方案</span><i class="icon icon-chevron-right"></i><strong>{{ mode === 'create' ? '创建方案' : plan.name }}</strong></nav><h1>{{ mode === 'create' ? '创建编排方案' : '编辑编排方案' }}<span class="mono">API CONFIG</span></h1></div>
       <div :class="$style['pl-builder-actions']"><UButton :class="$style['pl-secondary-button']" icon="i-lucide-save" color="neutral" variant="outline" label="保存配置" :loading="saving" :disabled="saving" @click="onSave" /><UButton :class="$style['pl-primary-button']" icon="i-lucide-circle-check-big" label="保存并启用" :loading="saving" :disabled="saving" @click="onPublish" /></div>
     </header>
     <UAlert v-if="error" :class="$style['pl-validation-banner']" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="error" />
-    <UAlert v-else-if="saveAttempted && issues.length" :class="$style['pl-validation-banner']" color="warning" variant="subtle" icon="i-lucide-triangle-alert" :title="issues[0]!.message" />
+    <UAlert v-else-if="saveAttempted && issues.length" :class="$style['pl-validation-banner']" color="warning" variant="subtle" icon="i-lucide-triangle-alert" :title="`共 ${issues.length} 处问题，已定位并滚动到首个错误字段。`" />
 
     <div :class="$style['pl-builder-body']">
+      <UForm :class="$style['pl-builder-form']" :state="plan" :validate="() => formErrors">
       <section :class="$style['pl-section']" aria-labelledby="plan-basic-title">
         <header :class="$style['pl-section-head']">
           <span :class="$style['pl-section-icon']"><i class="icon icon-id-card"></i></span>
           <div><span>01</span><h2 id="plan-basic-title">基本信息</h2><p>设置方案名称、用途描述和启用状态；名称在工作区内唯一。</p></div>
         </header>
-        <UForm :class="$style['pl-form-grid']" :state="plan">
+        <div :class="$style['pl-form-grid']">
           <UFormField :class="$style['pl-field']" label="名称" name="name" required>
             <UInput v-model="plan.name" autocomplete="off" maxlength="128" placeholder="例如：故障诊断三段式方案" />
           </UFormField>
@@ -203,7 +239,7 @@ onBeforeUnmount(() => {
           <UFormField :class="[$style['pl-field'], $style['pl-span-2']]" label="用途描述" name="description">
             <UTextarea v-model="plan.description" :rows="3" autoresize :maxrows="6" placeholder="说明方案解决什么场景，帮助会话选择合适的编排。" />
           </UFormField>
-        </UForm>
+        </div>
       </section>
 
       <section :class="$style['pl-section']" aria-labelledby="plan-mode-title">
@@ -292,10 +328,10 @@ onBeforeUnmount(() => {
               <UTooltip text="移除"><UButton :class="$style['pl-icon-button']" icon="i-lucide-x" color="error" variant="ghost" square :aria-label="`移除 ${member.agentName}`" @click="removeMember(index)" /></UTooltip>
             </span>
             <div v-if="plan.mode === 'routing'" :class="$style['pl-route-config']">
-              <UFormField :class="$style['pl-field']" label="路由标识" required help="方案内唯一，供路由决策与兜底引用。">
+              <UFormField :class="$style['pl-field']" label="路由标识" :name="`routeKey-${index}`" required help="方案内唯一，供路由决策与兜底引用。">
                 <UInput v-model="member.routeKey" class="mono" maxlength="64" placeholder="例如：billing" />
               </UFormField>
-              <UFormField :class="$style['pl-field']" label="触发条件" required help="描述什么样的任务应交给该成员。">
+              <UFormField :class="$style['pl-field']" label="触发条件" :name="`when-${index}`" required help="描述什么样的任务应交给该成员。">
                 <UInput v-model="member.when" maxlength="256" placeholder="例如：账单、发票、扣款相关问题" />
               </UFormField>
             </div>
@@ -308,14 +344,14 @@ onBeforeUnmount(() => {
           <span :class="$style['pl-section-icon']"><i class="icon icon-settings-2"></i></span>
           <div><span>05</span><h2 id="plan-config-title">模式配置</h2><p>{{ plan.mode === 'loop' ? '设置循环执行的轮数上限。' : '可选设置未命中任何路由时的兜底成员。' }}</p></div>
         </header>
-        <UForm :class="$style['pl-form-grid']" :state="plan">
+        <div :class="$style['pl-form-grid']">
           <UFormField v-if="plan.mode === 'loop'" :class="$style['pl-field']" label="循环轮数" name="maxIterations" required :help="`必填，${MIN_ITERATIONS}-${MAX_ITERATIONS} 的整数。`">
             <UInputNumber v-model="plan.maxIterations" :min="MIN_ITERATIONS" :max="MAX_ITERATIONS" :step="1" aria-label="循环轮数" />
           </UFormField>
           <UFormField v-if="plan.mode === 'routing'" :class="$style['pl-field']" label="兜底路由" name="fallback" help="从已填写的路由标识中选择；不设置时未命中任务将直接失败。">
             <USelect v-model="plan.fallback" :items="fallbackItems" aria-label="兜底路由" placeholder="不设置兜底" />
           </UFormField>
-        </UForm>
+        </div>
       </section>
 
       <section :class="$style['pl-section']" aria-labelledby="plan-review-title">
@@ -335,12 +371,8 @@ onBeforeUnmount(() => {
           <UButton :class="$style['pl-primary-button']" icon="i-lucide-circle-check-big" label="启用并保存" :loading="saving" :disabled="saving" @click="onPublish" />
         </footer>
       </section>
+      </UForm>
     </div>
-
-    <UModal v-model:open="closeConfirmOpen" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存到后端，离开后将丢失。">
-      <template #body><p :class="$style['pl-modal-copy']">当前修改尚未保存到后端，离开后将丢失。</p></template>
-      <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="closeConfirmOpen = false" /><UButton label="放弃修改" color="error" @click="emit('close')" /></template>
-    </UModal>
   </main>
 </template>
 
