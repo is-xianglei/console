@@ -16,18 +16,20 @@ export async function register(payload: RegisterRequest): Promise<AuthResponse> 
   })
 }
 
-/** 用户登录 */
+/** 用户登录(幂等,允许网络抖动重试一次) */
 export async function login(payload: LoginRequest): Promise<AuthResponse> {
   return authRequest<AuthResponse>('/auth/login', {
     method: 'POST',
+    retry: true,
     body: JSON.stringify(payload),
   })
 }
 
-/** 刷新 Token */
+/** 刷新 Token(幂等,允许网络抖动重试一次) */
 export async function refreshToken(refreshToken: string): Promise<TokenResponse> {
   return authRequest<TokenResponse>('/auth/refresh', {
     method: 'POST',
+    retry: true,
     body: JSON.stringify({ refresh_token: refreshToken }),
   })
 }

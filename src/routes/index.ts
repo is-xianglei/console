@@ -245,9 +245,10 @@ const router = createRouter({
   ],
 })
 
-function safeRedirect(value: unknown): string | undefined {
-  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return
-  if (/^\/(login|register)(?:[/?#]|$)/.test(value)) return
+/** 校验回调跳转地址:仅接受站内相对路径,拒绝 `//` 开头与回调到登录/注册页。 */
+export function safeRedirect(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return null
+  if (/^\/(login|register)(?:[/?#]|$)/.test(value)) return null
   return value
 }
 
