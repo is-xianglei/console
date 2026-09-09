@@ -103,6 +103,18 @@ CSS 要点：`--app-header-h: var(--topbar-height)`（本地作用域或 :root�
 
 ---
 
+## Memories / Skills 约定（知识资产页）
+
+- **memories**：列表已路由化为标准形态（列表/详情/编辑/新建各自独立路由页）。列表用 `FilterPanel + ListCard + ResourceTable + ResourcePagination`，`keyword/type/page/pageSize` 经 `useListUrlState` 进 URL；空态分型三态——加载失败(重试)/从未创建(新建按钮)/筛选无结果(清除筛选+回显条件)，以 `total===0 && !hasActiveFilter` 判定「从未创建」；删除弹窗标题带记忆名(>30 字截断)，删除后 `items.length===0 && page>1` 回退页码并**重拉**；保存走 `useSaveFeedback`（新建/编辑回列表 + `?highlight`，从详情进编辑保存留详情）。
+- **skills**：标准 CRUD。`/skills/:name` 详情路由 + `/skills/:name/edit` 编辑路由（name 是**字符串**，可含 `.zip`，路由不用 `\d+` 约束）。列表 `FilterPanel + ListCard + ResourceTable`，名称列链接进详情；选中态以 `route.params.name` 为主，`selectedSkillName` 只作已删邻项高亮派生，**避免双状态源**（不要在 upload 等方法里再写 `state.selectedSkillName`）。
+- **接口未提供的兜底**（必须在代码注释与文档标注「接口化 TODO」）：
+  - 后端无搜索/分页接口 → 前端过滤 + 内存分页（复用 groups 样板的 `filteredXxx/pagedItems` 切片），如 skills。
+  - 后端无字段类型 → 用 `scope` 等现有字段替代筛选（如 skills 用「作用域」而非「类型」）。
+  - 后端无更新接口 → 编辑页退化为「只读元数据 + 重新上传覆盖」，页面用 `UAlert` 明示、不误导用户（如 skills 用 zip 覆盖）。
+  - 后端搜索态不支持 offset → 搜索退化为单次拉取并保留 `response.total`，不造假分页。
+
+---
+
 ## Common Mistakes
 
 1. 用模板字符串拼 Tailwind 任意类（如 `grid-cols-[repeat(${n},...)]`）：Tailwind JIT 只静态扫描源码，运行时拼接的类不生成样式。改用 CSS Module 静态 `grid-template-columns: repeat(var(--filter-cols,3),minmax(0,1fr))` + `:style` 绑变量。
