@@ -86,6 +86,23 @@ CSS 要点：`--app-header-h: var(--topbar-height)`（本地作用域或 :root�
 
 ---
 
+## Build 模块约定（agents / workflows / plans）
+
+三个 build 资源（Agent / Workflow / Plan）共享同一套复杂编辑模式（Builder），且交互已按 p2 拉平到同一套约定：
+
+- **列表页**：三资源统一 `FilterPanel`（关键字/启用状态/模式或模型/创建时间区间）+ `ListCard` + `ResourceTable` + `ResourcePagination`；`query = {keyword,enabled,mode|model,dateRange,page,pageSize}` 进 URL（`useListUrlState`）；操作列右固定、只留「编辑」直出、其余（复制/启停/删除）进 `UDropdownMenu`「更多」，行操作菜单**三资源完全一致**。
+- **状态列**：用 `UBadge`（published/disabled 语义色），不做就地开关除非后果轻；行内启停走「更多」菜单项（先确认后切换），失败时**乐观回滚**（store 保存失败会重拉列表收敛，不要手动翻转导致与服务端不一致）。
+- **Builder 编辑**（最复杂、最容易回归）：
+  - Builder **不自持脏快照**——返回键/Esc/取消只 `emit('close')`；脏判断与确认弹窗统一由**页面层** `useUnsavedGuard` 承担（五条离开路径：浏览器退回/侧栏切换/顶部返回/Esc/取消 走同一弹窗，杜绝两个 UModal 叠放）。
+  - 快照在 `openEdit` 完成、`?duplicate` 加载完成、保存成功**三处**都调用 `snapshot.reset()`，否则会误判脏/漏判脏（p2 回归重点）。
+  - 校验失败调 `focusFirstError`（定位首个 `aria-invalid` / 滚到分区锚点），保存按钮保持可点（只 `:disabled="saving"`），错误横幅只留「共 N 处问题」摘要。
+  - 字段级错误用 `UForm :validate`（返回 `{name,message}[]`）落到对应 `UFormField` 下方，不是只用 `required` 视觉标记。
+  - 必填字段（名称/路由标识/系统提示词等）统一 `UFormField required`。
+- **编辑页 404**：`openEdit` 详情为 null 时置 `notFound`，edit 页渲染「未找到 + 返回列表」`UAlert`，不渲染空草稿 Builder；id 为 `NaN`/非法时直接走 404 空态，不发详情请求。
+- **保存成功**：统一 `useSaveFeedback.afterSave`（toast + 回列表 + `?highlight`），不再 `goToDetail`；详情页进编辑保留回详情的 `from=detail` 分流（p1 约定）。
+
+---
+
 ## Common Mistakes
 
 1. 用模板字符串拼 Tailwind 任意类（如 `grid-cols-[repeat(${n},...)]`）：Tailwind JIT 只静态扫描源码，运行时拼接的类不生成样式。改用 CSS Module 静态 `grid-template-columns: repeat(var(--filter-cols,3),minmax(0,1fr))` + `:style` 绑变量。
