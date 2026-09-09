@@ -21,6 +21,11 @@ interface WorkflowsState {
   loading: boolean
   saving: boolean
   deleting: boolean
+  /** E-2 服务端分页专用状态；默认不启用，列表仍走全量拉取 + 前端分页（prd A-6）。 */
+  pageState: {
+    items: WorkflowResponse[]
+    total: number
+  }
 }
 
 /** 保存 Workflow 的输入；成员按数组顺序提交，sort_order 取数组下标。 */
@@ -70,6 +75,10 @@ export const useWorkflowsStore = defineStore('workflows', () => {
     loading: false,
     saving: false,
     deleting: false,
+    pageState: {
+      items: [],
+      total: 0,
+    },
   })
 
   /** 工作区切换或 reset 后，仍在途的请求结果一律丢弃，避免写入错误工作区的数据。 */
@@ -98,6 +107,8 @@ export const useWorkflowsStore = defineStore('workflows', () => {
     state.loading = false
     state.saving = false
     state.deleting = false
+    state.pageState.items = []
+    state.pageState.total = 0
   }
 
   async function loadWorkflows(): Promise<string | null> {
@@ -135,6 +146,44 @@ export const useWorkflowsStore = defineStore('workflows', () => {
     } catch {
       if (contextChanged(generation, workspaceId)) return undefined
       return null
+    }
+  }
+
+  /**
+   * E-2 服务端分页（可选，默认不启用）：与 groups.loadPage 同款样板，单接口拉一页写入
+   * pageState，generation 计数丢弃旧响应。默认不启用——prd A-6 本阶段保留全量拉取 +
+   * 前端分页（chat 工作台依赖全量 items），当单资源超过 500 条时再切换。
+   */
+  async function loadPage(params: {
+    limit?: number
+    offset?: number
+    keyword?: string | null
+    is_enabled?: boolean | null
+  } = {}): Promise<string | null> {
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    const requestGeneration = ++listGeneration
+    state.loading = true
+    try {
+      const response = await getWorkflowList({
+        keyword: params.keyword ?? undefined,
+        is_enabled: params.is_enabled ?? undefined,
+        limit: params.limit ?? 20,
+        offset: params.offset ?? 0,
+      })
+      if (contextChanged(generation, workspaceId) || requestGeneration !== listGeneration) return null
+      state.pageState.items = response.items
+      state.pageState.total = response.total
+      return null
+    } catch (error) {
+      if (contextChanged(generation, workspaceId) || requestGeneration !== listGeneration) return null
+      state.pageState.items = []
+      state.pageState.total = 0
+      return errorMessage(error, 'Workflow 列表加载失败')
+    } finally {
+      if (!contextChanged(generation, workspaceId) && requestGeneration === listGeneration) {
+        state.loading = false
+      }
     }
   }
 
@@ -193,6 +242,7 @@ export const useWorkflowsStore = defineStore('workflows', () => {
     state,
     resetWorkflows,
     loadWorkflows,
+    loadPage,
     loadWorkflowDetail,
     saveWorkflow,
     removeWorkflow,

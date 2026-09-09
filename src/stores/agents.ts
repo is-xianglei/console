@@ -26,6 +26,11 @@ interface AgentsState {
   catalogsLoading: boolean
   saving: boolean
   deleting: boolean
+  /** E-2 服务端分页专用状态；默认不启用，列表仍走全量拉取 + 前端分页（prd A-6）。 */
+  pageState: {
+    items: AgentResponse[]
+    total: number
+  }
 }
 
 export interface SaveAgentInput {
@@ -81,6 +86,10 @@ export const useAgentsStore = defineStore('agents', () => {
     catalogsLoading: false,
     saving: false,
     deleting: false,
+    pageState: {
+      items: [],
+      total: 0,
+    },
   })
 
   function contextChanged(generation: number, workspaceId: number | null) {
@@ -112,6 +121,8 @@ export const useAgentsStore = defineStore('agents', () => {
     state.catalogsLoading = false
     state.saving = false
     state.deleting = false
+    state.pageState.items = []
+    state.pageState.total = 0
   }
 
   async function loadAgents(): Promise<string | null> {
@@ -180,6 +191,44 @@ export const useAgentsStore = defineStore('agents', () => {
     } catch {
       if (contextChanged(generation, workspaceId)) return undefined
       return null
+    }
+  }
+
+  /**
+   * E-2 服务端分页（可选，默认不启用）：与 groups.loadPage 同款样板，单接口拉一页写入
+   * pageState，generation 计数丢弃旧响应。默认不启用——prd A-6 本阶段保留全量拉取 +
+   * 前端分页（chat 工作台依赖全量 items），当单资源超过 500 条时再切换。
+   */
+  async function loadPage(params: {
+    limit?: number
+    offset?: number
+    keyword?: string | null
+    is_enabled?: boolean | null
+  } = {}): Promise<string | null> {
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    const listGeneration = ++agentListGeneration
+    state.loading = true
+    try {
+      const response = await getAgentList({
+        keyword: params.keyword ?? undefined,
+        is_enabled: params.is_enabled ?? undefined,
+        limit: params.limit ?? 20,
+        offset: params.offset ?? 0,
+      })
+      if (contextChanged(generation, workspaceId) || listGeneration !== agentListGeneration) return null
+      state.pageState.items = response.items
+      state.pageState.total = response.total
+      return null
+    } catch (error) {
+      if (contextChanged(generation, workspaceId) || listGeneration !== agentListGeneration) return null
+      state.pageState.items = []
+      state.pageState.total = 0
+      return errorMessage(error, 'Agent 列表加载失败')
+    } finally {
+      if (!contextChanged(generation, workspaceId) && listGeneration === agentListGeneration) {
+        state.loading = false
+      }
     }
   }
 
@@ -291,6 +340,7 @@ export const useAgentsStore = defineStore('agents', () => {
     state,
     resetAgents,
     loadAgents,
+    loadPage,
     loadCatalogs,
     loadAll,
     loadAgentDetail,

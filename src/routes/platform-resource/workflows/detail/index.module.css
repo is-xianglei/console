@@ -38,6 +38,14 @@
   line-height: 1.6;
 }
 
+.wf-detail-tabs {
+  border-bottom: 1px solid var(--border);
+}
+
+.wf-detail-pane {
+  padding-top: var(--space-md);
+}
+
 .wf-detail-section h3 {
   margin-bottom: 8px;
   color: var(--text-dim);

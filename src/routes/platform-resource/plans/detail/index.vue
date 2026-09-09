@@ -2,7 +2,9 @@
 import { computed, ref, useCssModule, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PLAN_MODE_LABEL } from '@/hooks/useOrchestrationPlanManager'
+import { useSaveFeedback } from '@/hooks/useSaveFeedback'
 import type { PlanResponse } from '@/interfaces/orchestration-plan/api'
+import { RelativeTime } from '@/components/resource'
 import { useAgentsStore } from '@/stores/agents'
 import { useOrchestrationPlansStore } from '@/stores/orchestrationPlans'
 
@@ -15,6 +17,34 @@ const plansStore = useOrchestrationPlansStore()
 const agentsStore = useAgentsStore()
 const pendingDelete = ref(false)
 const deleting = ref(false)
+const saveFeedback = useSaveFeedback({
+  listRoute: { name: 'platform-resource', params: { module: 'build', resource: 'plans' } },
+})
+
+const TAB_KEYS = ['basic', 'members', 'server'] as const
+type TabKey = (typeof TAB_KEYS)[number]
+
+const tabItems = [
+  { value: 'basic', label: '基础信息' },
+  { value: 'members', label: '成员' },
+  { value: 'server', label: '服务端信息' },
+]
+
+function isTabKey(value: unknown): value is TabKey {
+  return typeof value === 'string' && (TAB_KEYS as readonly string[]).includes(value)
+}
+
+const activeTab = computed<TabKey>({
+  get() {
+    const raw = route.query.tab
+    const value = Array.isArray(raw) ? raw[0] : raw
+    return isTabKey(value) ? value : 'basic'
+  },
+  set(tab) {
+    if (tab === activeTab.value) return
+    void router.replace({ query: { ...route.query, tab } })
+  },
+})
 
 const planId = computed(() => {
   const value = route.params.id
@@ -41,11 +71,6 @@ function brokenMembers(plan: PlanResponse) {
   return plan.members.filter((member) => !member.is_available).length
 }
 
-function formatTime(value: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('zh-CN', { hour12: false })
-}
-
 function goToList() {
   void router.push({ name: 'platform-resource', params: { module: 'build', resource: 'plans' } })
 }
@@ -70,7 +95,7 @@ async function confirmDelete() {
     const error = await plansStore.removePlan(detail.value.id)
     if (error === undefined) return
     if (error) return
-    goToList()
+    await saveFeedback.afterDelete({ message: '已删除编排方案' })
   } finally {
     deleting.value = false
     pendingDelete.value = false
@@ -108,10 +133,17 @@ watch(
         <UAlert v-if="brokenMembers(detail) > 0" color="error" variant="subtle" icon="i-lucide-triangle-alert" title="部分成员 Agent 已停用，方案将无法运行。" />
       </div>
 
-      <p :class="styles['pl-detail-description']">{{ detail.description || '未填写用途描述' }}</p>
+      <UTabs v-model="activeTab" :items="tabItems" :content="false" variant="link" size="sm" :class="styles['pl-detail-tabs']" />
 
-      <section :class="styles['pl-detail-section']">
-        <h3>成员编排</h3>
+      <div v-if="activeTab === 'basic'" :class="styles['pl-detail-pane']">
+        <dl :class="styles['pl-detail-list']">
+          <div><dt>描述</dt><dd>{{ detail.description || '未填写用途描述' }}</dd></div>
+          <div><dt>模式</dt><dd>{{ PLAN_MODE_LABEL[detail.mode] }} <small class="mono">{{ detail.mode.toUpperCase() }}</small></dd></div>
+          <div><dt>状态</dt><dd>{{ detail.is_enabled ? '已启用' : '已停用' }}</dd></div>
+        </dl>
+      </div>
+
+      <div v-else-if="activeTab === 'members'" :class="styles['pl-detail-pane']">
         <ol :class="styles['pl-detail-members']">
           <li v-for="member in sortedMembers(detail)" :key="member.id" :class="{ [styles.unavailable]: !isMemberAvailable(member) }">
             <span class="mono">{{ String(member.position + 1).padStart(2, '0') }}</span>
@@ -123,18 +155,17 @@ watch(
           </li>
         </ol>
         <p v-if="!detail.members.length" :class="styles['pl-detail-empty']">尚未添加任何成员。</p>
-      </section>
+      </div>
 
-      <section :class="styles['pl-detail-section']">
-        <h3>服务端信息</h3>
+      <div v-else :class="styles['pl-detail-pane']">
         <dl :class="styles['pl-detail-list']">
           <div><dt>方案 ID</dt><dd class="mono">{{ detail.id }}</dd></div>
           <div><dt>工作区 ID</dt><dd class="mono">{{ detail.workspace_id }}</dd></div>
           <div><dt>创建者 ID</dt><dd class="mono">{{ detail.created_by_user_id }}</dd></div>
-          <div><dt>创建时间</dt><dd>{{ formatTime(detail.created_at) }}</dd></div>
-          <div><dt>更新时间</dt><dd>{{ formatTime(detail.updated_at) }}</dd></div>
+          <div><dt>创建时间</dt><dd><RelativeTime :value="detail.created_at" /></dd></div>
+          <div><dt>更新时间</dt><dd><RelativeTime :value="detail.updated_at" /></dd></div>
         </dl>
-      </section>
+      </div>
 
       <footer :class="styles['pl-detail-actions']">
         <UButton :class="styles['pl-icon-button']" icon="i-lucide-trash-2" color="error" variant="ghost" square aria-label="删除当前方案" @click="requestDelete" />

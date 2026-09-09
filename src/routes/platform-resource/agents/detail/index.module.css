@@ -18,6 +18,14 @@
   margin-top: 0;
 }
 
+.ag-detail-tabs {
+  border-bottom: 1px solid var(--border);
+}
+
+.ag-detail-pane {
+  padding-top: var(--space-md);
+}
+
 .ag-detail-actions {
   padding-top: var(--space-md);
   border-top: 1px solid var(--border);

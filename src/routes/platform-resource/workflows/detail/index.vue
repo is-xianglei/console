@@ -3,7 +3,9 @@ import { computed, ref, useCssModule, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { WORKFLOW_MODE_LABEL } from '@/constants/workflow'
 import { isWorkflowMemberAvailable } from '@/hooks/useWorkflowManager'
+import { useSaveFeedback } from '@/hooks/useSaveFeedback'
 import type { WorkflowResponse } from '@/interfaces/workflow/api'
+import { RelativeTime } from '@/components/resource'
 import { useAgentsStore } from '@/stores/agents'
 import { useWorkflowsStore } from '@/stores/workflows'
 
@@ -16,6 +18,34 @@ const workflowsStore = useWorkflowsStore()
 const agentsStore = useAgentsStore()
 const pendingDelete = ref(false)
 const deleting = ref(false)
+const saveFeedback = useSaveFeedback({
+  listRoute: { name: 'platform-resource', params: { module: 'build', resource: 'workflows' } },
+})
+
+const TAB_KEYS = ['basic', 'members', 'server'] as const
+type TabKey = (typeof TAB_KEYS)[number]
+
+const tabItems = [
+  { value: 'basic', label: '基础信息' },
+  { value: 'members', label: '成员' },
+  { value: 'server', label: '服务端信息' },
+]
+
+function isTabKey(value: unknown): value is TabKey {
+  return typeof value === 'string' && (TAB_KEYS as readonly string[]).includes(value)
+}
+
+const activeTab = computed<TabKey>({
+  get() {
+    const raw = route.query.tab
+    const value = Array.isArray(raw) ? raw[0] : raw
+    return isTabKey(value) ? value : 'basic'
+  },
+  set(tab) {
+    if (tab === activeTab.value) return
+    void router.replace({ query: { ...route.query, tab } })
+  },
+})
 
 const workflowId = computed(() => {
   const value = route.params.id
@@ -33,11 +63,6 @@ function isMemberAvailable(member: WorkflowResponse['agents'][number]) {
 
 function brokenMembers(workflow: WorkflowResponse) {
   return workflow.agents.filter((member) => !isMemberAvailable(member)).length
-}
-
-function formatTime(value: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('zh-CN', { hour12: false })
 }
 
 function goToList() {
@@ -64,7 +89,7 @@ async function confirmDelete() {
     const error = await workflowsStore.removeWorkflow(detail.value.id)
     if (error === undefined) return
     if (error) return
-    goToList()
+    await saveFeedback.afterDelete({ message: '已删除 Workflow' })
   } finally {
     deleting.value = false
     pendingDelete.value = false
@@ -102,10 +127,17 @@ watch(
         <UAlert v-if="brokenMembers(detail) > 0" color="error" variant="subtle" icon="i-lucide-triangle-alert" title="部分成员 Agent 已停用或已删除，Workflow 将无法运行。" />
       </div>
 
-      <p :class="styles['wf-detail-description']">{{ detail.description || '未填写用途描述' }}</p>
+      <UTabs v-model="activeTab" :items="tabItems" :content="false" variant="link" size="sm" :class="styles['wf-detail-tabs']" />
 
-      <section :class="styles['wf-detail-section']">
-        <h3>执行成员</h3>
+      <div v-if="activeTab === 'basic'" :class="styles['wf-detail-pane']">
+        <dl :class="styles['wf-detail-list']">
+          <div><dt>描述</dt><dd>{{ detail.description || '未填写用途描述' }}</dd></div>
+          <div><dt>模式</dt><dd>{{ WORKFLOW_MODE_LABEL[detail.mode] }} <small class="mono">{{ detail.mode.toUpperCase() }}</small></dd></div>
+          <div><dt>状态</dt><dd>{{ detail.is_enabled ? '已启用' : '已停用' }}</dd></div>
+        </dl>
+      </div>
+
+      <div v-else-if="activeTab === 'members'" :class="styles['wf-detail-pane']">
         <ol :class="styles['wf-detail-members']">
           <li v-for="(member, index) in [...detail.agents].sort((left, right) => left.sort_order - right.sort_order || left.agent_id - right.agent_id)" :key="`${member.agent_id}-${member.sort_order}`" :class="{ [styles.unavailable]: !isMemberAvailable(member) }">
             <span class="mono">{{ String(index + 1).padStart(2, '0') }}</span>
@@ -117,18 +149,17 @@ watch(
           </li>
         </ol>
         <p v-if="!detail.agents.length" :class="styles['wf-detail-empty']">尚未添加任何执行成员。</p>
-      </section>
+      </div>
 
-      <section :class="styles['wf-detail-section']">
-        <h3>服务端信息</h3>
+      <div v-else :class="styles['wf-detail-pane']">
         <dl :class="styles['wf-detail-list']">
           <div><dt>Workflow ID</dt><dd class="mono">{{ detail.id }}</dd></div>
           <div><dt>工作区 ID</dt><dd class="mono">{{ detail.workspace_id }}</dd></div>
           <div><dt>创建者 ID</dt><dd class="mono">{{ detail.created_by_user_id }}</dd></div>
-          <div><dt>创建时间</dt><dd>{{ formatTime(detail.created_at) }}</dd></div>
-          <div><dt>更新时间</dt><dd>{{ formatTime(detail.updated_at) }}</dd></div>
+          <div><dt>创建时间</dt><dd><RelativeTime :value="detail.created_at" /></dd></div>
+          <div><dt>更新时间</dt><dd><RelativeTime :value="detail.updated_at" /></dd></div>
         </dl>
-      </section>
+      </div>
 
       <footer :class="styles['wf-detail-actions']">
         <UButton :class="styles['wf-icon-button']" icon="i-lucide-trash-2" color="error" variant="ghost" square aria-label="删除当前 Workflow" @click="requestDelete" />

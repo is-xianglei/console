@@ -22,6 +22,11 @@ interface OrchestrationPlansState {
   loading: boolean
   saving: boolean
   deleting: boolean
+  /** E-2 服务端分页专用状态；默认不启用，列表仍走全量拉取 + 前端分页（prd A-6）。 */
+  pageState: {
+    items: PlanResponse[]
+    total: number
+  }
 }
 
 /** 保存方案的输入；成员按数组顺序提交，position 由后端依序生成。 */
@@ -83,6 +88,10 @@ export const useOrchestrationPlansStore = defineStore('orchestrationPlans', () =
     loading: false,
     saving: false,
     deleting: false,
+    pageState: {
+      items: [],
+      total: 0,
+    },
   })
 
   function contextChanged(generation: number, workspaceId: number | null) {
@@ -110,6 +119,8 @@ export const useOrchestrationPlansStore = defineStore('orchestrationPlans', () =
     state.loading = false
     state.saving = false
     state.deleting = false
+    state.pageState.items = []
+    state.pageState.total = 0
   }
 
   async function loadPlans(): Promise<string | null> {
@@ -146,6 +157,45 @@ export const useOrchestrationPlansStore = defineStore('orchestrationPlans', () =
     } catch {
       if (contextChanged(generation, workspaceId)) return undefined
       return null
+    }
+  }
+
+  /**
+   * E-2 服务端分页（可选，默认不启用）：与 groups.loadPage 同款样板，单接口拉一页写入
+   * pageState，generation 计数丢弃旧响应。默认不启用——prd A-6 本阶段保留全量拉取 +
+   * 前端分页（chat 工作台依赖全量 items），当单资源超过 500 条时再切换。
+   * 存储的是 rawPage 字段，不影响加载器加载方式。
+   */
+  async function loadPage(params: {
+    limit?: number
+    offset?: number
+    keyword?: string | null
+    is_enabled?: boolean | null
+  } = {}): Promise<string | null> {
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    const listGeneration = ++planListGeneration
+    state.loading = true
+    try {
+      const response = await getPlanList({
+        keyword: params.keyword ?? undefined,
+        is_enabled: params.is_enabled ?? undefined,
+        limit: params.limit ?? 20,
+        offset: params.offset ?? 0,
+      })
+      if (contextChanged(generation, workspaceId) || listGeneration !== planListGeneration) return null
+      state.pageState.items = response.items
+      state.pageState.total = response.total
+      return null
+    } catch (error) {
+      if (contextChanged(generation, workspaceId) || listGeneration !== planListGeneration) return null
+      state.pageState.items = []
+      state.pageState.total = 0
+      return errorMessage(error, '编排方案列表加载失败')
+    } finally {
+      if (!contextChanged(generation, workspaceId) && listGeneration === planListGeneration) {
+        state.loading = false
+      }
     }
   }
 
@@ -199,6 +249,7 @@ export const useOrchestrationPlansStore = defineStore('orchestrationPlans', () =
     state,
     resetPlans,
     loadPlans,
+    loadPage,
     loadPlanDetail,
     savePlan,
     removePlan,
