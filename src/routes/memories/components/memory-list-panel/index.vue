@@ -144,7 +144,7 @@ async function onDelete() {
     return
   }
   pendingDelete.value = null
-  toast.add({ title: 'Memory 已删除', color: 'success', icon: 'i-lucide-trash-2' })
+  toast.add({ title: `Memory「${item.name}」已删除`, color: 'success', icon: 'i-lucide-trash-2' })
   // 删除成功后若当前页已无数据：回退到上一页并重拉（store 的本地 page 也被 URL 覆盖）。
   // 此处以 URL 的 page 为准，避免与 state.page 双份递减造成错位。
   if (manager.items.value.length === 0 && manager.page.value > 1) {

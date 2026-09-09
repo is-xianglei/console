@@ -108,7 +108,7 @@ async function onDeleteConfirm() {
     return
   }
   pendingDeleteName.value = null
-  toast.add({ title: '技能已删除', color: 'success', icon: 'i-lucide-trash-2' })
+  toast.add({ title: `技能「${name}」已删除`, color: 'success', icon: 'i-lucide-trash-2' })
   // 删除后当前页无数据则退页纠正，URL 由 useListUrlState 同步。
   if (manager.pagedItems.value.length === 0 && manager.state.page > 1) {
     manager.state.page -= 1
