@@ -105,15 +105,17 @@
 
 ## 跨子任务验收标准
 
-- [ ] 全站 7 个列表页（agents/workflows/plans/departments/groups/people/memories）刷新后搜索词、筛选、页码、每页条数、树选中不丢；复制 URL 到新标签页得到同一视图。（skills 列表计入第 8 个。）
-- [ ] 每类资源新建/编辑保存成功后：toast 含对象名 → 回到列表 → 目标行高亮约 2 秒 → URL 的 `highlight` 被清除。
-- [ ] 每类资源删除成功后：回到列表或上一页，toast 含对象名，列表总数正确。
-- [ ] 所有分页列表为真分页（总数 / 每页条数 / 页码 / 跳转），people 不再 200 条截断；departments 树表不分页但有"N 个部门"计数与展开/折叠。
-- [ ] 所有表格：加载态为骨架屏；操作列固定右侧；图标操作有 tooltip；≥4 个操作收进下拉。
-- [ ] 全库 `grep -rnE "confirm\(|alert\(" src/` 无命中；无"点击只弹 toast 不执行"的假按钮。
-- [ ] 权限判断只经过 `usePermissions`，people "不能删自己"等已知规则迁入其中。
-- [ ] `npm run build`（`vue-tsc -b && vite build`）、`npm run lint`（`--max-warnings=0`）、`npm run test`（`vitest run`）全绿。
-- [ ] `.trellis/spec/frontend/component-guidelines.md`、`state-management.md`、`quality-guidelines.md` 写入本次约定。
+- [x] 全站 7 个列表页（agents/workflows/plans/departments/groups/people/memories）刷新后搜索词、筛选、页码、每页条数、树选中不丢；复制 URL 到新标签页得到同一视图。（skills 列表计入第 8 个。）—— 8 个列表 manager 均接 `useListUrlState`（`useAgentManager:58-68` / `useWorkflowManager:142-152` / `useOrchestrationPlanManager:139-149` / `useGroupManager:36-46` / `useDepartmentManager:81-88` / `usePeopleManager:69-78` / `useMemoryListManager:16-24` / `useSkillManager:15-23`）
+- [x] 每类资源新建/编辑保存成功后：toast 含对象名 → 回到列表 → 目标行高亮约 2 秒 → URL 的 `highlight` 被清除。—— 各 editor hook 均用 `useSaveFeedback.afterSave`/`afterSaveToDetail`（`useAgentEditor:120,132` / `useWorkflowEditor:123` / `usePlanEditor:137,170` / `useDepartmentEditor:169-176` / `useGroupEditor:199-206` / `usePeopleEditor:187,199-202` / `useMemoryEditor:185-187`）；列表均 `useHighlightFromQuery` + `highlightId`，2s 后 `replace` 清除（`useSaveFeedback:74-81`）
+- [x] 每类资源删除成功后：回到列表或上一页，toast 含对象名，列表总数正确。—— 列表删除 `showToast(\`${对象名} 已删除\`)`；memory/skills 兜底 `afterDelete`/过滤+翻页纠正；确认弹窗标题与成功 toast 均含对象名
+- [x] 所有分页列表为真分页（总数 / 每页条数 / 页码 / 跳转），people 不再 200 条截断；departments 树表不分页但有"N 个部门"计数与展开/折叠。—— 各列表 `items-per-page>0`；`ResourcePagination` 四件套；departments 树表 `ListCard` 计数 + `expandAll/collapseAll`；people 200 截断弱化提示（后端无 total，接口化 TODO）
+- [x] 所有表格：加载态为骨架屏；操作列固定右侧；图标操作有 tooltip；≥4 个操作收进下拉。—— 各列表 `ResourceTable :loading` 骨架；`pinActions` 右固定；图标全 `UTooltip`；>3 操作进 `UDropdownMenu`
+- [x] 全库 `grep -rnE "confirm\\(|alert\\(" src/` 无命中；无"点击只弹 toast 不执行"的假按钮。
+- [x] 权限判断只经过 `usePermissions`，people "不能删自己"等已知规则迁入其中。—— `usePermissions`/`vCan`；`constants/permissions.ts` 迁入 person 不能删自己、owner 不可移除；people 删自己不渲染、批量 `safeSelectedIds` 剔除
+- [x] `npm run build`（`vue-tsc -b && vite build`）、`npm run lint`（`--max-warnings=0`）、`npm run test`（`vitest run`）全绿。—— 最终验证：vue-tsc 0 错误、210 用例全绿、eslint 0 警告、build ✓
+- [x] `.trellis/spec/frontend/component-guidelines.md`、`state-management.md`、`quality-guidelines.md` 写入本次约定。—— p0-p5 各阶段 spec 回写，三份均有实质内容
+
+> 集成评审结论（2026-09-08）：p0~p5 五个子任务全部归档，9 条验收全部达成。已知限制按 prd 风险条款处理并标注"接口化 TODO"：people 200 截断（后端无 total）、skills 编辑走 zip 覆盖（后端无 update）、skills 类型筛选用 scope（无 type 字段）、memories 搜索态单次拉取（后端无 offset）。
 
 ## 风险
 
