@@ -74,6 +74,15 @@ function inferCodec(def: ListUrlValue): ListUrlCodec {
 
 /** 供单测直接断言的默认编解码（包一层转成泛型避免类型噪音）。 */
 export const listUrlCodec = <V extends ListUrlValue>(def: V): ListUrlCodec<V> => inferCodec(def) as ListUrlCodec<V>
+
+/** created_at(ISO) 是否落在 [start, end] 两个日期字符串范围内（同天视为命中）。 */
+export function inDateRange(iso: string, start: string, end: string): boolean {
+  const at = Date.parse(iso)
+  if (!Number.isFinite(at)) return false
+  const [s, e] = [Date.parse(start), Date.parse(end)]
+  if (!Number.isFinite(s) || !Number.isFinite(e)) return false
+  return at >= s && at <= e + 86_399_000
+}
 /**
  * 把一组筛选字段与 route.query 双向绑定（R1）。
  *

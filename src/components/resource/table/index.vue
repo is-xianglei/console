@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends Record<string, any>">
-import { computed, onBeforeUnmount, ref, useCssModule, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useCssModule, watch } from 'vue'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 
 defineOptions({ name: 'ResourceTable' })
@@ -61,8 +61,17 @@ const emit = defineEmits<{
 // 仅暴露我们需要的树形 API；不强依赖 UTable 的具体实例类型。
 const tableRef = ref<{ tableApi: { expandAll: () => void; collapseAll: () => void } } | null>(null)
 
-// ===== highlightId：命中行高亮（CSS 负责淡出），定时器卸载清理 =====
+// ===== highlightId：命中行高亮（CSS 负责淡出）+ 滚动到该行（E-3），定时器卸载清理 =====
 let highlightTimer: ReturnType<typeof setTimeout> | undefined
+
+function scrollToHighlight(id: string) {
+  // 行可能不在当前页，先用类名定位 DOM 行并滚入视口。
+  const escaped = String(id).replace(/[^a-zA-Z0-9_-]/g, '\\$&')
+  const row = typeof document !== 'undefined'
+    ? document.querySelector<HTMLElement>(`.highlight-row-${escaped}`)
+    : null
+  row?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
 
 watch(
   () => props.highlightId,
@@ -72,8 +81,17 @@ watch(
     highlightTimer = setTimeout(() => {
       highlightTimer = undefined
     }, 2000)
+    // 数据就绪后再定位：等行渲染出来后滚动，避免 highlightId 先于 data 到达。
+    void nextTick(() => scrollToHighlight(id))
   },
   { immediate: true },
+)
+
+watch(
+  () => props.data,
+  () => {
+    if (props.highlightId) void nextTick(() => scrollToHighlight(props.highlightId!))
+  },
 )
 
 onBeforeUnmount(() => {
@@ -132,6 +150,7 @@ const tableMeta = computed(() => ({
     tr: (row: TableRow<T>) => [
       props.activeId != null && props.rowKey(row.original) === props.activeId ? styles.active : '',
       props.highlightId != null && props.rowKey(row.original) === props.highlightId ? styles.highlighted : '',
+      `highlight-row-${props.rowKey(row.original)}`,
     ].filter(Boolean).join(' '),
     td: (cell: { column: { id: string }; row: { depth: number } }) => (
       treeColumnId.value && cell.column.id === treeColumnId.value && cell.row.depth > 0 ? styles.treeCell : null
