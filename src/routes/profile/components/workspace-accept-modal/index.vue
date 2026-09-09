@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FormError } from '@nuxt/ui'
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
+import { useSnapshotDirty } from '@/hooks/useFormHelpers'
 
 defineOptions({ name: 'WorkspaceAcceptModal' })
 
@@ -10,11 +11,16 @@ const emit = defineEmits<{
   accept: [workspaceId: number]
 }>()
 const form = reactive({ workspaceId: '' })
+const confirmOpen = ref(false)
+const { dirty, reset: resetDirty } = useSnapshotDirty(() => form)
 
 watch(
   () => props.open,
   (open) => {
-    if (open) form.workspaceId = ''
+    if (open) {
+      form.workspaceId = ''
+      resetDirty()
+    }
   },
 )
 
@@ -29,6 +35,31 @@ function validate(values: Partial<typeof form>): FormError[] {
 function onSubmit() {
   emit('accept', Number(form.workspaceId))
 }
+
+function updateOpen(open: boolean) {
+  if (open) {
+    emit('update:open', true)
+    return
+  }
+  requestClose()
+}
+
+function requestClose() {
+  if (props.loading) {
+    emit('update:open', false)
+    return
+  }
+  if (dirty.value) {
+    confirmOpen.value = true
+    return
+  }
+  emit('update:open', false)
+}
+
+function confirmDiscard() {
+  confirmOpen.value = false
+  emit('update:open', false)
+}
 </script>
 
 <template>
@@ -36,7 +67,9 @@ function onSubmit() {
     :open="props.open"
     title="接受工作区邀请"
     description="输入邀请记录对应的工作区 ID。"
-    @update:open="emit('update:open', $event)"
+    :close="!props.loading"
+    :dismissible="!props.loading"
+    @update:open="updateOpen"
   >
     <template #body>
       <UForm
@@ -62,7 +95,7 @@ function onSubmit() {
         variant="outline"
         label="取消"
         :disabled="props.loading"
-        @click="emit('update:open', false)"
+        @click="requestClose"
       />
       <UButton
         type="submit"
@@ -71,6 +104,18 @@ function onSubmit() {
         label="接受邀请"
         :loading="props.loading"
       />
+    </template>
+  </UModal>
+
+  <UModal
+    v-model:open="confirmOpen"
+    title="放弃未保存的修改？"
+    description="关闭后将丢失尚未保存的改动。"
+    :close="true"
+  >
+    <template #footer>
+      <UButton color="neutral" variant="outline" label="取消" @click="confirmOpen = false" />
+      <UButton color="error" icon="i-lucide-trash-2" label="放弃修改" @click="confirmDiscard" />
     </template>
   </UModal>
 </template>

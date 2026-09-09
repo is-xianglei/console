@@ -62,9 +62,12 @@ const workspaceTypeLabel: Record<string, string> = {
   enterprise: '企业',
 }
 
-function showError(message: string) {
-  error.value = message
+function showBlockingError(message: string) {
   toast.add({ title: message, color: 'error', icon: 'i-lucide-circle-alert' })
+}
+
+function showFormError(message: string) {
+  error.value = message
 }
 
 async function loadCurrentWorkspace(workspaceId: number | null) {
@@ -97,7 +100,7 @@ async function onWorkspaceSwitch(workspaceId: number) {
         : {},
     })
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '切换工作区失败，请稍后重试'
+    showBlockingError(cause instanceof Error ? cause.message : '切换工作区失败，请稍后重试')
   } finally {
     switchingId.value = null
   }
@@ -121,7 +124,7 @@ async function onSaveWorkspace(payload: WorkspaceCreateRequest | WorkspaceUpdate
   if (!message && !await authStore.loadWorkspaces()) message = '工作区列表刷新失败'
   editorSaving.value = false
   if (message) {
-    showError(message)
+    showFormError(message)
     return
   }
   editorOpen.value = false
@@ -140,7 +143,7 @@ async function onAcceptInvite(workspaceId: number) {
   if (!message && !await authStore.loadWorkspaces()) message = '工作区列表刷新失败'
   accepting.value = false
   if (message) {
-    showError(message)
+    showFormError(message)
     return
   }
   acceptOpen.value = false
@@ -173,11 +176,11 @@ async function onDeleteWorkspace() {
   const originalWorkspaceId = currentWorkspaceId.value
   if (!workspace || !originalWorkspaceId || workspaceBusy.value) return
   if (workspace.membership_role !== 'owner') {
-    showError('只有工作区所有者可以删除工作区')
+    showBlockingError('只有工作区所有者可以删除工作区')
     return
   }
   if (workspace.id === originalWorkspaceId) {
-    showError('当前工作区不能删除，请先切换到其他工作区')
+    showBlockingError('当前工作区不能删除，请先切换到其他工作区')
     return
   }
 
@@ -206,7 +209,7 @@ async function onDeleteWorkspace() {
   }
 
   if (message) {
-    showError(message)
+    showBlockingError(message)
     return
   }
   pendingDelete.value = null

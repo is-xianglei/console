@@ -41,9 +41,13 @@ const inviteRoleItems = computed(() => (
 ))
 const removeDescription = computed(() => (
   pendingRemove.value
-    ? `将「${pendingRemove.value.full_name || pendingRemove.value.username}」从当前工作区移除。`
+    ? `将「${pendingRemove.value.full_name || pendingRemove.value.username}」从当前工作区移除，该成员将立即失去当前工作区访问权限。`
     : ''
 ))
+
+function showBlockingError(message: string) {
+  toast.add({ title: message, color: 'error', icon: 'i-lucide-circle-alert' })
+}
 
 function initials(member: WorkspaceMemberDetailResponse) {
   return (member.full_name || member.username).slice(0, 1).toUpperCase()
@@ -128,7 +132,7 @@ async function onRemove() {
   if (!message) await refreshAuthWorkspaces()
   removing.value = false
   if (message) {
-    error.value = message
+    showBlockingError(message)
     return
   }
   pendingRemove.value = null

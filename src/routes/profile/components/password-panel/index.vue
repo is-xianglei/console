@@ -18,7 +18,13 @@ function validate(values: Partial<typeof form.value>): FormError[] {
   const errors: FormError[] = []
   if (!values.oldPassword) errors.push({ name: 'oldPassword', message: '请输入当前密码' })
   if (!values.newPassword) errors.push({ name: 'newPassword', message: '请输入新密码' })
-  else if (values.newPassword.length < 6) errors.push({ name: 'newPassword', message: '新密码至少 6 个字符' })
+  else if (
+    values.newPassword.length < 8
+    || !/[A-Za-z]/.test(values.newPassword)
+    || !/\d/.test(values.newPassword)
+  ) {
+    errors.push({ name: 'newPassword', message: '新密码至少 8 位，且需同时包含字母和数字' })
+  }
   if (!values.confirmPassword) errors.push({ name: 'confirmPassword', message: '请再次输入新密码' })
   else if (values.confirmPassword !== values.newPassword) {
     errors.push({ name: 'confirmPassword', message: '两次输入的新密码不一致' })
@@ -58,6 +64,7 @@ onBeforeUnmount(() => {
     :class="$style.formPanel"
     :state="form"
     :validate="validate"
+    :validate-on="['blur']"
     :disabled="loading"
     @submit="onSubmit"
   >
@@ -78,7 +85,7 @@ onBeforeUnmount(() => {
         type="password"
         size="lg"
         autocomplete="new-password"
-        placeholder="至少 6 个字符"
+        placeholder="至少 8 位，含字母和数字"
       />
     </UFormField>
     <UFormField label="确认新密码" name="confirmPassword" required>

@@ -37,7 +37,7 @@ function close() {
     :open="props.open"
     title="删除工作区"
     :description="step === 'warning'
-      ? `即将删除「${props.workspace?.display_name ?? ''}」，此操作无法撤销。`
+      ? `即将删除工作区「${props.workspace?.display_name ?? ''}」（${props.workspace?.slug ?? ''}），该工作区的成员关系、全部会话、Agent 与相关数据将被永久移除，无法恢复。`
       : `输入 ${props.workspace?.slug ?? ''} 以确认删除。`"
     :close="!props.loading"
     @update:open="(open) => { if (!open) close() }"
@@ -45,7 +45,7 @@ function close() {
     <template #body>
       <div v-if="step === 'warning'" :class="$style.warning">
         <UIcon name="i-lucide-triangle-alert" aria-hidden="true" />
-        <p>工作区内的成员关系和业务数据可能一并失效。删除期间会临时切换工作区，请勿关闭页面。</p>
+        <p>删除期间会临时切换工作区，请勿关闭页面。操作不可撤销，请谨慎确认。</p>
       </div>
       <UFormField v-else label="工作区标识" name="confirmation" required>
         <UInput

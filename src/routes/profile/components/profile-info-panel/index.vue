@@ -69,6 +69,7 @@ onBeforeUnmount(() => {
     :class="$style.formPanel"
     :state="form"
     :validate="validate"
+    :validate-on="['blur']"
     :disabled="loading"
     @submit="onSubmit"
   >

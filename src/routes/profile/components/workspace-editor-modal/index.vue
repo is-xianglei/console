@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FormError } from '@nuxt/ui'
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useSnapshotDirty } from '@/hooks/useFormHelpers'
 import type {
   WorkspaceCreateRequest,
   WorkspaceUpdateRequest,
@@ -40,6 +41,8 @@ const title = computed(() => (creating.value ? '创建工作区' : '编辑当前
 const description = computed(() => (
   creating.value ? '建立独立的成员与资源空间。' : '更新当前工作区的展示与联系信息。'
 ))
+const confirmOpen = ref(false)
+const { dirty, reset: resetDirty } = useSnapshotDirty(() => form)
 
 function resetForm() {
   const workspace = props.workspace
@@ -58,7 +61,10 @@ function resetForm() {
 watch(
   [() => props.open, () => props.mode, () => props.workspace],
   ([open]) => {
-    if (open) resetForm()
+    if (open) {
+      resetForm()
+      resetDirty()
+    }
   },
   { immediate: true },
 )
@@ -126,7 +132,28 @@ function onSubmit() {
 }
 
 function updateOpen(open: boolean) {
-  if (!props.loading || open) emit('update:open', open)
+  if (open) {
+    emit('update:open', true)
+    return
+  }
+  requestClose()
+}
+
+function requestClose() {
+  if (props.loading) {
+    emit('update:open', false)
+    return
+  }
+  if (dirty.value) {
+    confirmOpen.value = true
+    return
+  }
+  emit('update:open', false)
+}
+
+function confirmDiscard() {
+  confirmOpen.value = false
+  emit('update:open', false)
 }
 </script>
 
@@ -144,6 +171,7 @@ function updateOpen(open: boolean) {
         id="workspace-editor-form"
         :state="form"
         :validate="validate"
+        :validate-on="['blur']"
         :disabled="props.loading"
         :class="$style.form"
         @submit="onSubmit"
@@ -196,7 +224,7 @@ function updateOpen(open: boolean) {
         variant="outline"
         label="取消"
         :disabled="props.loading"
-        @click="emit('update:open', false)"
+        @click="requestClose"
       />
       <UButton
         type="submit"
@@ -205,6 +233,18 @@ function updateOpen(open: boolean) {
         :label="creating ? '创建' : '保存'"
         :loading="props.loading"
       />
+    </template>
+  </UModal>
+
+  <UModal
+    v-model:open="confirmOpen"
+    title="放弃未保存的修改？"
+    description="关闭后将丢失尚未保存的改动。"
+    :close="true"
+  >
+    <template #footer>
+      <UButton color="neutral" variant="outline" label="取消" @click="confirmOpen = false" />
+      <UButton color="error" icon="i-lucide-trash-2" label="放弃修改" @click="confirmDiscard" />
     </template>
   </UModal>
 </template>

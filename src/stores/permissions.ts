@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
+import { ApiError } from '@/http'
 import {
   deletePermissionRule,
   getPermissionRuleList,
@@ -11,6 +12,10 @@ import type { PermissionRule } from '../interfaces/permission/model'
 interface PermissionsState {
   permissionRules: PermissionRule[]
   permissionRulesLoading: boolean
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback
 }
 
 export const usePermissionsStore = defineStore('permissions', () => {
@@ -42,29 +47,30 @@ export const usePermissionsStore = defineStore('permissions', () => {
     }
   }
 
-  /** 新增或更新权限规则，成功后刷新列表。 */
-  async function savePermissionRule(payload: PermissionRuleCreate): Promise<boolean> {
+  /** 新增或更新权限规则，成功后刷新列表；失败返回可展示的错误信息。 */
+  async function savePermissionRule(payload: PermissionRuleCreate): Promise<string | null> {
     const generation = dataGeneration
     try {
       await updatePermissionRule(payload)
-      if (generation !== dataGeneration) return false
+      if (generation !== dataGeneration) return null
       await loadPermissionRules()
-      return true
-    } catch {
-      return false
+      return null
+    } catch (error) {
+      return errorMessage(error, '规则保存失败')
     }
   }
 
-  /** 删除权限规则，成功后从当前列表移除。 */
-  async function removePermissionRule(ruleId: number) {
+  /** 删除权限规则，成功后从当前列表移除；失败返回可展示的错误信息。 */
+  async function removePermissionRule(ruleId: number): Promise<string | null> {
     const generation = dataGeneration
     try {
       await deletePermissionRule(ruleId)
       if (generation === dataGeneration) {
         state.permissionRules = state.permissionRules.filter((rule) => rule.id !== ruleId)
       }
-    } catch {
-      // 删除失败时保留列表，避免前后端状态不一致。
+      return null
+    } catch (error) {
+      return errorMessage(error, '规则删除失败')
     }
   }
 

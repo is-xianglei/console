@@ -18,6 +18,7 @@ const form = reactive({
 const saving = ref(false)
 const deletingId = ref<number | null>(null)
 const pendingDeleteId = ref<number | null>(null)
+const pendingDeleteName = ref('')
 
 /** 只展示全局规则(会话级规则在对话里通过"始终允许"产生,不在此集中管理) */
 const globalRules = computed(() => state.permissionRules.filter((r) => r.scope === 'global'))
@@ -40,23 +41,23 @@ async function onAddRule() {
   const tool = form.tool.trim()
   if (!tool || saving.value) return
   saving.value = true
-  const ok = await savePermissionRule({ scope: 'global', tool_name: tool, behavior: form.behavior })
+  const message = await savePermissionRule({ scope: 'global', tool_name: tool, behavior: form.behavior })
   saving.value = false
-  if (ok) {
+  if (message === null) {
     form.tool = ''
     form.behavior = 'ask'
     toast.add({ title: '全局规则已添加', color: 'success', icon: 'i-lucide-circle-check' })
   } else {
-    toast.add({ title: '添加规则失败', description: '请稍后重试', color: 'error', icon: 'i-lucide-circle-alert' })
+    toast.add({ title: '添加规则失败', description: message, color: 'error', icon: 'i-lucide-circle-alert' })
   }
 }
 
 async function handleDelete(id: number) {
   deletingId.value = id
-  await removePermissionRule(id)
+  const message = await removePermissionRule(id)
   deletingId.value = null
-  if (state.permissionRules.some((rule) => rule.id === id)) {
-    toast.add({ title: '删除规则失败', description: '请稍后重试', color: 'error', icon: 'i-lucide-circle-alert' })
+  if (message) {
+    toast.add({ title: '删除规则失败', description: message, color: 'error', icon: 'i-lucide-circle-alert' })
   } else {
     toast.add({ title: '全局规则已删除', color: 'success', icon: 'i-lucide-circle-check' })
   }
@@ -149,7 +150,7 @@ onMounted(() => {
                   :loading="deletingId === r.id"
                   :disabled="deletingId !== null && deletingId !== r.id"
                   aria-label="删除规则"
-                  @click="pendingDeleteId = r.id"
+                  @click="pendingDeleteId = r.id; pendingDeleteName = r.tool_name"
                 />
               </UTooltip>
             </li>
@@ -161,8 +162,8 @@ onMounted(() => {
     <UModal
       :open="pendingDeleteId !== null"
       title="删除全局规则"
-      description="删除后，该工具将重新使用平台默认权限策略。"
-      @update:open="(open) => { if (!open) pendingDeleteId = null }"
+      :description="`将删除规则「${pendingDeleteName}」，该工具将恢复平台默认权限策略。`"
+      @update:open="(open) => { if (!open) { pendingDeleteId = null; pendingDeleteName = '' } }"
     >
       <template #footer>
         <UButton color="neutral" variant="outline" label="取消" @click="pendingDeleteId = null" />
