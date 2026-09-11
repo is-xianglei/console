@@ -1,3 +1,10 @@
+/* 表格基线：本文件用的是**非 module 类名**（.br-table 等由外层 :global 语义承载），
+   而 @import 进来的基线类名会被改写成模块哈希，直接复用不了。
+   所以这里不 import 基线，只把数值对齐到同一套 token：
+   表头高 --table-head-height、单元格高 --table-row-height-tall（本表名称列是双行）、
+   横向内边距 --table-cell-pad-x、列宽 --table-col-*。
+   原先本文件自带 40 / 66 / 10px 与 48 / 220 / 112px 一套独立数值，是第 5 套表格基线。 */
+
 .br-resource-icon {
   display: grid;
   place-items: center;
@@ -46,8 +53,8 @@
 }
 
 .br-table th {
-  height: 40px;
-  padding: 0 10px;
+  height: var(--table-head-height);
+  padding: 0 var(--table-cell-pad-x);
   position: sticky;
   top: 0;
   z-index: 2;
@@ -61,11 +68,11 @@
 }
 
 .br-table td {
-  height: 66px;
-  padding: 8px 10px;
+  height: var(--table-row-height-tall);
+  padding: var(--table-row-pad-y) var(--table-cell-pad-x);
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   overflow: hidden;
 }
 
@@ -75,11 +82,11 @@
 }
 
 .br-table tbody tr:hover {
-  background: var(--bg-surface);
+  background: var(--bg-hover);
 }
 
 .br-table [data-slot='tbody'] > tr:hover > td {
-  background: var(--bg-surface) !important;
+  background: var(--bg-hover) !important;
 }
 
 .br-table tbody tr.active {
@@ -96,11 +103,11 @@
 }
 
 .br-table .br-select-cell {
-  width: 48px;
+  width: var(--table-col-select);
 }
 
 .br-name-col {
-  width: 220px;
+  width: var(--table-col-name);
 }
 
 .br-status-col,
@@ -110,7 +117,7 @@
 }
 
 .br-actions-col {
-  width: 112px;
+  width: var(--table-col-actions);
   text-align: right !important;
 }
 

@@ -1,3 +1,7 @@
+/* 表格基线（行高、内边距、字色字号、列省略、行悬停）+ 语义列类（col-name 等）
+   的单一来源。必须放在最前。 */
+@import '@/assets/styles/table-baseline.module.css';
+
 .panel {
   display: flex;
   flex: 1 1 0;
@@ -75,81 +79,23 @@
   border-radius: var(--radius-control);
 }
 
-.table {
-  width: 100%;
-  height: 100%;
-  min-width: 980px;
-}
+/* 本页表格宽度仍由 .resource-table（ResourceTable 组件自身）给出，页面不再重复写
+   width / table-layout。原先这里还有一份 .table { width:100%; min-width:980px } 的副本，
+   与组件逐条重复；下面 @container (max-width:980px) 里对应的 min-width 归零一并删掉。
 
-.table > :global([data-slot='base']) {
-  width: 100%;
-  min-width: 980px;
-  border-collapse: collapse;
-  table-layout: fixed;
-  background: transparent;
-}
+   注意：p5 前这份样式里用的是**裸** th / td / tbody tr 选择器，
+   而 UTable 实际只渲染 [data-slot='th'] / [data-slot='td']，
+   那些规则从来没命中过（表格一直靠 UTable 自带主题撑），已随本次收敛删除。 */
 
-.table :global(th) {
-  height: 40px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.table :global(td) {
-  height: 62px;
-  padding: 7px 12px;
-  overflow: hidden;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  font-size: var(--fs-sm);
-}
-
-.table :global(tbody tr) {
-  cursor: pointer;
-  transition: background var(--dur-fast), box-shadow var(--dur-fast);
-}
-
-.table :global(tbody tr:hover),
-.table :global([data-slot='tbody'] > tr:hover > td) {
-  background: var(--bg-surface);
-}
-
-.table :global(tbody tr).active,
-.table :global([data-slot='tbody'] > tr.active > td) {
-  background: var(--accent-agent-dim);
-}
-
+/* p5 前这里用 290 / 180 / 92 / 132 / 88px 一组自定义列宽，与其它页的 220 / 230 / 260 / 290
+   是两套尺子；现在改用基线的语义列类，页面不再自带 px。 */
 .table :global([data-slot='tbody'] > tr.active > td:first-child) {
   box-shadow: inset 2px 0 var(--accent-agent);
 }
 
-.nameColumn {
-  width: 290px;
-}
-
+/* 「稳定标识」是本页独有的列（其它页没有对应语义），保留自有宽度；其余列宽走基线语义列类。 */
 .keyColumn {
   width: 180px;
-}
-
-.typeColumn,
-.statusColumn,
-.versionColumn,
-.usageColumn {
-  width: 92px;
-}
-
-.updatedColumn {
-  width: 132px;
-}
-
-.actionsColumn {
-  width: 88px;
-  text-align: right !important;
 }
 
 .memoryName {
@@ -278,22 +224,15 @@
 }
 
 @container (max-width: 980px) {
-  .table,
-  .table > :global([data-slot='base']) {
-    min-width: 0;
-  }
-
-  .table :global(th:nth-child(2)),
-  .table :global(td:nth-child(2)),
-  .table :global(th:nth-child(5)),
-  .table :global(td:nth-child(5)),
-  .table :global(th:nth-child(6)),
-  .table :global(td:nth-child(6)) {
+  /* 窄容器下按列序隐藏：稳定标识(2)、版本(5)、使用次数(6)。
+     注意列序以**渲染顺序**为准：UTable 未开勾选列，所以第 1 列就是 Memory 名称。 */
+  .table :global([data-slot='th']:nth-child(2)),
+  .table :global([data-slot='td']:nth-child(2)),
+  .table :global([data-slot='th']:nth-child(5)),
+  .table :global([data-slot='td']:nth-child(5)),
+  .table :global([data-slot='th']:nth-child(6)),
+  .table :global([data-slot='td']:nth-child(6)) {
     display: none;
-  }
-
-  .nameColumn {
-    width: auto;
   }
 
   .rowActions {
@@ -302,19 +241,15 @@
 }
 
 @container (max-width: 620px) {
-  .table :global(th:nth-child(4)),
-  .table :global(td:nth-child(4)),
-  .table :global(th:nth-child(7)),
-  .table :global(td:nth-child(7)) {
+  /* 继续收窄：隐藏类型(3)、**最近更新(8)**（第 8 列，不是第 7）和操作(9)。
+     原写法写的是 nth-child(7)，实际会隐藏「最近更新」而留下操作列——
+     操作列一旦被藏，行内就没有任何入口了，所以这里按真实列序改回来：
+     隐藏 3 / 8，操作列始终保留（只把桌面按钮换成移动端菜单）。 */
+  .table :global([data-slot='th']:nth-child(3)),
+  .table :global([data-slot='td']:nth-child(3)),
+  .table :global([data-slot='th']:nth-child(8)),
+  .table :global([data-slot='td']:nth-child(8)) {
     display: none;
-  }
-
-  .typeColumn {
-    width: 82px;
-  }
-
-  .actionsColumn {
-    width: 48px;
   }
 
   .desktopActions {

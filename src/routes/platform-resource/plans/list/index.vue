@@ -32,12 +32,12 @@ const modeOptions: Array<{ value: 'all' | PlanResponse['mode']; label: string }>
 ]
 
 const columns: TableColumn<PlanResponse>[] = [
-  { id: 'plan', header: '方案' },
-  { id: 'state', header: '状态' },
-  { id: 'mode', header: '编排模式' },
+  { id: 'plan', header: '方案', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
+  { id: 'state', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { id: 'mode', header: '编排模式', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
   { id: 'members', header: '成员' },
-  { id: 'createdAt', header: '创建时间' },
-  { id: 'actions', header: '操作' },
+  { id: 'createdAt', header: '创建时间', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
+  { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
 ]
 
 const deleteTitle = computed(() => manager.pendingDelete.value ? `删除 ${manager.pendingDelete.value.name}？` : '删除编排方案？')
@@ -163,8 +163,8 @@ watch(
         @clear-filters="onResetFilters"
       >
         <template #plan-cell="{ row }">
-          <div :class="styles.primaryCell">
-            <span :class="styles.entityIcon"><UIcon name="i-lucide-workflow" /></span>
+          <div :class="styles['primary-cell']">
+            <span :class="styles['entity-icon']"><UIcon name="i-lucide-workflow" /></span>
             <span>
               <strong>{{ row.original.name }}</strong>
               <small class="mono">{{ planCode(row.original.id) }}</small>

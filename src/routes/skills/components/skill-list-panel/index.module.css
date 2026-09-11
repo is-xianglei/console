@@ -1,3 +1,7 @@
+/* 表格基线（行高、内边距、字色字号、列省略、行悬停）+ 语义列类（col-name 等）
+   的单一来源。必须放在最前。 */
+@import '@/assets/styles/table-baseline.module.css';
+
 .panel {
   display: flex;
   min-width: 0;
@@ -68,30 +72,9 @@
   width: 150px;
 }
 
-.table {
-  width: 100%;
-}
-
-.table :global([data-slot='tbody'] > tr) {
-  cursor: pointer;
-}
-
-.table :global([data-slot='tbody'] > tr:hover > td) {
-  background: var(--bg-hover);
-}
-
-.table :global([data-slot='th']) {
-  height: 38px;
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-}
-
-.table :global([data-slot='td']) {
-  height: 54px;
-  color: var(--text-secondary);
-  font-size: var(--fs-sm);
-}
+/* 表格本体（width、行高、字色字号、行悬停）已在基线里；原先这里有一份与
+   teams/plans/workflows 三个列表页逐字相同的 .table 副本，已删除。
+   唯一差异是表头字号曾用 --fs-xs，基线用 --fs-sm，按基线统一。 */
 
 .alert {
   margin: 10px 10px 0;
@@ -110,26 +93,8 @@
   border-radius: var(--radius-control);
 }
 
-.nameColumn {
-  width: 220px;
-}
-
-.descColumn {
-  width: auto;
-}
-
-.versionColumn {
-  width: 92px;
-}
-
-.updatedColumn {
-  width: 132px;
-}
-
-.actionsColumn {
-  width: 88px;
-  text-align: right !important;
-}
+/* 列宽走基线的语义列类，页面不再自带 220 / 92 / 132 / 88px 一套尺子。
+   「描述」列不设宽，自动占剩余空间。 */
 
 .skillName {
   width: 100%;

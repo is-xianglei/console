@@ -1,4 +1,9 @@
 /* departments 三页共用：页面壳、指标条、工具栏、表格与详情样式(groups / people 的 shared 直接 @import 复用)。 */
+
+/* 表格基线（行高、内边距、字色字号、列省略、行悬停）。
+   p5 起基线是全站单一来源，这里只负责把它带进 departments/groups/people
+   的三棵样式树；原先本文件自带一份 th 38 / td 54 的副本，已删除。 */
+@import '@/assets/styles/table-baseline.module.css';
 .page { width: 100%; max-width: var(--page-content-max); margin: 0 auto; padding: 30px 28px 48px; }
 .header { min-height: 86px; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .heading { min-width: 0; }
@@ -21,16 +26,8 @@
 .workspaceName { margin-left: auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .alert { margin: 10px; }
 .listPane { min-width: 0; overflow: auto; }
-.table { width: 100%; }
-.table :global([data-slot='tbody'] > tr) { cursor: pointer; }
-.table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
-.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: var(--fs-sm); text-transform: uppercase; }
-.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: var(--fs-sm); }
-.primaryCell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
-.primaryCell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
-.primaryCell strong { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--fs-sm); }
-.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
-.entityIcon { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-agent-dim); color: var(--accent-agent); }
+/* .primaryCell / .entityIcon 已移入 table-baseline.module.css（本文件第 6 行导入），
+   类名改为 .primary-cell / .entity-icon；原先这里那份和另外 4 个 list 页逐字相同。 */
 .rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 .description { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.65; }
 .meta { margin-top: 14px; border-top: 1px solid var(--border); }

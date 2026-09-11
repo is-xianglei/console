@@ -24,12 +24,14 @@ const rawFileInput = ref<HTMLInputElement | null>(null)
 const pendingDeleteName = ref<string | null>(null)
 const deleting = ref(false)
 
+/** 列宽由 table-baseline.module.css 的语义列类给出：同类列全站同宽。
+ * 「描述」列不设宽，自动占剩余；页面不再自己写 220/92/132/88px。 */
 const columns: TableColumn<SkillResponse>[] = [
-  { accessorKey: 'name', header: '名称', meta: { class: { th: styles.nameColumn, td: styles.nameColumn } } },
-  { accessorKey: 'description', header: '描述', meta: { class: { th: styles.descColumn, td: styles.descColumn } } },
-  { accessorKey: 'version', header: '版本', meta: { class: { th: styles.versionColumn, td: styles.versionColumn } } },
-  { accessorKey: 'updated_at', header: '更新时间', meta: { class: { th: styles.updatedColumn, td: styles.updatedColumn } } },
-  { id: 'actions', header: '操作', meta: { class: { th: styles.actionsColumn, td: styles.actionsColumn } } },
+  { accessorKey: 'name', header: '名称', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
+  { accessorKey: 'description', header: '描述' },
+  { accessorKey: 'version', header: '版本', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { accessorKey: 'updated_at', header: '更新时间', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
+  { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
 ]
 
 /** 空态分型：有筛选条件 →「筛选无结果」；否则 →「尚未上传技能包」。 */

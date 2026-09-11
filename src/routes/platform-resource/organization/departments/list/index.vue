@@ -25,14 +25,16 @@ const enabledOptions = [
   { value: 'disabled', label: '已停用' },
 ] as { value: DepartmentEnabledFilter; label: string }[]
 
+/** 列宽由 table-baseline.module.css 的语义列类给出（col-name / col-status / col-time /
+ * col-actions 随 ../shared 的 @import 进入本页），其余未标注的列自动分摊剩余宽度。 */
 const columns: TableColumn<DepartmentTreeRow>[] = [
-  { id: 'name', header: '部门名称' },
+  { id: 'name', header: '部门名称', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
   { id: 'code', header: '编码' },
   { id: 'manager', header: '负责人' },
   { id: 'sort', header: '排序' },
-  { id: 'state', header: '状态' },
-  { id: 'createdAt', header: '创建时间' },
-  { id: 'actions', header: '操作' },
+  { id: 'state', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { id: 'createdAt', header: '创建时间', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
+  { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
 ]
 
 /** 树形行 children 展开（UTable getSubRows）。 */
@@ -167,8 +169,8 @@ watch(
         @clear-filters="onResetFilters"
       >
         <template #name-cell="{ row }">
-          <div :class="[styles.primaryCell, { [styles.ancestor]: row.original.ancestorOfMatch, [styles.matched]: row.original.match, [styles.subtreeInactive]: row.original.subtreeInactive }]">
-            <span :class="styles.entityIcon"><UIcon name="i-lucide-building-2" /></span>
+          <div :class="[styles['primary-cell'], { [styles.ancestor]: row.original.ancestorOfMatch, [styles.matched]: row.original.match, [styles.subtreeInactive]: row.original.subtreeInactive }]">
+            <span :class="styles['entity-icon']"><UIcon name="i-lucide-building-2" /></span>
             <span>
               <strong>{{ row.original.name }}</strong>
               <small class="mono">DEPT-{{ row.original.id }}</small>

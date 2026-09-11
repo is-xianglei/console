@@ -1,5 +1,11 @@
 @import '../shared/index.module.css';
 
+/* 本页原先自带一份表格基线副本（.table + 4 条 [data-slot] 规则，th 38 / td 54）和一份
+   primaryCell 副本（.primaryCell / > span:last-child / strong / small / .entityIcon）。
+   p5 起基线由 src/assets/styles/table-baseline.module.css 单一承载、primaryCell 组由
+   ../shared/index.module.css 承载，二者都随上面的 @import 进入本文件，逐份重写只会造成
+   列宽与行高再次分叉，故此处只保留页面独有的 .rowActions。 */
+
 /* departments 列表页：固定高骨架（筛选卡 + 列表卡，整页不滚动，仅表格行区滚动）。 */
 .page {
   /* 高度由 AppShell 的 flex 链分配（.shell:100dvh > .workspace-shell:flex:1 >
@@ -42,19 +48,8 @@
 
 .alert { margin: 10px 10px 0; }
 
-/* 表格样式（ListCard 承载滚动，这里只保留表格自身样式与树形弱化/命中态）。 */
-.table { width: 100%; }
-.table :global([data-slot='tbody'] > tr) { cursor: pointer; }
-.table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
-.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: var(--fs-sm); text-transform: uppercase; }
-.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: var(--fs-sm); }
-
+/* 表格样式由基线（ListCard 承载滚动）提供；本页只保留行操作按钮组。 */
 .rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
-.primaryCell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
-.primaryCell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
-.primaryCell strong { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--fs-sm); }
-.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
-.entityIcon { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-agent-dim); color: var(--accent-agent); }
 
 /* 搜索命中节点高亮、祖先链弱化。 */
 .matched strong { color: var(--accent-agent); }

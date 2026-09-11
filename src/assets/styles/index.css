@@ -146,6 +146,29 @@
   --fs-2xl: 22px;   /* 页面标题（原 --page-title-size 的值，保留该 token 兼容） */
 
   --page-title-size: var(--fs-2xl);
+
+  /* ===== 表格基线（p5 收敛后的单一来源）=====
+   * 收敛前全站并存 5 套表格基线，同一语义的尺寸散落在 9 个文件里：
+   *   th 高度 36 / 38 / 40px，td 高度 54 / 62 / 64 / 66 / 72px，
+   *   操作列宽 76 / 88 / 112 / 132px，名称列宽 220 / 230 / 260 / 290px。
+   * 现在行高、内边距、列宽只在这里定义一次，
+   * 各页的 .table 规则由 src/assets/styles/table-baseline.module.css 统一承载。
+   *
+   * 行高分「单行」与「双行」两档（原先 54 与 72 的差别是隐含的）：
+   * 单行是默认值，双行页面覆写 --table-row-height: var(--table-row-height-tall)。 */
+  --table-head-height: 38px;         /* 表头行高（原 36 / 38 / 40 三档合一） */
+  --table-row-height: 56px;          /* 单元格行高，单行内容（原 54 / 62 / 64 三档合一） */
+  --table-row-height-tall: 72px;     /* 单元格行高，双行内容（原 66 / 72 两档合一） */
+  --table-row-pad-y: 8px;            /* 单元格纵向内边距。
+                                        UTable 主题自带 py-3.5(14px)，基线里退成 0 再按本值补齐，
+                                        否则 padding 会把目标行高撑破。 */
+  --table-cell-pad-x: 10px;          /* 单元格横向内边距（原 10 / 12 两档统一） */
+  --table-col-select: 48px;          /* 勾选列（含 WCAG 24×24 命中区的双侧余量） */
+  --table-col-name: 220px;           /* 名称列（原 220 / 230 / 260 / 290 四档统一） */
+  --table-col-time: 150px;           /* 时间列 */
+  --table-col-status: 104px;         /* 状态 / 模式等枚举列 */
+  --table-col-actions: 112px;        /* 操作列（原 76 / 88 / 112 / 132 四档统一） */
+
   --topbar-height: 48px;
   --mobile-nav-height: 50px;
 }

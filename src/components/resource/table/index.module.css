@@ -16,9 +16,12 @@
   transition: background var(--dur-fast), box-shadow var(--dur-fast);
 }
 
+/* 悬停底色统一取 --bg-hover（与 src/assets/styles/table-baseline.module.css 一致）。
+   改前这里用 --bg-surface，而 7 个 list 页各自覆写成 --bg-hover，
+   同一状态两种底色；现在由基线统一，组件不再另立一套。 */
 .resource-table :global([data-slot='tbody'] > tr:hover > td),
 .resource-table :global([data-slot='tbody'] > tr:focus-visible > td) {
-  background: var(--bg-surface);
+  background: var(--bg-hover);
 }
 
 .resource-table :global([data-slot='tbody'] > tr).active > td,

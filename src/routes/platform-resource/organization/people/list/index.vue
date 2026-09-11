@@ -41,14 +41,16 @@ const departmentFilterOptions = computed(() => [
   ...manager.departmentOptions.value.filter((option) => option.value !== SELECT_NONE_VALUE),
 ])
 
+/** 列宽由 table-baseline.module.css 的语义列类给出（col-name / col-status / col-time /
+ * col-actions 随 ../shared 的 @import 进入本页），其余未标注的列自动分摊剩余宽度。 */
 const columns: TableColumn<PersonRow>[] = [
-  { id: 'name', header: '人员' },
+  { id: 'name', header: '人员', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
   { id: 'account', header: '账号' },
   { id: 'department', header: '部门' },
   { id: 'phone', header: '手机' },
-  { id: 'state', header: '状态' },
-  { id: 'createdAt', header: '创建时间' },
-  { id: 'actions', header: '操作' },
+  { id: 'state', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { id: 'createdAt', header: '创建时间', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
+  { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
 ]
 
 const workspaceId = computed(() => authStore.currentWorkspaceId ?? authStore.currentWorkspace?.id ?? null)
@@ -287,7 +289,7 @@ watch(
             @clear-filters="onResetFilters"
           >
             <template #name-cell="{ row }">
-              <div :class="styles.primaryCell">
+              <div :class="styles['primary-cell']">
                 <UAvatar :alt="personName(row.original)" :src="row.original.avatar_url || undefined" size="sm" />
                 <span>
                   <strong>{{ personName(row.original) }}<UBadge v-if="manager.isSelf(row.original.id)" :class="styles.mineBadge" label="我" color="primary" variant="subtle" size="xs" /></strong>

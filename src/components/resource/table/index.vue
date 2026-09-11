@@ -132,7 +132,6 @@ const displayColumns = computed(() => {
   const selectColumn: TableColumn<T> = {
     id: 'select',
     header: '',
-    size: 44,
     meta: { class: { th: styles.selectCell, td: styles.selectCell } },
   } as TableColumn<T>
   return [selectColumn, ...props.columns]

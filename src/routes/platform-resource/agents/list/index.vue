@@ -29,13 +29,16 @@ const modelOptions = computed<Array<{ value: string; label: string }>>(() => {
   return [{ value: 'all', label: '全部模型' }, ...[...models].sort().map((value) => ({ value, label: value }))]
 })
 
+/** 列宽由 table-baseline.module.css 的语义列类给出：同类列全站同宽。
+ * 名称 / 时间 / 枚举 / 操作走 col-* 定宽，模型与能力绑定两列不设宽，自动占剩余。
+ * 原先本页用 :nth-child 百分比定宽（7 档 4~25%），是另一套体系，已废弃。 */
 const columns: TableColumn<AgentResponse>[] = [
-  { id: 'name', header: '名称' },
-  { id: 'state', header: '状态' },
+  { id: 'name', header: '名称', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
+  { id: 'state', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
   { id: 'model', header: '模型' },
   { id: 'capabilities', header: '能力绑定' },
-  { id: 'createdAt', header: '创建时间' },
-  { id: 'actions', header: '操作' },
+  { id: 'createdAt', header: '创建时间', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
+  { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
 ]
 
 const deleteTitle = computed(() => manager.pendingDelete.value ? `删除 ${manager.pendingDelete.value.name}？` : '删除 Agent？')
@@ -157,8 +160,8 @@ watch(
         @clear-filters="onResetFilters"
       >
         <template #name-cell="{ row }">
-          <div :class="styles.primaryCell">
-            <span :class="styles.entityIcon"><UIcon name="i-lucide-bot" /></span>
+          <div :class="styles['primary-cell']">
+            <span :class="styles['entity-icon']"><UIcon name="i-lucide-bot" /></span>
             <span>
               <strong>{{ row.original.name }}</strong>
               <small class="mono">{{ agentCode(row.original.id) }}</small>

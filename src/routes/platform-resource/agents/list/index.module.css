@@ -1,5 +1,9 @@
 /* Agents 列表页（p2 A-1~A-7：FilterPanel + ListCard 纵向三段，外层固定高、表格内部滚动）。 */
 
+/* 表格基线（行高、内边距、字色字号、列省略、行悬停）+ 语义列类（col-name 等）
+   的单一来源。必须放在最前。 */
+@import '@/assets/styles/table-baseline.module.css';
+
 .page {
   /* 高度由 AppShell 的 flex 链分配（.shell:100dvh > .workspace-shell:flex:1 >
      .page-stage:flex:1），不再用 100vh 减顶栏。原写法在移动端会连同
@@ -47,30 +51,23 @@
 
 .alert { margin: 10px 10px 0; }
 
-.table { width: 100%; }
-.table :global([data-slot='base']) {
-  width: 100%;
-  table-layout: fixed;
-}
-.table :global([data-slot='th']),
+/* 名称 / 状态 / 时间 / 操作四类列的宽度已由基线（见文件首行 @import）的语义列类给出，
+   本页不给列写 px。原先这里用 7 条 :nth-child 百分比定宽（4/22/10/16/25/13/10%），
+   与其它页的 px 定宽是两套体系，同一语义的列在不同页面宽度完全不同；
+   p5 起列宽只认语义列类，页面不再自带尺子。
+
+   p5 前这里还有 .table 的 width/table-layout 和 th/td 的省略号规则，
+   与 .resource-table（ResourceTable 组件自身）逐条重复，现已删除——
+   表格组件是唯一的渲染方，它自己那份就是权威。 */
+
+/* 能力绑定列是「服务端数字 ID 绑定」+ 摘要两行，单行档 56px 放不下。 */
 .table :global([data-slot='td']) {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  height: var(--table-row-height-tall);
 }
-.table :global([data-slot='th']:nth-child(1)),
-.table :global([data-slot='td']:nth-child(1)) { width: 4%; }
-.table :global([data-slot='th']:nth-child(2)),
-.table :global([data-slot='td']:nth-child(2)) { width: 22%; }
-.table :global([data-slot='th']:nth-child(3)),
-.table :global([data-slot='td']:nth-child(3)) { width: 10%; }
-.table :global([data-slot='th']:nth-child(4)),
-.table :global([data-slot='td']:nth-child(4)) { width: 16%; }
+
 .table :global([data-slot='th']:nth-child(5)),
-.table :global([data-slot='td']:nth-child(5)) { width: 25%; white-space: normal; }
-.table :global([data-slot='th']:nth-child(6)),
-.table :global([data-slot='td']:nth-child(6)) { width: 13%; }
-.table :global([data-slot='th']:nth-child(7)),
-.table :global([data-slot='td']:nth-child(7)) { width: 10%; }
+.table :global([data-slot='td']:nth-child(5)) { white-space: normal; }
+
 .table :global([data-pinned='right']) {
   background: var(--bg-panel);
   box-shadow: -1px 0 var(--border);
@@ -85,16 +82,9 @@
 .table :global([data-slot='tbody'] > tr.highlighted > [data-pinned='right']) {
   background: var(--accent-agent-dim);
 }
-.table :global([data-slot='tbody'] > tr) { cursor: pointer; }
-.table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
-.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: var(--fs-sm); text-transform: uppercase; }
-.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: var(--fs-sm); }
 
-.primaryCell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
-.primaryCell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
-.primaryCell strong { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--fs-sm); }
-.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
-.entityIcon { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-agent-dim); color: var(--accent-agent); }
+/* .primaryCell / .entityIcon 已移入 table-baseline.module.css（本文件顶部 @import），
+   类名改为 .primary-cell / .entity-icon；原先本页那份与另外 4 个 list 页逐字相同。 */
 
 .statusBadge { text-transform: none; }
 

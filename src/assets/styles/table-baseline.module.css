@@ -1,0 +1,113 @@
+/* 表格基线（p5 收敛的单一来源）
+ *
+ * 收敛前全站并存 5 套表格基线，同一语义的行高/列宽散落在 9 个文件里：
+ *   th 高度 36 / 38 / 40px，td 高度 54 / 62 / 64 / 66 / 72px，
+ *   名称列 220 / 222 / 230 / 260 / 290px 与 22% / auto，
+ *   操作列 76 / 88 / 112 / 132px 与 10%。
+ * 各页的差异没有一处是刻意设计的结果，只是历次改版各写各的。
+ *
+ * 用法——在页面自己的 module.css 里**第一行** @import：
+ *     @import '@/assets/styles/table-baseline.module.css';
+ * 导入方必须原样保留 .table 类名（:table-class="styles.table" 已经这么做了）。
+ *
+ * 为什么用 @import 而不是把基线写进 ResourceTable 组件：
+ * 1. 组件里的规则与页面规则同为 (0,2,0) 特异性，胜负由打包顺序决定，
+ *    而 Tailwind 的 @import "tailwindcss" 在入口 CSS 里更靠前——
+ *    看起来能用，但顺序一旦被调整就会静默失效。
+ * 2. @import 的语义是确定的：Vite 把被导入文件按模块重命名后**前置**插入，
+ *    导入方在同名选择器上声明的规则因为排在后面而获胜（已用构建产物验证）。
+ *    也就是说「共享默认值 + 页面按需覆写」是可靠语义，不是巧合。
+ * 3. 组件侧不需要为列宽知道任何业务语义：列宽属于页面，基线属于全站。
+ *
+ * 列宽只写在 th 上：table-layout: fixed 下第一行决定整列宽度，
+ * td 再声明一遍既冗余，又容易和 th 的声明漂移。 */
+
+/* 表格本体：占满容器、固定布局、内容超长省略。
+ * 固定布局是把「列宽可控」和「长文本不撑破」这两件事一起解决的，
+ * 因此它是基线的一部分，不再由各页重复声明。 */
+.table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.table :global([data-slot='base']) {
+  width: 100%;
+}
+
+/* 表头：38px（原 36 / 38 / 40 三档合一）。
+ * 不设背景——表头底色由 ResourceTable 的 data-slot 主题与各页需要决定，
+ * 基线只负责「行高、字色、字号、字重、字距」这类必须一致的量。 */
+.table :global([data-slot='th']) {
+  height: var(--table-head-height);
+  padding: 0 var(--table-cell-pad-x);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* 单元格：高度走 CSS 变量的默认值（双行内容自行覆写 --table-row-height），
+ * 纵向内边距必须为 0——UTable 主题自带 py-3.5，不退掉就凑不出目标行高。 */
+.table :global([data-slot='td']) {
+  height: var(--table-row-height);
+  padding: var(--table-row-pad-y) var(--table-cell-pad-x);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+/* 长内容一律省略号，避免固定布局下文字压到相邻列。 */
+.table :global([data-slot='th']),
+.table :global([data-slot='td']) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 行交互：整行可点 + 悬停高亮（原 7 个 list 页各写一遍）。
+ * 悬停底色必须与 ResourceTable 里 .active 用的强调色配合，取 --bg-hover；
+ * 收敛前 ResourceTable 用 --bg-surface、各页用 --bg-hover，同一状态两种底色。 */
+.table :global([data-slot='tbody'] > tr) {
+  cursor: pointer;
+}
+
+.table :global([data-slot='tbody'] > tr:hover > td),
+.table :global([data-slot='tbody'] > tr:focus-visible > td) {
+  background: var(--bg-hover);
+}
+
+/* ===== 列宽（语义列，同语义全站只有一个值）=====
+ * 用法：{ id: 'name', header: '名称', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } }
+ *
+ * 类名带前缀是为了和页面自己的类（.primaryCell 之类）分开；`col-name`
+ * 这种连字符键在模块导出对象上要写 styles['col-name']。
+ *
+ * 为什么列宽能写在这里：@import 进来的类名会一并出现在导入方的模块
+ * 导出对象上（Vite 给整个文件族用导入方的 hash 重命名），所以页面拿
+ * styles['col-name'] 拿得到，而值仍然只在基线里定义一次。
+ * 只声明宽度不声明 padding——列宽与内边距是两件事，混在一起会让
+ * 换列宽的页面顺带改掉排版。 */
+.col-select { width: var(--table-col-select); }
+.col-name { width: var(--table-col-name); }
+.col-time { width: var(--table-col-time); }
+.col-status { width: var(--table-col-status); }
+.col-actions { width: var(--table-col-actions); text-align: right; }
+
+/* 名称列里的主标题：单行省略。
+ * 原先各页写死 max-width: 190 / 240px，在 2560px 视口下名称列实宽 300px+，
+ * 却把标题截在 240px——留白浪费了近三分之一列宽。改成跟随列宽。 */
+.col-name strong {
+  max-width: 100%;
+}
+
+/* ===== 名称列的主单元（图标 +「主标题 / 副标题」两行）=====
+ * 收敛前这段在 5 个 list 页各写一遍（teams / plans / workflows / agents / departments），
+ * 逐字相同——连图标 26px 和 gap 9px 都一样；页面之间的差异只有一处
+ * （departments 写了 max-width: 190px，agents 写了 240px），而那正是要修掉的东西：
+ * 名称列实宽在 2560px 视口下有 300px+，写死 max-width 等于每行白白截掉一截。
+ *
+ * 类名沿用 col-* 的连字符风格，取用写法是 styles['primary-cell']。 */
+.primary-cell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
+.primary-cell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
+.primary-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--fs-sm); }
+.primary-cell small { margin-top: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
+.entity-icon { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-agent-dim); color: var(--accent-agent); }

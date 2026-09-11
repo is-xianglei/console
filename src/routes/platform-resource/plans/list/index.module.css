@@ -1,5 +1,9 @@
 /* 编排方案列表页（p2 A-1~A-7：FilterPanel + ListCard 纵向三段，外层固定高、表格内部滚动）。 */
 
+/* 表格基线（行高、内边距、字色字号、列省略、行悬停）：p5 起全站单一来源。
+   必须放在最前——后面同名选择器的声明才能压过基线。 */
+@import '@/assets/styles/table-baseline.module.css';
+
 .page {
   /* 高度由 AppShell 的 flex 链分配（.shell:100dvh > .workspace-shell:flex:1 >
      .page-stage:flex:1），不再用 100vh 减顶栏。原写法在移动端会连同
@@ -47,17 +51,13 @@
 
 .alert { margin: 10px 10px 0; }
 
-.table { width: 100%; }
-.table :global([data-slot='tbody'] > tr) { cursor: pointer; }
-.table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
-.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: var(--fs-sm); text-transform: uppercase; }
-.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: var(--fs-sm); }
+/* 行高走双行档：名称列是「主标题 + 副标题」。 */
+.table :global([data-slot='td']) {
+  height: var(--table-row-height-tall);
+}
 
-.primaryCell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
-.primaryCell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
-.primaryCell strong { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--fs-sm); }
-.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
-.entityIcon { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-agent-dim); color: var(--accent-agent); }
+/* .primaryCell / .entityIcon 已移入 table-baseline.module.css（本文件顶部 @import），
+   类名改为 .primary-cell / .entity-icon；原先本页那份与另外 4 个 list 页逐字相同。 */
 
 .statusBadge { text-transform: none; }
 

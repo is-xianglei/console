@@ -42,15 +42,18 @@ const statusLabel: Record<MemoryStatus, string> = {
   superseded: '已替代',
   archived: '已归档',
 }
+/** 列宽由 table-baseline.module.css 的语义列类给出（col-name / col-time / col-status /
+ * col-actions），同类列全站同宽；页面不再自己写 290/180/92/132/88px 那一套。
+ * 「稳定标识」本页独有，是唯一保留自有宽的列（.keyColumn）。 */
 const columns: TableColumn<MemorySummary>[] = [
-  { accessorKey: 'name', header: 'Memory', meta: { class: { th: styles.nameColumn, td: styles.nameColumn } } },
+  { accessorKey: 'name', header: 'Memory', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
   { accessorKey: 'memory_key', header: '稳定标识', meta: { class: { th: styles.keyColumn, td: styles.keyColumn } } },
-  { accessorKey: 'memory_type', header: '类型', meta: { class: { th: styles.typeColumn, td: styles.typeColumn } } },
-  { accessorKey: 'status', header: '状态', meta: { class: { th: styles.statusColumn, td: styles.statusColumn } } },
-  { accessorKey: 'version', header: '版本', meta: { class: { th: styles.versionColumn, td: styles.versionColumn } } },
-  { accessorKey: 'use_count', header: '使用次数', meta: { class: { th: styles.usageColumn, td: styles.usageColumn } } },
-  { accessorKey: 'updated_at', header: '最近更新', meta: { class: { th: styles.updatedColumn, td: styles.updatedColumn } } },
-  { id: 'actions', header: '', meta: { class: { th: styles.actionsColumn, td: styles.actionsColumn } } },
+  { accessorKey: 'memory_type', header: '类型', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { accessorKey: 'status', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { accessorKey: 'version', header: '版本', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { accessorKey: 'use_count', header: '使用次数', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { accessorKey: 'updated_at', header: '最近更新', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
+  { id: 'actions', header: '', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
 ]
 
 /** 空态分型：有筛选条件 →「筛选无结果」；否则 →「从未创建」。 */

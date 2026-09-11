@@ -31,12 +31,16 @@
 .resource-table-wrap { min-width: 0; border-right: 1px solid var(--border); overflow: hidden; }
 .resource-table { min-width: 0; }
 .resource-table > [data-slot='base'] { width: 100%; min-width: 820px; table-layout: fixed; background: var(--bg-panel); }
-.resource-table [data-slot='th'] { height: 36px; padding: 8px 10px; background: var(--bg-elevated); }
-.resource-table [data-slot='td'] { height: 64px; padding: 8px 10px; }
-.resource-table .resource-select-cell { width: 48px; }
-.resource-table .resource-name-cell { width: 220px; }
+/* 数值对齐 src/assets/styles/table-baseline.module.css 的同一套 token。
+   本文件用的是非 module 类名（.resource-table 由 Page.vue 的 UTable :class 承载），
+   import 进来的基线类名会被改写成模块哈希，复用不了，所以只统一数值不统一来源。
+   原先这里是第 4 套表格尺度：th 36 / td 64 / 名称 220 / 操作 76。 */
+.resource-table [data-slot='th'] { height: var(--table-head-height); padding: 0 var(--table-cell-pad-x); background: var(--bg-elevated); }
+.resource-table [data-slot='td'] { height: var(--table-row-height); padding: var(--table-row-pad-y) var(--table-cell-pad-x); }
+.resource-table .resource-select-cell { width: var(--table-col-select); }
+.resource-table .resource-name-cell { width: var(--table-col-name); }
 .resource-table .resource-value-cell { min-width: 0; }
-.resource-table .resource-actions-cell { width: 76px; text-align: right; }
+.resource-table .resource-actions-cell { width: var(--table-col-actions); text-align: right; }
 .resource-table [data-slot='tbody'] > tr { cursor: pointer; }
 .resource-table [data-slot='tbody'] > tr.selected > td { background: var(--accent-agent-dim); }
 .resource-table [data-slot='tbody'] > tr.selected > td:first-child { box-shadow: inset 2px 0 var(--accent-agent); }
@@ -82,4 +86,4 @@
 :global(.resource-slideover-body [data-slot='label']) { color: var(--text-dim); font-size: var(--fs-xs); font-weight: 650; letter-spacing: 0; text-transform: uppercase; }
 @media (max-width: 1180px) { .workbench-grid { grid-template-columns: minmax(0, 1fr); }.inspector { display: block; border-top: 1px solid var(--border); }.resource-table-wrap { border-right: 0; } }
 @media (max-width: 760px) { .resource-page { padding: 24px 12px calc(72px + env(safe-area-inset-bottom)); }.resource-header { align-items: stretch; flex-direction: column; gap: 12px; }.resource-header > .primary-action { align-self: stretch; }.stats-strip { grid-template-columns: repeat(2, 1fr); }.stat-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--border-subtle); }.stat-item:nth-child(4) { border-top: 1px solid var(--border-subtle); }.resource-toolbar { flex-wrap: wrap; }.toolbar-search { width: 100%; }.selection-summary { margin-left: 0; }.workbench-grid { min-height: 340px; grid-template-columns: minmax(0, 1fr); }.feature-panel > header { flex-direction: column; }.resource-table > [data-slot='base'] { min-width: 100%; }.resource-table [data-slot='th']:not(:nth-child(-n + 2)):not(:last-child),
-.resource-table [data-slot='td']:not(:nth-child(-n + 2)):not(:last-child) { display: none; }.resource-table .resource-name-cell { width: auto; }.resource-table .resource-actions-cell { width: 76px; } }
+.resource-table [data-slot='td']:not(:nth-child(-n + 2)):not(:last-child) { display: none; }.resource-table .resource-name-cell { width: auto; }.resource-table .resource-actions-cell { width: var(--table-col-actions); } }

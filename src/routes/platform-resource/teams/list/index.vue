@@ -21,16 +21,19 @@ const authStore = useAuthStore()
 const router = useRouter()
 const highlight = useHighlightFromQuery()
 
-/** 列表页只读展示：成员数、入口 Agent 都从结构化成员推导，不再依赖目录里的展示串。 */
+/** 列表页只读展示：成员数、入口 Agent 都从结构化成员推导，不再依赖目录里的展示串。
+ *
+ * 列宽由 table-baseline.module.css 的语义列类给出（col-name / col-time / col-status /
+ * col-actions），同类列全站同宽；页面不再自己写 px，也就不再有 220/230/260/290 的分叉。 */
 const columns: TableColumn<TeamFormModel>[] = [
-  { id: 'name', header: '名称' },
-  { id: 'status', header: '状态' },
-  { id: 'mode', header: '编排模式' },
+  { id: 'name', header: '名称', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
+  { id: 'status', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { id: 'mode', header: '编排模式', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
   { id: 'entry', header: '入口 Agent' },
   { id: 'members', header: '成员数' },
   { id: 'owner', header: '负责人' },
-  { id: 'updatedAt', header: '最近变更' },
-  { id: 'actions', header: '操作' },
+  { id: 'updatedAt', header: '最近变更', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
+  { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
 ]
 
 const statusOptions = [
@@ -141,8 +144,8 @@ function onPageSize(size: number) {
         @clear-filters="manager.resetView"
       >
         <template #name-cell="{ row }">
-          <div :class="styles.primaryCell">
-            <span :class="styles.entityIcon"><UIcon name="i-lucide-network" /></span>
+          <div :class="styles['primary-cell']">
+            <span :class="styles['entity-icon']"><UIcon name="i-lucide-network" /></span>
             <span>
               <strong>{{ row.original.name }}</strong>
               <small class="mono">{{ row.original.id }}</small>

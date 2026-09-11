@@ -32,14 +32,16 @@ const typeOptions = [
   { value: 'custom', label: '自定义' },
 ]
 
+/** 列宽由 table-baseline.module.css 的语义列类给出（col-name / col-status / col-time /
+ * col-actions 随 ../shared 的 @import 进入本页），其余未标注的列自动分摊剩余宽度。 */
 const columns: TableColumn<GroupResponse>[] = [
-  { id: 'name', header: '群组' },
-  { id: 'type', header: '类型' },
-  { id: 'visibility', header: '可见性' },
-  { id: 'joinMode', header: '加入方式' },
-  { id: 'state', header: '状态' },
-  { id: 'createdAt', header: '创建时间' },
-  { id: 'actions', header: '操作' },
+  { id: 'name', header: '群组', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
+  { id: 'type', header: '类型', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { id: 'visibility', header: '可见性', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { id: 'joinMode', header: '加入方式', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { id: 'state', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { id: 'createdAt', header: '创建时间', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
+  { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
 ]
 
 const workspaceId = computed(() => authStore.currentWorkspaceId ?? authStore.currentWorkspace?.id ?? null)
@@ -155,8 +157,8 @@ watch(
         @clear-filters="onResetFilters"
       >
         <template #name-cell="{ row }">
-          <div :class="styles.primaryCell">
-            <span :class="styles.entityIcon"><UIcon name="i-lucide-users-round" /></span>
+          <div :class="styles['primary-cell']">
+            <span :class="styles['entity-icon']"><UIcon name="i-lucide-users-round" /></span>
             <span>
               <strong>{{ row.original.name }}<UBadge v-if="manager.isMine(row.original.id)" :class="styles.mineBadge" label="我已加入" color="primary" variant="subtle" size="xs" /></strong>
               <small class="mono">{{ row.original.slug }}</small>
