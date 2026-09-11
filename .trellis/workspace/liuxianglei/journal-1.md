@@ -151,3 +151,69 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: p4 字号 scale 收敛
+
+**Date**: 2026-09-11
+**Task**: p4 字号 scale 收敛
+**Branch**: `main`
+
+### Summary
+
+建立 --fs-* 九档字号 token，把全站 8–11px 字面值从 594 处收敛到 14 处（占比 71.5%→5.8%），分 5 批按目录推进。剩余 14 处确认为图标选择器。表格行高/字号比按 scope 划分移交 p5。
+
+### Main Changes
+
+p4 字号 scale 收敛：8–11px 字面值 594 → 14 处。
+
+## 做了什么
+
+- `src/assets/styles/index.css` 新增 9 档 `--fs-*` token（micro 10 / xs 11 /
+  sm 12 / base 13 / md 14 / lg 16 / xl 20 / 2xl 22），每档带用途注释。
+  前缀选 `--fs-` 而非 `--text-`：后者在本文件里已被文字颜色占用
+  （`--text-primary` / `--text-secondary` / `--text-muted` / `--text-dim`），
+  用 `--text-xs` 这类命名会静默串色。
+- 按目录分 5 批收敛，每批只改 `font-size` 一条声明：
+  共享层（app-shell / module-sidebar / workspace-selector / resource/*）→
+  platform-resource 资源页 → organization → components 共享组件 →
+  chat + skills + memories + apps + settings + profile。
+- 判定尺子：承载中文/业务数字的至少 `--fs-xs`(11px)，承载中文的默认档
+  `--fs-sm`(12px)，纯装饰英文 eyebrow/kbd 可用 `--fs-micro`(10px)。
+  MiSans 中文字面宽正好 1em，11px 下每汉字 11 物理像素、横向 9 格笔画，
+  是 dpr=1 屏上可辨认的下限。
+- `.md h1–h4`（19/16/14/13px）按 PRD 要求原样未动。
+- `components/ai/orb/index.module.css` 的 `.pill-label` 11.5px → `--fs-sm`，
+  它渲染中文「推理中…」，属同一问题的半档遗留值。
+
+## 结果
+
+| 指标 | 前 | 后 |
+|---|---|---|
+| 8–11px 字面值 | 594（71.5%） | 14（5.8%） |
+| token 引用 | 0 | 592 |
+| 声明总数 | 831 | 832 |
+
+剩余 14 处全部核对为图标选择器（`> i` / `:global(.icon)` / `.twisty` /
+`.chip-remove` 内的 `<UIcon>`），字号在那里定的是图标字形尺寸，不承载文字。
+
+`vue-tsc --noEmit` 与 `vite build` 均通过。
+
+## 遗留
+
+p4 验收第 4 条「表格行高/字号比进入 1.6–3.0」未在 p4 内达成——现状
+`agents/list` 为 `th 38 / td 54` 配 12px（比值 3.2 / 4.5），
+`build-resource-table` 为 40 / 66，`memories` 为 40 / 62。
+收敛行高属于 p5 的 scope（p5 的 Notes 已写明要用本任务的 scale 反推），
+故 p4 内只改字号、不动 `height`，该项随 p5 一并解决。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3a335c7` | (see git log) |
+
+### Status
+
+[OK] **Completed**

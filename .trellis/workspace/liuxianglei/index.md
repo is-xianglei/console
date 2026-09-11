@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
-- **Last Active**: 2026-09-09
+- **Total Sessions**: 7
+- **Last Active**: 2026-09-11
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~153 | Active |
+| `journal-1.md` | ~219 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-09-11 | p4 字号 scale 收敛 | `3a335c7` | `main` |
 | 6 | 2026-09-09 | 父任务集成评审——控制台 CRUD 页面改造完成 | `2750ad2`, `a68ae74` | `main` |
 | 5 | 2026-09-09 | p5 登录注册/个人资料/设置/应用中心补齐 | `70c8933`, `a091603`, `7c318ac`, `80c1fe7`, `41afa60` | `main` |
 | 4 | 2026-09-09 | p3 memories 与 skills 页面标准化 | `0b8ebd9`, `5141e88`, `97c7174`, `a32c58b` | `main` |
