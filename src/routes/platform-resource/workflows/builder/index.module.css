@@ -36,7 +36,7 @@
   align-items: center;
   gap: 5px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .wf-builder-title nav strong {
@@ -58,7 +58,7 @@
 
 .wf-builder-title h1 span {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 
 .wf-builder-actions {
@@ -135,7 +135,7 @@
 }
 
 .wf-section {
-  max-width: 920px;
+  max-width: 1100px;
   width: 100%;
   margin: 0 auto;
   padding: var(--space-md);
@@ -171,7 +171,7 @@
 
 .wf-section-head > div > span {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-micro);
   font-weight: 650;
 }
 
@@ -184,7 +184,7 @@
 .wf-section-head p {
   margin-top: 3px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.55;
 }
 
@@ -193,7 +193,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .wf-member-count.invalid {
@@ -217,13 +217,20 @@
 
 .wf-field [data-slot='label'] {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 650;
 }
 
 .wf-field [data-slot='help'] {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
+}
+
+/* UInput/USelect/UTextarea 的 root 默认 inline-flex，表单栅格中必须显式撑满。 */
+.wf-field :global([data-slot='root']),
+.wf-field :global([data-slot='base']) {
+  width: 100%;
+  min-width: 0;
 }
 
 .wf-mode-grid {
@@ -286,13 +293,13 @@
 
 .wf-mode-main small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .wf-mode-hint {
   grid-column: 1 / -1;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
 }
 
@@ -303,7 +310,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .wf-mode-note i {
@@ -390,7 +397,7 @@
 .wf-agent-main small {
   margin-top: 2px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .wf-agent-meta {
@@ -401,12 +408,12 @@
 .wf-agent-meta strong {
   display: block;
   color: var(--accent-agent);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .wf-agent-meta small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .wf-agent-meta small.offline {
@@ -463,7 +470,7 @@
 .wf-member-index {
   width: 24px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .wf-member-main {
@@ -479,7 +486,7 @@
 
 .wf-member-main small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 /* 成员 Agent 被停用或删除时的红色提示。 */
@@ -488,7 +495,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .wf-member-actions {
@@ -516,7 +523,7 @@
 
 .wf-issue-group > strong {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 650;
 }
 
@@ -534,7 +541,7 @@
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
 }
 
@@ -553,7 +560,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .wf-builder-footer {

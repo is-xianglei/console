@@ -67,7 +67,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEscape))
       </div>
     </header>
 
-    <section :class="$style['br-metrics']" aria-label="资源统计">
+    <section v-if="page.showStats !== false" :class="$style['br-metrics']" aria-label="资源统计">
       <div v-for="(stat, index) in summaryStats" :key="stat[1]" :class="{ [$style.highlight]: index === 0 }"><span>{{ stat[1] }}</span><strong>{{ stat[0] }}</strong></div>
     </section>
 
@@ -91,15 +91,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEscape))
         <UTooltip text="清除选择"><UButton icon="i-lucide-x" color="neutral" variant="ghost" square aria-label="清除选择" @click="manager.selectedIds.value = new Set()" /></UTooltip>
       </div>
 
-      <div :class="$style['br-content']">
+      <div :class="[$style['br-content'], { [$style['has-inspector']]: manager.selectedRow.value }]">
         <div :class="$style['br-list-pane']">
           <BuildResourceTable :page="page" :rows="manager.visibleRows.value" :selected-id="manager.selectedId.value" :selected-ids="manager.selectedIds.value" @select="manager.selectedId.value = $event" @toggle="manager.toggleRow" @edit="manager.openEdit" @duplicate="manager.openDuplicate" @delete="manager.requestDelete([$event.id])" @reset="manager.resetView" />
           <footer :class="$style['br-pagination']">
             <span>共 {{ manager.filteredRows.value.length }} 项</span>
-            <UPagination v-model:page="manager.pageNumber.value" :items-per-page="manager.pageSize" :total="manager.filteredRows.value.length" size="sm" />
+            <UPagination v-model:page="manager.pageNumber.value" :items-per-page="manager.pageSize.value" :total="manager.filteredRows.value.length" size="sm" />
           </footer>
         </div>
-        <BuildResourceInspector :page="page" :row="manager.selectedRow.value" @close="manager.selectedId.value = ''" @edit="manager.openEdit" @duplicate="manager.openDuplicate" @status="onSingleStatusChange" />
+        <BuildResourceInspector v-if="manager.selectedRow.value" :page="page" :row="manager.selectedRow.value" @close="manager.selectedId.value = ''" @edit="manager.openEdit" @duplicate="manager.openDuplicate" @status="onSingleStatusChange" />
       </div>
     </section>
 

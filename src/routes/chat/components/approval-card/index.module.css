@@ -22,7 +22,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 9px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -35,7 +35,7 @@
 .ap-fn {
   flex: 1;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -43,7 +43,7 @@
 .ap-reason {
   padding: 9px 12px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
 }
 .ap-actions {
@@ -61,7 +61,7 @@
   background: var(--bg-elevated);
   color: var(--text-secondary);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   cursor: pointer;
   transition: all var(--dur-fast) var(--ease-out);
 }
@@ -93,7 +93,7 @@
   align-items: center;
   gap: 6px;
   padding: 9px 12px;
-  font-size: 10.5px;
+  font-size: var(--fs-sm);
   color: var(--text-dim);
   border-top: 1px solid var(--border-subtle);
 }

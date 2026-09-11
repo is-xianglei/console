@@ -72,7 +72,7 @@
 
 .br-inspector-head small {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .br-inspector-head h2 {
@@ -132,7 +132,7 @@
 .br-detail-section h3 {
   margin-bottom: 9px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 650;
 }
 
@@ -152,13 +152,13 @@
 
 .br-detail-section dt {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .br-detail-section dd {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   text-align: right;
 }
 
@@ -174,7 +174,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .br-meta-list span {
@@ -200,7 +200,7 @@
   background: var(--bg-elevated);
   color: var(--text-muted);
   font-family: var(--font-data);
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .br-tags [data-slot='base'] {
@@ -232,12 +232,12 @@
 
 .br-activity strong {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .br-activity small {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .br-inspector-actions {

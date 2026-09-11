@@ -55,7 +55,7 @@
 .agent-name {
   flex: 1;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0;
   color: var(--text-primary);
@@ -64,7 +64,7 @@
   text-overflow: ellipsis;
 }
 .agent-pid {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   color: var(--text-dim);
 }
 .agent-card-bot {
@@ -74,7 +74,7 @@
 }
 .agent-status-txt {
   font-family: var(--font-data);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--text-muted);

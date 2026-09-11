@@ -10,7 +10,7 @@
   overflow-y: auto;
 }
 .ac-inner {
-  max-width: var(--content-max);
+  max-width: var(--grid-max);
   margin: 0 auto;
   padding: 32px 32px 48px;
   display: flex;
@@ -132,7 +132,7 @@
   font-size: 18px;
 }
 .hero-tag {
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--accent-agent);
 }
@@ -163,7 +163,7 @@
   border-radius: var(--radius-control);
   padding: 8px 16px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0;
   cursor: pointer;
@@ -187,7 +187,7 @@
 }
 .app-row-reason {
   font-style: normal;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   font-weight: 400;
 }
@@ -206,13 +206,13 @@
   padding: 16px;
 }
 .hero-prompt {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   line-height: 1.6;
   text-align: center;
 }
 .cat-tabs { align-self: flex-start; border: 1px solid var(--border); background: var(--bg-elevated); }
-.cat-tabs :global([data-slot='trigger']) { min-width: 48px; font-family: var(--font-ui); font-size: 10px; }
+.cat-tabs :global([data-slot='trigger']) { min-width: 48px; font-family: var(--font-ui); font-size: var(--fs-sm); }
 .cat-tabs :global([data-slot='trigger'][data-state='active']) { color: var(--bg-deep); }
 .app-list {
   display: grid;
@@ -265,7 +265,7 @@
 }
 .app-row-desc {
   font-family: var(--font-body);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;

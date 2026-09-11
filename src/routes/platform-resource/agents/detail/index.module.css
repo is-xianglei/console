@@ -41,6 +41,6 @@
 
 .ag-modal-copy {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.65;
 }

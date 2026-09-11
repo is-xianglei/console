@@ -104,7 +104,7 @@
   align-items: center;
   gap: 5px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .wf-heading > nav strong {
@@ -171,7 +171,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 
 .wf-metrics {
@@ -211,7 +211,7 @@
 .wf-metrics span {
   min-width: 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .wf-metrics strong {
@@ -228,7 +228,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .wf-workspace {
@@ -366,7 +366,7 @@ button.active {
   border-bottom: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
@@ -447,7 +447,7 @@ button.active {
 .wf-table td > small {
   margin-top: 3px;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .wf-name-cell .wf-name-description {
@@ -472,7 +472,7 @@ button.active {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
 }
 
@@ -509,7 +509,7 @@ button.active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 @container (max-width: 1080px) {

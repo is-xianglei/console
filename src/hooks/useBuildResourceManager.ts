@@ -19,6 +19,9 @@ const RESOURCE_PREFIX: Record<string, string> = {
   mcp: 'MCP',
 }
 
+/** 每页条数默认值，与 useAgentManager 的 DEFAULT_PAGE_SIZE 保持一致。 */
+const DEFAULT_PAGE_SIZE = 20
+
 function cloneRows(rows: ResourceRow[]) {
   return rows.map((row) => ({ ...row, values: [...row.values], tags: [...row.tags] }))
 }
@@ -44,7 +47,7 @@ export function useBuildResourceManager(page: Ref<ResourcePage>) {
   const selectedId = ref('')
   const selectedIds = ref<Set<string>>(new Set())
   const pageNumber = ref(1)
-  const pageSize = 6
+  const pageSize = ref(DEFAULT_PAGE_SIZE)
   const formOpen = ref(false)
   const formMode = ref<ResourceFormMode>('create')
   const editingId = ref('')
@@ -69,12 +72,19 @@ export function useBuildResourceManager(page: Ref<ResourcePage>) {
         return a[sortBy.value].localeCompare(b[sortBy.value], 'zh-CN')
       })
   })
-  const totalPages = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / pageSize)))
-  const visibleRows = computed(() => filteredRows.value.slice((pageNumber.value - 1) * pageSize, pageNumber.value * pageSize))
+  const totalPages = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / pageSize.value)))
+  const visibleRows = computed(() => filteredRows.value.slice((pageNumber.value - 1) * pageSize.value, pageNumber.value * pageSize.value))
   const selectedRow = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)
   const allVisibleSelected = computed(() => visibleRows.value.length > 0 && visibleRows.value.every((row) => selectedIds.value.has(row.id)))
   const hasFilters = computed(() => Boolean(search.value) || statusFilter.value !== 'all' || ownerFilter.value !== 'all')
-  const deleteTitle = computed(() => pendingDeleteIds.value.length > 1 ? `删除 ${pendingDeleteIds.value.length} 项资源` : '删除资源')
+  const deleteTitle = computed(() => {
+    // 单条删除时带上对象名，与 agents/workflows/plans 的删除文案保持一致。
+    if (pendingDeleteIds.value.length === 1) {
+      const target = rows.value.find((row) => row.id === pendingDeleteIds.value[0])
+      if (target) return `删除 ${target.name}？`
+    }
+    return pendingDeleteIds.value.length > 1 ? `删除 ${pendingDeleteIds.value.length} 项资源？` : '删除资源？'
+  })
 
   function ensureRows() {
     if (!catalog[page.value.key]) catalog[page.value.key] = cloneRows(page.value.rows)
@@ -170,12 +180,12 @@ export function useBuildResourceManager(page: Ref<ResourcePage>) {
     const current = catalog[page.value.key]
     if (!current) return
     const targets = new Set(pendingDeleteIds.value)
-    const count = targets.size
+    const removed = current.filter((row) => targets.has(row.id))
     catalog[page.value.key] = current.filter((row) => !targets.has(row.id))
     if (targets.has(selectedId.value)) selectedId.value = ''
     selectedIds.value = new Set([...selectedIds.value].filter((id) => !targets.has(id)))
     pendingDeleteIds.value = []
-    showToast(`已删除 ${count} 项资源`)
+    showToast(removed.length === 1 ? `${removed[0]!.name} 已删除` : `已删除 ${removed.length} 项资源`)
   }
 
   function updateStatus(ids: string[], status: ResourceStatus) {

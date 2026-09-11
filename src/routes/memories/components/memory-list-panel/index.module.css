@@ -1,5 +1,6 @@
 .panel {
   display: flex;
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
@@ -17,11 +18,12 @@
 }
 
 .search {
-  width: min(420px, 56%);
+  width: 100%;
 }
 
 .typeFilter {
-  width: 128px;
+  width: 100%;
+  max-width: 220px;
 }
 
 .refreshButton {
@@ -45,6 +47,18 @@
   flex: 1;
   overflow: hidden;
   container-type: inline-size;
+}
+
+.tableWrap > :global(.resource-table) {
+  min-height: 100%;
+}
+
+.emptyState {
+  min-height: 260px;
+  height: 100%;
+  padding: 32px 16px;
+  display: grid;
+  place-items: center;
 }
 
 /* 骨架屏行：与数据行等高，占满整行。 */
@@ -81,7 +95,7 @@
   border-bottom: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -92,7 +106,7 @@
   overflow: hidden;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .table :global(tbody tr) {
@@ -195,7 +209,7 @@
 .expandBtn {
   height: auto;
   padding: 0;
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .memoryCopy strong {
@@ -206,14 +220,14 @@
 
 .memoryCopy small {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .key,
 .updated {
   display: block;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .rowActions,
@@ -255,7 +269,7 @@
   padding: 8px 12px;
   border-top: 1px solid var(--border);
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .footer strong {
@@ -327,7 +341,8 @@
   }
 
   .typeFilter {
-    width: 116px;
+    width: 100%;
+    max-width: none;
   }
 }
 

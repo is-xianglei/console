@@ -2,8 +2,13 @@
 
 /* departments 列表页：固定高骨架（筛选卡 + 列表卡，整页不滚动，仅表格行区滚动）。 */
 .page {
-  --app-header-h: var(--topbar-height);
-  height: calc(100vh - var(--app-header-h));
+  /* 高度由 AppShell 的 flex 链分配（.shell:100dvh > .workspace-shell:flex:1 >
+     .page-stage:flex:1），不再用 100vh 减顶栏。原写法在移动端会连同
+     .workspace-shell 的底部导航 padding 一起溢出，分页条被裁掉。
+     min-height: 0 不能漏——缺了它 flex 子项不收缩，overflow: hidden 会再次裁底部。 */
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -29,7 +34,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -41,14 +46,14 @@
 .table { width: 100%; }
 .table :global([data-slot='tbody'] > tr) { cursor: pointer; }
 .table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
-.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: 9px; text-transform: uppercase; }
-.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: 10px; }
+.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: var(--fs-sm); text-transform: uppercase; }
+.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: var(--fs-sm); }
 
 .rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 .primaryCell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
 .primaryCell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
-.primaryCell strong { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: 11px; }
-.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: 9px; }
+.primaryCell strong { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--fs-sm); }
+.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
 .entityIcon { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-agent-dim); color: var(--accent-agent); }
 
 /* 搜索命中节点高亮、祖先链弱化。 */
@@ -63,12 +68,12 @@
   display: flex;
   justify-content: flex-end;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 /* 删除阻断：检查中 loading 与原因列表。 */
-.blockerBusy { padding: 12px 0; color: var(--text-muted); font-size: 11px; display: flex; align-items: center; gap: 8px; }
-.blockerList { margin: 2px 0 6px; padding-left: 16px; color: var(--text-secondary); font-size: 11px; line-height: 1.8; list-style: disc; }
+.blockerBusy { padding: 12px 0; color: var(--text-muted); font-size: var(--fs-sm); display: flex; align-items: center; gap: 8px; }
+.blockerList { margin: 2px 0 6px; padding-left: 16px; color: var(--text-secondary); font-size: var(--fs-sm); line-height: 1.8; list-style: disc; }
 
 @media (max-width: 720px) {
   .page { padding: 12px; gap: 12px; }

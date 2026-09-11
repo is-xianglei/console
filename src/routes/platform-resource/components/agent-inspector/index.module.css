@@ -66,7 +66,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
 }
 
@@ -93,7 +93,7 @@
 .ag-inspector-head em {
   overflow: hidden;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-style: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -121,13 +121,13 @@
   justify-content: space-between;
   gap: var(--space-sm);
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .ag-detail-description {
   margin-top: 14px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.65;
 }
 
@@ -138,7 +138,7 @@
 .ag-detail-section h3 {
   margin-bottom: 9px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 650;
 }
 
@@ -158,13 +158,13 @@
 
 .ag-detail-section dt {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-detail-section dd {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   text-align: right;
 }
 
@@ -184,12 +184,12 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-detail-bindings em {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-style: normal;
 }
 
@@ -200,7 +200,7 @@
   background: var(--bg-elevated);
   color: var(--text-muted);
   overflow: hidden;
-  font-size: 10px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
 }
 
@@ -231,7 +231,7 @@
 
 .ag-runtime-metrics span {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-inspector-actions {

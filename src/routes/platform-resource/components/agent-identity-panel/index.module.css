@@ -9,7 +9,7 @@
 }
 
 .ag-editor-section {
-  width: min(840px, calc(100% - 32px));
+  width: min(980px, calc(100% - 24px));
   min-height: 100%;
   margin: 0 auto;
   padding: var(--space-lg) 0 48px;
@@ -36,7 +36,7 @@
 .ag-section-head > div > span {
   color: var(--accent-agent);
   font-family: var(--font-data);
-  font-size: 8px;
+  font-size: var(--fs-xs);
 }
 
 .ag-section-head h2 {
@@ -48,7 +48,7 @@
 .ag-section-head p {
   margin-top: 2px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .ag-form-grid {
@@ -65,7 +65,7 @@
   flex-direction: column;
   gap: 6px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-field > span:first-child {
@@ -82,13 +82,13 @@
 .ag-field > span em {
   margin-left: auto;
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-xs);
   font-style: normal;
 }
 
 .ag-field > small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }
 
@@ -157,7 +157,7 @@
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-form .ag-field > [data-slot='label'] > span {
@@ -169,7 +169,7 @@
 .ag-form .ag-field > [data-slot='label'] em {
   margin-left: auto;
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-xs);
   font-style: normal;
 }
 
@@ -180,7 +180,7 @@
 .ag-form .ag-field [data-slot='help'] {
   padding-top: 5px;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }
 
@@ -189,9 +189,20 @@
   width: 100%;
 }
 
+/* Nuxt UI 输入控件的 root 默认是 inline-flex；显式撑满栅格，避免控件塌缩。 */
+.ag-form .ag-field :global([data-slot='root']),
+.ag-form .ag-field :global([data-slot='base']) {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Nuxt UI 的 USwitch 轨道也是 button[data-slot='base']，会被这条规则的
+   灰底覆盖掉选中态。用 role="switch" 把它排除在外（Nuxt UI 的 Switch
+   在 track 上渲染 role="switch"，输入框是 input / textarea，本就可区分）。
+   注意 :where() 会归零特异性，这里必须用普通选择器以保证排序稳定。 */
 .ag-form .ag-field input,
 .ag-form .ag-field textarea,
-.ag-form .ag-field button[data-slot='base'] {
+.ag-form .ag-field button[data-slot='base']:not([role='switch']) {
   border-color: var(--border);
   background: var(--bg-elevated);
   color: var(--text-primary);

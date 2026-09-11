@@ -1,6 +1,6 @@
 .cli-card {
   font-family: var(--font-data);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
@@ -18,7 +18,7 @@
 }
 .cli-tag {
   font-family: var(--font-data);
-  font-size: 9px;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0;
   padding: 1px 7px;
@@ -50,7 +50,7 @@
 .cli-fn {
   flex: 1;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -59,7 +59,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 9px;
+  font-size: var(--fs-sm);
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -79,6 +79,6 @@
   padding: 9px 12px;
   color: var(--text-muted);
   white-space: pre-wrap;
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   line-height: 1.6;
 }

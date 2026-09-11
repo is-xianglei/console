@@ -113,17 +113,18 @@ const page = (
   mode: ResourcePage['mode'],
   featureTitle: string,
   featureHint: string,
-): ResourcePage => ({ key, module, title, group, icon, action, description, stats, columns, rows, mode, featureTitle, featureHint })
+  showStats = true,
+): ResourcePage => ({ key, module, title, group, icon, action, description, stats, showStats, columns, rows, mode, featureTitle, featureHint })
 
 export const PLATFORM_MODULES: Record<PlatformModuleKey, PlatformModule> = {
-  build: { key: 'build', title: '构建资源', caption: 'BUILD RESOURCES', sections: [{ label: '智能体编排', items: [{ key: 'agents', label: 'Agents', icon: 'bot' }, { key: 'teams', label: 'Teams', icon: 'network' }, { key: 'plans', label: '编排方案', icon: 'workflow' }, { key: 'workflows', label: 'Workflows', icon: 'workflow' }] }, { label: '能力与连接', items: [{ key: 'models', label: 'Models', icon: 'cpu' }, { key: 'skills', label: 'Skills', icon: 'wrench', route: '/skills' }, { key: 'mcp', label: 'MCP Servers', icon: 'server-cog' }] }] },
+  build: { key: 'build', title: '构建资源', caption: 'BUILD RESOURCES', sections: [{ label: '智能体编排', items: [{ key: 'agents', label: 'Agents', icon: 'bot' }, { key: 'teams', label: 'Teams', icon: 'network' }, { key: 'workflows', label: 'Workflows', icon: 'workflow' }] }, { label: '能力与连接', items: [{ key: 'models', label: 'Models', icon: 'cpu' }, { key: 'skills', label: 'Skills', icon: 'wrench', route: '/skills' }, { key: 'mcp', label: 'MCP Servers', icon: 'server-cog' }] }] },
   governance: { key: 'governance', title: '治理控制台', caption: 'GOVERNANCE', sections: [{ label: '策略', items: [{ key: 'policies', label: '策略与护栏', icon: 'shield', count: '18' }, { key: 'evaluations', label: '评测集', icon: 'flask-conical', count: '9' }, { key: 'risks', label: '风险事件', icon: 'triangle-alert', count: '2' }] }, { label: '可观测', items: [{ key: 'traces', label: '运行追踪', icon: 'route' }, { key: 'audits', label: '审计日志', icon: 'scroll-text' }, { key: 'quotas', label: '成本与配额', icon: 'chart-no-axes-column', count: '68%' }] }] },
   organization: { key: 'organization', title: '组织与权限', caption: 'ORGANIZATION', sections: [{ label: '组织目录', items: [{ key: 'departments', label: '部门', icon: 'building-2', count: '14' }, { key: 'groups', label: '群组', icon: 'users-round', count: '21' }, { key: 'people', label: '人员', icon: 'user-round', count: '286' }] }, { label: '访问控制', items: [{ key: 'roles', label: '角色', icon: 'badge-check', count: '9' }, { key: 'permissions', label: '权限策略', icon: 'key-round', count: '17' }, { key: 'requests', label: '访问申请', icon: 'inbox', count: '6' }] }] },
 }
 
 export const RESOURCE_PAGES: Record<string, ResourcePage> = {
   agents: page('agents', 'build', 'Agents', '智能体编排', 'bot', '创建 Agent', '配置模型、Team、Skills、MCP、护栏与运行配额，并管理发布版本。', [['12', '全部'], ['9', '在线'], ['2', '草稿'], ['98.7%', '成功率']], ['基础模型', '所属 Team', '成功率', '最近运行'], buildRows.agents, 'orchestration', 'Agent 运行编排', '拖动节点规划能力链，配置变更将进入草稿。'),
-  teams: page('teams', 'build', 'Teams', '智能体编排', 'network', '创建 Team', '编排多个 Agent 的职责、交接关系、共享上下文、并发与审批节点。', [['5', '全部'], ['4', '运行中'], ['18', '成员 Agent'], ['96.4%', '成功率']], ['编排模式', '入口 Agent', '成员数', '成功率'], buildRows.teams, 'orchestration', 'Team 交接拓扑', '检查入口、并行分支和人工审批节点。'),
+  teams: page('teams', 'build', 'Teams', '智能体编排', 'network', '创建 Team', '编排多个 Agent 的职责、交接关系、共享上下文、并发与审批节点。', [['5', '全部'], ['4', '运行中'], ['18', '成员 Agent'], ['96.4%', '成功率']], ['编排模式', '入口 Agent', '成员数', '成功率'], buildRows.teams, 'orchestration', 'Team 交接拓扑', '检查入口、并行分支和人工审批节点。', false),
   plans: page('plans', 'build', '编排方案', '智能体编排', 'workflow', '创建方案', '勾选 2-5 个 Agent 组成方案，选择顺序、并行、路由或循环模式，会话绑定后直接运行。', [['0', '全部'], ['0', '已启用'], ['0', '已停用'], ['0', '成员失效']], ['编排模式', '成员数', '状态', '更新时间'], [], 'orchestration', '编排方案预览', '方案数据由后端接口实时管理。'),
   workflows: page('workflows', 'build', 'Workflows', '智能体编排', 'workflow', '创建 Workflow', '把多个 Agent 组合成顺序、并行或智能路由的 Workflow，会话绑定后由后端编排执行。', [['0', '全部'], ['0', '已启用'], ['0', '已停用'], ['0', '成员失效']], ['编排模式', '成员数', '状态', '更新时间'], [], 'orchestration', 'Workflow 预览', 'Workflow 数据由后端接口实时管理。'),
   models: page('models', 'build', 'Models', '能力与连接', 'cpu', '添加模型', '管理模型提供方、路由顺序、健康状态、延迟、成本与数据驻留策略。', [['8', '模型'], ['7', '健康'], ['1', '降级中'], ['842 ms', 'P95 延迟']], ['提供方', '上下文', 'P95 延迟', '路由'], buildRows.models, 'connection', '模型路由测试', '输入制造任务，预览模型选择和回退路径。'),

@@ -3,7 +3,9 @@
 
 @theme static {
   --font-sans: 'MiSans', sans-serif;
-  --font-mono: 'MiSans', sans-serif;
+  /* Tailwind 的 font-mono 工具类走这里。原先指向 MiSans（比例字体），
+     导致 font-mono 名不副实；换成自托管的 JetBrains Mono。 */
+  --font-mono: 'JetBrains Mono Variable', 'MiSans', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-hyper-50: #ecfefb;
   --color-hyper-100: #ccfbf1;
@@ -27,6 +29,10 @@
   --font-ui: var(--font-sans);
   --font-body: var(--font-sans);
   --font-data: var(--font-sans);
+  /* 代码等宽场景专用。JetBrains Mono 不含 CJK 字形，中文由 MiSans 回退接管；
+     再兜底到系统等宽，保证任何环境下 `iiii` 与 `WWWW` 同宽。 */
+  --font-code: 'JetBrains Mono Variable', 'MiSans', ui-monospace, SFMono-Regular, Menlo,
+    Consolas, 'Liberation Mono', monospace;
 
   /* Nuxt UI 语义变量映射到 Hyperreal 暖灰层级。 */
   --ui-primary: #2dd4bf;
@@ -104,18 +110,50 @@
    * 中间对话区用 flex:1 吃掉剩余空间。 */
   --left-bar-w: 276px;
   --right-bar-w: clamp(300px, 24vw, 380px);
-  --content-max: clamp(880px, 84vw, 1400px);
+  /* 正文阅读宽度：消息列为 13px，减去恒定 40px 内边距（与 composer / task-bar
+     同一套留白）后内容宽 520px，正好 40 字/行，压住中文排版 25–40 舒适区的上限。
+     窄屏时消息列本身不足 600px，内边距不变、内容宽随视口线性收窄，1024px 下 31 字/行。原先只有一个 --content-max: clamp(880px, 84vw, 1400px)，
+     1920px 视口下顶到 1400px、该断点内容宽 1320px ≈ 101 字/行，是中文排版
+     舒适区上限的 2.5 倍以上，读长段落时回行极易串行。
+     现在按用途拆开——「读的宽度」与「写的宽度」本来就不该是同一个数。 */
+  --reading-max: 600px;
+  /* 输入区宽度：多行输入框需要承载长句与少量代码，比正文宽一些，
+     但仍远低于原先的 1400px。曾与正文共用 --content-max，此处解耦。 */
+  --composer-max: 900px;
+  /* 卡片网格宽度：应用中心、工作流列表这类「并列卡片」布局用的。
+     它们不是正文，套阅读宽度会把两列卡片压到 344px/列；
+     也不该回到 1400px，那在 1920px 下会拉出过长的一行。 */
+  --grid-max: 1120px;
   --page-content-max: 1500px;
   --page-gutter: clamp(16px, 2vw, 32px);
-  --page-title-size: 22px;
+
+  /* ===== 字号 scale =====
+   * 前缀用 --fs- 而不是 --text-：后者在本文件里已经被文字颜色占用
+   * （--text-primary / --text-muted ...），撞名会静默串色。
+   *
+   * 关于下限 11px：MiSans 的中文字面宽正好 1em（upem=1000，hmtx 宽 1000），
+   * 也就是说 11px 下每个汉字占 11 物理像素、横向 9 格笔画，dpr=1 屏上
+   * 已经接近可辨认的极限。所以 11px 是「承载中文的下限」，不是推荐值；
+   * 只有纯装饰性的英文 eyebrow 才允许压到 11px 以下。
+   * 承载信息的中文/数字一律从 --fs-sm(12px) 起跳。 */
+  --fs-micro: 10px; /* 纯装饰英文标签（eyebrow / 单位后缀），不承载中文 */
+  --fs-xs: 11px;    /* 次要元信息的下限：时间戳、计数、表头 */
+  --fs-sm: 12px;    /* 表格单元格、状态徽章、表单标签——承载中文的默认档 */
+  --fs-base: 13px;  /* 正文：消息列、说明段落、多行输入 */
+  --fs-md: 14px;    /* 局部强调：卡片标题、详情页小标题 */
+  --fs-lg: 16px;    /* 区块标题 */
+  --fs-xl: 20px;    /* 卡片/面板主标题 */
+  --fs-2xl: 22px;   /* 页面标题（原 --page-title-size 的值，保留该 token 兼容） */
+
+  --page-title-size: var(--fs-2xl);
   --topbar-height: 48px;
   --mobile-nav-height: 50px;
 }
 
 [data-theme='light'] {
-  --ui-primary: #0d9488;
-  --ui-secondary: #0d9488;
-  --ui-text-dimmed: #727a82;
+  --ui-primary: #0f766e;
+  --ui-secondary: #0f766e;
+  --ui-text-dimmed: #5f6870;
   --ui-text-muted: #626970;
   --ui-text-toned: #4d5358;
   --ui-text: #111315;
@@ -145,9 +183,9 @@
   --text-primary: #111315;
   --text-secondary: #4d5358;
   --text-muted: #626970;
-  --text-dim: #727a82;
-  --accent-agent: #0d9488;
-  --accent-agent-hover: #0f766e;
+  --text-dim: #5f6870;
+  --accent-agent: #0f766e;
+  --accent-agent-hover: #115e59;
   --accent-agent-dim: rgba(13, 148, 136, 0.1);
   --accent-agent-glow: rgba(13, 148, 136, 0.25);
   --overlay-scrim: rgba(17, 19, 21, 0.42);
@@ -177,7 +215,7 @@ body {
   color: var(--text-primary);
   font-family: var(--font-body);
   font-synthesis: none;
-  font-size: 13px;
+  font-size: var(--fs-base);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
@@ -196,6 +234,15 @@ pre,
 kbd,
 samp {
   font-family: inherit;
+}
+/* 上面统一重置了表单与代码元素的字体，这里把代码类元素重新指回等宽栈。
+   只覆盖真正的代码载体（code / pre / kbd / samp），不动 --font-data——
+   后者在项目里承载大量含中文的数字与标签，换等宽会让中文回退掉字形。 */
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-code);
 }
 :focus-visible {
   outline: none;
@@ -224,7 +271,7 @@ samp {
 /* ===== 复用工具类 ===== */
 .sec-head {
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -232,6 +279,14 @@ samp {
 }
 .mono {
   font-family: var(--font-data);
+}
+/* 放弃修改 / 删除确认弹窗里的说明文字。
+   原先 plans 与 teams 各写一份同名类，且 create 页没有 <style> 块，
+   裸 class 拿不到定义，故提为全局类给三个模块共用。 */
+.modal-copy {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.65;
 }
 /* 兼容项目中沿用的 Lucide 旧图标命名。 */
 .icon-check-circle::before {
@@ -319,7 +374,7 @@ samp {
 /* ===== Markdown 渲染样式(.md,由 markdown-it 输出,完全自定义 Hyperreal 调性) ===== */
 .md {
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--fs-base);
   line-height: 1.7;
   color: var(--text-primary);
   word-break: break-word;
@@ -390,8 +445,8 @@ samp {
 }
 /* 行内代码 */
 .md :not(pre) > code {
-  font-family: var(--font-data);
-  font-size: 12px;
+  font-family: var(--font-code);
+  font-size: var(--fs-xs);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -408,8 +463,8 @@ samp {
   overflow-x: auto;
 }
 .md pre code {
-  font-family: var(--font-data);
-  font-size: 12px;
+  font-family: var(--font-code);
+  font-size: var(--fs-xs);
   line-height: 1.6;
   color: var(--text-primary);
   background: none;
@@ -481,7 +536,7 @@ samp {
   border-radius: var(--radius-md);
   overflow: hidden;
   font-family: var(--font-data);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .md thead {
   background: var(--bg-elevated);

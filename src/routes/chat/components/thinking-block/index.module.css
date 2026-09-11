@@ -39,14 +39,14 @@
 }
 .think-lbl {
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--status-think);
 }
 .think-dur {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   color: var(--text-dim);
 }
 /* shimmer 扫光(移植 tr-shimmer):进行态时一道亮度低谷横扫文案 */

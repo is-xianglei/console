@@ -21,7 +21,7 @@
 
 .pl-detail-mode {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -29,7 +29,7 @@
 
 .pl-detail-mode small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .pl-detail-tabs {
@@ -43,7 +43,7 @@
 .pl-detail-section h3 {
   margin-bottom: 8px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 650;
   text-transform: uppercase;
 }
@@ -71,7 +71,7 @@
 
 .pl-detail-members li > span:first-child {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .pl-detail-members li.unavailable {
@@ -86,7 +86,7 @@
 .pl-detail-member-main strong {
   display: block;
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -94,7 +94,7 @@
 
 .pl-detail-member-main small {
   color: var(--accent-agent);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .pl-detail-members em {
@@ -102,13 +102,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 9px;
+  font-size: var(--fs-sm);
   font-style: normal;
 }
 
 .pl-detail-empty {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .pl-detail-list {
@@ -127,13 +127,13 @@
 
 .pl-detail-list dt {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .pl-detail-list dd {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .pl-detail-actions {
@@ -151,6 +151,6 @@
 
 .pl-modal-copy {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.65;
 }

@@ -2,7 +2,7 @@
 import { computed, useCssModule } from 'vue'
 import type { FormError } from '@nuxt/ui'
 import type { DepartmentFormModel, DepartmentValidationIssue } from '@/hooks/useDepartmentEditor'
-import type { SelectOption } from '@/hooks/useOrganizationSupport'
+import { SELECT_NONE_VALUE, type SelectOption } from '@/hooks/useOrganizationSupport'
 
 defineOptions({ name: 'DepartmentForm' })
 
@@ -18,7 +18,11 @@ const props = defineProps<{
 const emit = defineEmits<{ cancel: []; save: [] }>()
 
 const styles = useCssModule()
-const managerOptions = computed<SelectOption[]>(() => [{ value: '', label: '暂不设置' }, ...props.userOptions])
+const managerOptions = computed<SelectOption[]>(() => [{ value: SELECT_NONE_VALUE, label: '暂不设置' }, ...props.userOptions])
+
+function normalizeSelectValue(value: unknown): string {
+  return value === SELECT_NONE_VALUE ? '' : String(value ?? '')
+}
 const formErrors = computed<FormError[]>(() =>
   props.issues.map((issue) => ({ name: issue.field, message: issue.message })),
 )
@@ -35,8 +39,8 @@ function submit() {
       <UFormField label="部门编码" name="code"><UInput v-model="model.code" :class="[styles.field, 'mono']" placeholder="例如：DEV-ENG" /></UFormField>
     </div>
     <div :class="styles.grid">
-      <UFormField label="上级部门" name="parentId"><USelect v-model="model.parentId" :class="styles.field" :items="parentOptions" /></UFormField>
-      <UFormField label="负责人" name="managerId"><USelect v-model="model.managerId" :class="styles.field" :items="managerOptions" /></UFormField>
+      <UFormField label="上级部门" name="parentId"><USelect :model-value="model.parentId || SELECT_NONE_VALUE" :class="styles.field" :items="parentOptions" @update:model-value="(value: unknown) => { model.parentId = normalizeSelectValue(value) }" /></UFormField>
+      <UFormField label="负责人" name="managerId"><USelect :model-value="model.managerId || SELECT_NONE_VALUE" :class="styles.field" :items="managerOptions" @update:model-value="(value: unknown) => { model.managerId = normalizeSelectValue(value) }" /></UFormField>
     </div>
     <UFormField label="排序" name="sortOrder" description="数值越小越靠前。"><UInputNumber v-model="model.sortOrder" :class="styles.field" :min="0" /></UFormField>
     <UFormField label="描述" name="description"><UTextarea v-model="model.description" :class="styles.field" autoresize :maxrows="6" placeholder="部门职责、范围或备注" /></UFormField>

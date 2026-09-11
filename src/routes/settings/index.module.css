@@ -50,7 +50,7 @@
   align-items: center;
   gap: 8px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -58,7 +58,7 @@
   margin-bottom: 14px;
 }
 .set-count {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--text-dim);
   background: var(--bg-surface);
   border-radius: var(--radius-pill);
@@ -92,7 +92,7 @@
 }
 .set-segmented {
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 .set-empty {
   margin: 20px 0 8px;
@@ -103,7 +103,7 @@
   gap: 8px;
   min-height: 64px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 .set-spinner {
   width: 14px;
@@ -130,7 +130,7 @@
   color: var(--text-primary);
 }
 .set-badge {
-  font-size: 9px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0;
   padding: 2px 8px;
@@ -149,7 +149,7 @@
   background: color-mix(in srgb, var(--status-error) 12%, transparent);
 }
 .set-source {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   color: var(--text-dim);
 }
 .set-spacer {

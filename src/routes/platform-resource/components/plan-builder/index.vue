@@ -31,6 +31,7 @@ const agentSearch = ref('')
 const dragArmedIndex = ref<number | null>(null)
 const dragIndex = ref<number | null>(null)
 const dragOverIndex = ref<number | null>(null)
+const NO_FALLBACK_VALUE = '__no_fallback__'
 
 /**
  * 把校验问题映射到 UFormField 的 name 上（B-8）：错误落到对应字段下方。
@@ -60,7 +61,7 @@ const filteredAgents = computed(() => {
 })
 const orderSensitive = computed(() => props.plan.mode === 'sequential' || props.plan.mode === 'loop')
 const fallbackItems = computed(() => [
-  { label: '不设置兜底', value: '' },
+  { label: '不设置兜底', value: NO_FALLBACK_VALUE },
   ...props.plan.members
     .map((member) => member.routeKey.trim())
     .filter(Boolean)
@@ -349,7 +350,7 @@ onBeforeUnmount(() => {
             <UInputNumber v-model="plan.maxIterations" :min="MIN_ITERATIONS" :max="MAX_ITERATIONS" :step="1" aria-label="循环轮数" />
           </UFormField>
           <UFormField v-if="plan.mode === 'routing'" :class="$style['pl-field']" label="兜底路由" name="fallback" help="从已填写的路由标识中选择；不设置时未命中任务将直接失败。">
-            <USelect v-model="plan.fallback" :items="fallbackItems" aria-label="兜底路由" placeholder="不设置兜底" />
+            <USelect :model-value="plan.fallback || NO_FALLBACK_VALUE" :items="fallbackItems" aria-label="兜底路由" placeholder="不设置兜底" @update:model-value="(value: unknown) => { plan.fallback = value === NO_FALLBACK_VALUE ? '' : String(value ?? '') }" />
           </UFormField>
         </div>
       </section>
@@ -377,4 +378,3 @@ onBeforeUnmount(() => {
 </template>
 
 <style module src="./index.module.css"></style>
-

@@ -21,7 +21,7 @@
 
 .wf-detail-mode {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -29,12 +29,12 @@
 
 .wf-detail-mode small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .wf-detail-description {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
 }
 
@@ -49,7 +49,7 @@
 .wf-detail-section h3 {
   margin-bottom: 8px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 650;
   text-transform: uppercase;
 }
@@ -77,7 +77,7 @@
 
 .wf-detail-members li > span:first-child {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .wf-detail-members li.unavailable {
@@ -92,7 +92,7 @@
 .wf-detail-member-main strong {
   display: block;
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -100,7 +100,7 @@
 
 .wf-detail-member-main small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .wf-detail-members em {
@@ -108,13 +108,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 9px;
+  font-size: var(--fs-sm);
   font-style: normal;
 }
 
 .wf-detail-empty {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .wf-detail-list {
@@ -133,13 +133,13 @@
 
 .wf-detail-list dt {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .wf-detail-list dd {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .wf-detail-actions {
@@ -157,6 +157,6 @@
 
 .wf-modal-copy {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.65;
 }

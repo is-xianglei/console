@@ -1,33 +1,64 @@
 .resource-table {
   width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
 }
 
-.resource-table tbody tr {
+.resource-table :global([data-slot='base']) {
+  width: 100%;
+}
+
+.resource-table :global([data-slot='tbody'] > tr) {
   cursor: pointer;
   transition: background var(--dur-fast), box-shadow var(--dur-fast);
 }
 
-.resource-table tbody tr:hover {
+.resource-table :global([data-slot='tbody'] > tr > td) {
+  background: var(--bg-panel);
+  transition: background var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.resource-table :global([data-slot='tbody'] > tr:hover > td),
+.resource-table :global([data-slot='tbody'] > tr:focus-visible > td) {
   background: var(--bg-surface);
 }
 
-.resource-table tbody tr.active {
+.resource-table :global([data-slot='tbody'] > tr).active > td,
+.resource-table :global([data-slot='tbody'] > tr[data-selected='true'] > td) {
   background: var(--accent-agent-dim);
   box-shadow: inset 2px 0 var(--accent-agent);
 }
 
 /* highlightId 命中行：高亮后 2s 淡出（CSS transition）。 */
-.resource-table tbody tr.highlighted {
+.resource-table :global([data-slot='tbody'] > tr).highlighted > td {
   background: var(--accent-agent-dim);
   box-shadow: inset 3px 0 var(--accent-agent);
   animation: highlight-fade 2s var(--ease-out) forwards;
 }
 
+.resource-table :global([data-slot='tbody'] > tr:focus-visible) {
+  outline: 2px solid var(--accent-agent);
+  outline-offset: -2px;
+}
+
+/* 固定列必须使用不透明底色，否则横向滚动时会透出相邻列内容。 */
+.resource-table :global([data-slot='th'][data-pinned]),
+.resource-table :global([data-slot='td'][data-pinned]) {
+  background: var(--bg-panel);
+}
+
+.resource-table :global([data-slot='tbody'] > tr:hover > td[data-pinned]),
+.resource-table :global([data-slot='tbody'] > tr:focus-visible > td[data-pinned]) {
+  background: var(--bg-surface);
+}
+
+.resource-table :global([data-slot='tbody'] > tr).active > td[data-pinned],
+.resource-table :global([data-slot='tbody'] > tr[data-selected='true'] > td[data-pinned]),
+.resource-table :global([data-slot='tbody'] > tr).highlighted > td[data-pinned] {
+  background: var(--accent-agent-dim);
+}
+
 @keyframes highlight-fade {
   from { background: var(--accent-agent-dim); }
-  to { background: transparent; }
+  to { background: var(--bg-panel); }
 }
 
 /* 加载骨架：columns × skeletonRows 个 USkeleton，按表格列数等宽排布。 */
@@ -44,7 +75,19 @@
 
 /* 勾选列：居中放 checkbox。 */
 .selectCell {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  padding-inline: 8px !important;
   text-align: center;
+}
+
+/* 勾选框本体在 size='sm' 下是 size-3.5（14×14），外层容器 h-4（16px），
+   两者都低于 WCAG 2.2 SC 2.5.8 的 24×24。
+   列宽 48px 且已有 8px 内边距，横向余量够，直接给本体补 5px 透明内边距
+   把命中区撑到 24×24；可见方块仍由 indicator 的 size-full 决定，视觉不变。 */
+.selectCell :global([data-slot='base']) {
+  padding: 5px;
 }
 
 /* 树形首列：缩进由 depth 驱动，这里只承担 flex 布局。 */
@@ -59,7 +102,12 @@
   gap: 2px;
 }
 
+/* 树形展开是本组件唯一的展开入口（点行走 @select 跳详情），
+   20×20 低于 WCAG 2.2 SC 2.5.8 的 24×24 下限。
+   用绝对定位的 ::before 把命中区撑到 28×28，可见盒子与图标维持 20/12px 不变，
+   避免打开这一列就撑高行高。 */
 .treeToggle {
+  position: relative;
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
@@ -72,13 +120,22 @@
   cursor: pointer;
 }
 
+.treeToggle::before {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+}
+
 .treeToggle:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
 
 .treeToggle i {
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .empty {

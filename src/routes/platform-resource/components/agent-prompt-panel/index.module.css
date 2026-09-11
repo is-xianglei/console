@@ -9,7 +9,7 @@
 }
 
 .ag-editor-section {
-  width: min(840px, calc(100% - 32px));
+  width: min(980px, calc(100% - 24px));
   min-height: 100%;
   margin: 0 auto;
   padding: var(--space-lg) 0 48px;
@@ -36,7 +36,7 @@
 .ag-section-head > div > span {
   color: var(--accent-agent);
   font-family: var(--font-data);
-  font-size: 8px;
+  font-size: var(--fs-xs);
 }
 
 .ag-section-head h2 {
@@ -48,7 +48,7 @@
 .ag-section-head p {
   margin-top: 2px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .ag-field {
@@ -58,7 +58,7 @@
   flex-direction: column;
   gap: 6px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-field > span:first-child {
@@ -75,13 +75,13 @@
 .ag-field > span em {
   margin-left: auto;
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-xs);
   font-style: normal;
 }
 
 .ag-field > small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }
 
@@ -113,7 +113,7 @@
 .ag-prompt-editor {
   min-height: 270px !important;
   font-family: var(--font-data);
-  font-size: 11px !important;
+  font-size: var(--fs-sm) !important;
 }
 
 .ag-prompt-contract {
@@ -142,18 +142,18 @@
 
 .ag-prompt-contract strong {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .ag-prompt-contract small {
   margin-top: 2px;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-lock {
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-micro);
   white-space: nowrap;
 }
 
@@ -195,7 +195,7 @@
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-form .ag-field > [data-slot='label'] > span {
@@ -207,7 +207,7 @@
 .ag-form .ag-field > [data-slot='label'] em {
   margin-left: auto;
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-xs);
   font-style: normal;
 }
 
@@ -218,7 +218,7 @@
 .ag-form .ag-field [data-slot='help'] {
   padding-top: 5px;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }
 
@@ -227,9 +227,15 @@
   width: 100%;
 }
 
+.ag-form .ag-field :global([data-slot='root']),
+.ag-form .ag-field :global([data-slot='base']) {
+  width: 100%;
+  min-width: 0;
+}
+
 .ag-form .ag-field input,
 .ag-form .ag-field textarea,
-.ag-form .ag-field button[data-slot='base'] {
+.ag-form .ag-field button[data-slot='base']:not([role='switch']) {
   border-color: var(--border);
   background: var(--bg-elevated);
   color: var(--text-primary);

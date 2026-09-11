@@ -54,7 +54,7 @@
   border-bottom: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
@@ -167,7 +167,7 @@
 
 .br-resource-name small {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .br-status {
@@ -180,7 +180,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
 }
 

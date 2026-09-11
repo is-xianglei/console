@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/http'
 import { getUserDetail } from '@/http/user'
 import { WORKSPACE_ROLE_OPTIONS, usePeopleManager, workspaceRoleLabel } from '@/hooks/usePeopleManager'
+import { SELECT_NONE_VALUE } from '@/hooks/useOrganizationSupport'
 import type { UserResponse } from '@/interfaces/user/model'
 import { useAuthStore } from '@/stores/auth'
 
@@ -84,7 +85,7 @@ async function load() {
 /** 部门变更：departmentsStore.setMemberDepartment → 重拉 workspaceMembers。 */
 async function onDepartmentChange(value: unknown) {
   if (!membership.value) return
-  const departmentId = String(value ?? '')
+  const departmentId = value === SELECT_NONE_VALUE ? '' : String(value ?? '')
   if (departmentId === String(membership.value.department_id ?? '')) return
   const error = await manager.updateDepartment(userId.value, departmentId)
   if (error) {
@@ -179,7 +180,7 @@ watch(
         <div :class="styles.sectionHeader" style="margin-top: 0"><div><span>WORKSPACE</span><h3>工作区归属</h3></div><div :class="styles.badgeGroup"><UBadge :class="styles.roleBadge" :color="membership ? 'success' : 'neutral'" variant="subtle">{{ membership ? '已加入' : '非成员' }}</UBadge></div></div>
         <template v-if="membership">
           <div :class="styles.assignmentForm">
-            <UFormField label="部门" :description="`归属于 ${workspaceName} 的部门；选择「未分配部门」即移出当前部门。`"><USelect :model-value="String(membership.department_id ?? '')" :items="manager.departmentOptions.value" :loading="manager.assigning.value" :disabled="manager.assigning.value" aria-label="部门" @update:model-value="onDepartmentChange" /></UFormField>
+            <UFormField label="部门" :description="`归属于 ${workspaceName} 的部门；选择「未分配部门」即移出当前部门。`"><USelect :model-value="String(membership.department_id ?? SELECT_NONE_VALUE)" :items="manager.departmentOptions.value" :loading="manager.assigning.value" :disabled="manager.assigning.value" aria-label="部门" @update:model-value="onDepartmentChange" /></UFormField>
             <UFormField label="工作区角色" :description="isSelf ? '不能修改自己的工作区角色。' : undefined"><USelect :model-value="membership.role" :items="WORKSPACE_ROLE_OPTIONS" :loading="manager.assigning.value" :disabled="manager.assigning.value || isSelf" aria-label="工作区角色" @update:model-value="onRoleChange" /></UFormField>
             <UFormField label="岗位" description="岗位随部门成员关系维护，可在部门详情页调整。"><UInput :model-value="membership.job_title || ''" placeholder="未填写" disabled aria-label="岗位" /></UFormField>
           </div>

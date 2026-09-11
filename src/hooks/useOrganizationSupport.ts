@@ -12,6 +12,9 @@ export interface SelectOption {
   label: string
 }
 
+/** Radix Select 不允许 SelectItem 使用空字符串，使用哨兵值表示“未选择”。 */
+export const SELECT_NONE_VALUE = '__none__'
+
 /**
  * 组织资源支持数据：拉取用户目录与工作区成员，
  * 派生负责人下拉、上级部门下拉、可加入部门的成员下拉、可邀请入群的用户下拉、人员工作区归属，
@@ -49,7 +52,7 @@ export function useOrganizationSupport() {
 
   /** 人员归属下拉：全部部门(含「未分配」)。 */
   const departmentOptions = computed<SelectOption[]>(() => [
-    { value: '', label: '未分配部门' },
+    { value: SELECT_NONE_VALUE, label: '未分配部门' },
     ...departmentsStore.state.items.map((item) => ({ value: String(item.id), label: item.name })),
   ])
 
@@ -77,7 +80,7 @@ export function useOrganizationSupport() {
       }
     }
     return [
-      { value: '', label: '无上级部门' },
+      { value: SELECT_NONE_VALUE, label: '无上级部门' },
       ...departmentsStore.state.items
         .filter((item) => !excluded.has(item.id))
         .map((item) => ({ value: String(item.id), label: item.name })),

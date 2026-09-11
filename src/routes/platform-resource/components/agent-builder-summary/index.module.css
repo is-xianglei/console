@@ -24,7 +24,7 @@
 .ag-summary-section h3 {
   margin-bottom: 9px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 650;
 }
 
@@ -47,14 +47,14 @@
 .ag-summary-list dt,
 .ag-policy-counts dt {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-summary-list dd,
 .ag-policy-counts dd {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   text-align: right;
 }
 
@@ -74,7 +74,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-builder-summary {
@@ -92,14 +92,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-builder-summary > header :global(.mono) {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 8px;
+  font-size: var(--fs-micro);
 }
 
 .ag-builder-summary > header .ready { color: var(--status-success); }
@@ -123,7 +123,7 @@
 .ag-preview-agent em {
   overflow: hidden;
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-micro);
   font-style: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -157,7 +157,7 @@
   border-radius: var(--radius-control);
   background: var(--bg-elevated);
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: var(--fs-sm);
   line-height: 1.55;
 }
 
@@ -196,13 +196,13 @@
 
 .ag-summary-model strong {
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-summary-model small,
 .ag-summary-model em {
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-micro);
   font-style: normal;
 }
 
@@ -233,7 +233,7 @@
 
 .ag-summary-counts span {
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-micro);
 }
 
 .ag-summary-chips {

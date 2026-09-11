@@ -6,6 +6,8 @@ import router from './routes'
 import './assets/fonts/misans/MiSans-Regular.min.css'
 import './assets/fonts/misans/MiSans-Medium.min.css'
 import './assets/fonts/misans/MiSans-Bold.min.css'
+// 本地 JetBrains Mono：真正的等宽字体，只服务 code / pre / kbd / samp。
+import './assets/fonts/jetbrains-mono/JetBrainsMono.min.css'
 // 使用本地构建依赖，兼容现有的 `icon icon-*` 类名。
 import 'lucide-static/font/lucide.css'
 // Vue Flow 基础样式必须排在项目样式之前，否则组件里的 CSS Modules 覆盖不掉它的默认值。

@@ -51,7 +51,7 @@
 .kicker,
 .recordCount {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 
 .recordCount {
@@ -63,7 +63,7 @@
   color: var(--text-muted);
   display: inline-flex;
   align-items: center;
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .actions {
@@ -94,13 +94,13 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .key,
 .dim {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .tabs {
@@ -148,19 +148,19 @@
   justify-content: space-between;
   gap: 12px;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .timeline li > div span,
 .timeline li > span {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .timeline p {
   margin: 5px 0 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.55;
 }
 

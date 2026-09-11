@@ -1,0 +1,50 @@
+@import '../../plans/shared/index.module.css';
+
+.tm-loading {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  color: var(--text-primary);
+  background: var(--bg-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tm-not-found {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 var(--page-gutter);
+  color: var(--text-primary);
+  background: var(--bg-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tm-not-found > :global(.alert) {
+  max-width: 560px;
+  width: 100%;
+}
+
+.tm-loading-inner {
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--fs-sm);
+}
+
+.tm-loading-back {
+  position: fixed;
+  top: 12px;
+  left: var(--page-gutter);
+}
+
+/* 放弃修改确认弹窗的说明文字，与 plans/edit 的 .pl-modal-copy 保持一致。 */
+.tm-modal-copy {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.65;
+}

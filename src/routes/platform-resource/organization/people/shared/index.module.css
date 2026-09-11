@@ -8,8 +8,8 @@
 .personHero { display: flex; align-items: center; gap: 11px; }
 .personHero > div { min-width: 0; display: flex; flex-direction: column; }
 .personHero strong { color: var(--text-primary); font-size: 12px; }
-.personHero span { margin-top: 3px; overflow: hidden; color: var(--text-dim); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.personHero span { margin-top: 3px; overflow: hidden; color: var(--text-dim); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
 /* 详情页「工作区归属」编辑区：部门/角色下拉 + 岗位只读。 */
 .assignmentForm { margin-top: 10px; display: grid; gap: 9px; }
-.assignmentForm :global([data-slot='label']) { color: var(--text-muted); font-size: 9px; }
-.assignmentHint { margin-top: 8px; color: var(--text-dim); font-size: 9px; line-height: 1.6; }
+.assignmentForm :global([data-slot='label']) { color: var(--text-muted); font-size: var(--fs-sm); }
+.assignmentHint { margin-top: 8px; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.6; }

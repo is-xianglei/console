@@ -46,11 +46,11 @@
 
 .kicker {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 
 .ver {
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--accent-agent);
   background: var(--accent-agent-dim);
@@ -101,7 +101,7 @@
 
 .metaK {
   font-family: var(--font-ui);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;

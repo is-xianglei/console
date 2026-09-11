@@ -1,9 +1,13 @@
 /* Workflows 列表页（p2 A-1~A-7：FilterPanel + ListCard 纵向三段，外层固定高、表格内部滚动）。 */
 
-/* 外层：高度 = 100vh - 顶栏，垂直排列，不滚动。 */
 .page {
-  --app-header-h: var(--topbar-height);
-  height: calc(100vh - var(--app-header-h));
+  /* 高度由 AppShell 的 flex 链分配（.shell:100dvh > .workspace-shell:flex:1 >
+     .page-stage:flex:1），不再用 100vh 减顶栏。原写法在移动端会连同
+     .workspace-shell 的底部导航 padding 一起溢出，分页条被裁掉。
+     min-height: 0 不能漏——缺了它 flex 子项不收缩，overflow: hidden 会再次裁底部。 */
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -12,15 +16,21 @@
 }
 
 .dateRange {
+  width: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
+.dateRange > :global([data-slot='root']) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .dateRange span {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .workspaceName {
@@ -29,7 +39,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -41,33 +51,33 @@
 .table { width: 100%; }
 .table :global([data-slot='tbody'] > tr) { cursor: pointer; }
 .table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
-.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: 9px; text-transform: uppercase; }
-.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: 10px; }
+.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: var(--fs-sm); text-transform: uppercase; }
+.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: var(--fs-sm); }
 
 .primaryCell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
 .primaryCell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
-.primaryCell strong { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: 11px; }
-.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: 9px; }
+.primaryCell strong { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--fs-sm); }
+.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
 .primaryDesc { color: var(--text-muted); }
 .entityIcon { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-agent-dim); color: var(--accent-agent); }
 
 .statusBadge { text-transform: none; }
 
-.modeText { color: var(--text-primary); font-size: 11px; }
-.memberText { color: var(--text-primary); font-size: 11px; }
+.modeText { color: var(--text-primary); font-size: var(--fs-sm); }
+.memberText { color: var(--text-primary); font-size: var(--fs-sm); }
 .memberAlert {
   margin-top: 2px;
   color: var(--status-error);
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
-.rowActions :deep([data-slot='trigger']) { display: inline-flex; }
+.rowActions :global([data-slot='trigger']) { display: inline-flex; }
 
-.modalCopy { color: var(--text-muted); font-size: 11px; line-height: 1.65; }
+.modalCopy { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.65; }
 
 .toast {
   min-height: 42px;

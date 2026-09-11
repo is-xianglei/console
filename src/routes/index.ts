@@ -24,6 +24,9 @@ import PersonEditLoader from './platform-resource/organization/people/edit/Loade
 import PlanCreateLoader from './platform-resource/plans/create/Loader.vue'
 import PlanDetailLoader from './platform-resource/plans/detail/Loader.vue'
 import PlanEditLoader from './platform-resource/plans/edit/Loader.vue'
+import TeamCreateLoader from './platform-resource/teams/create/Loader.vue'
+import TeamDetailLoader from './platform-resource/teams/detail/Loader.vue'
+import TeamEditLoader from './platform-resource/teams/edit/Loader.vue'
 import WorkflowCreateLoader from './platform-resource/workflows/create/Loader.vue'
 import WorkflowDetailLoader from './platform-resource/workflows/detail/Loader.vue'
 import WorkflowEditLoader from './platform-resource/workflows/edit/Loader.vue'
@@ -168,6 +171,24 @@ const router = createRouter({
           path: 'platform/build/plans/:id(\\d+)/edit',
           name: 'plan-edit',
           component: PlanEditLoader,
+          meta: { requiresAuth: true, platform: true, module: 'build' },
+        },
+        {
+          path: 'platform/build/teams/create',
+          name: 'team-create',
+          component: TeamCreateLoader,
+          meta: { requiresAuth: true, platform: true, module: 'build' },
+        },
+        {
+          path: 'platform/build/teams/:id',
+          name: 'team-detail',
+          component: TeamDetailLoader,
+          meta: { requiresAuth: true, platform: true, module: 'build' },
+        },
+        {
+          path: 'platform/build/teams/:id/edit',
+          name: 'team-edit',
+          component: TeamEditLoader,
           meta: { requiresAuth: true, platform: true, module: 'build' },
         },
         {

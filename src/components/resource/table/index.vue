@@ -215,7 +215,7 @@ defineExpose<{ expandAll: () => void; collapseAll: () => void }>({ expandAll, co
   >
     <!-- 勾选列（selectable 时） -->
     <template v-if="props.selectable" #select-header>
-      <UCheckbox :model-value="allSelected" :indeterminate="someSelected" :aria-label="allSelected ? '取消全选' : '全选'" @update:model-value="(value: boolean | 'indeterminate') => toggleAll(value === true)" />
+      <UCheckbox :model-value="someSelected ? 'indeterminate' : allSelected" :aria-label="allSelected ? '取消全选' : '全选'" @update:model-value="(value: boolean | 'indeterminate') => toggleAll(value === true)" />
     </template>
     <template v-if="props.selectable" #select-cell="{ row }">
       <UCheckbox :model-value="selectedSet.has(row.id)" :aria-label="`选择第 ${row.index + 1} 行`" @update:model-value="(value: boolean | 'indeterminate') => onRowCheckbox(row.id, value)" />

@@ -7,7 +7,7 @@
 .formPanel :global([data-slot='label']) {
   color: var(--text-secondary);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;

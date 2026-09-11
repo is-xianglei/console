@@ -6,7 +6,7 @@
 }
 /* 卡片:与输入框同一套卡片语言(圆角 + 边框 + 表面色) */
 .task-card {
-  max-width: var(--content-max);
+  max-width: var(--composer-max);
   margin: 0 auto;
   background: var(--bg-panel);
   border: 1px solid var(--border);
@@ -105,7 +105,7 @@
 .task-count {
   display: inline-flex;
   align-items: baseline;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -206,7 +206,7 @@
 }
 .task-row-ix {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   width: 18px;
   flex-shrink: 0;
 }
@@ -317,7 +317,7 @@
   align-items: center;
   gap: 10px;
   font-family: var(--font-data);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 .task-owner {
   display: inline-flex;
@@ -351,7 +351,7 @@
 /* 状态徽章:仅表头汇总用;行内改用状态图标 + sm 徽章 */
 .task-badge {
   font-family: var(--font-data);
-  font-size: 9px;
+  font-size: var(--fs-sm);
   letter-spacing: 0;
   text-transform: uppercase;
   padding: 2px 8px;

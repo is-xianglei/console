@@ -48,10 +48,9 @@
   font-size: 12px;
 }
 
-.kicker,
-.recordCount {
+.kicker {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 
 .recordCount {
@@ -63,7 +62,7 @@
   color: var(--text-muted);
   display: inline-flex;
   align-items: center;
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .shell {

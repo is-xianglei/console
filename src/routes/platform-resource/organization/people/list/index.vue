@@ -7,6 +7,7 @@ import { usePeopleManager, USER_LIST_LIMIT, type PersonRow } from '@/hooks/usePe
 import { useHighlightFromQuery } from '@/hooks/useSaveFeedback'
 import type { DepartmentTreeResponse } from '@/interfaces/department/model'
 import { useAuthStore } from '@/stores/auth'
+import { SELECT_NONE_VALUE } from '@/hooks/useOrganizationSupport'
 
 defineOptions({ name: 'PeopleResourceList' })
 
@@ -34,6 +35,11 @@ const membershipOptions = [
   { value: 'admin', label: '管理员' },
   { value: 'non-member', label: '非成员' },
 ] as { value: 'all' | 'member' | 'admin' | 'non-member'; label: string }[]
+
+const departmentFilterOptions = computed(() => [
+  { value: SELECT_NONE_VALUE, label: '全部部门' },
+  ...manager.departmentOptions.value.filter((option) => option.value !== SELECT_NONE_VALUE),
+])
 
 const columns: TableColumn<PersonRow>[] = [
   { id: 'name', header: '人员' },
@@ -222,10 +228,10 @@ watch(
               <!-- 窄屏替代入口：部门级联（A7）。 -->
               <UFormField label="部门">
                 <USelect
-                  :model-value="manager.state.departmentId"
-                  :items="[{ value: '', label: '全部部门' }, ...(manager.departmentOptions.value as { value: string; label: string }[])]"
+                  :model-value="manager.state.departmentId || SELECT_NONE_VALUE"
+                  :items="departmentFilterOptions"
                   aria-label="部门"
-                  @update:model-value="(value: unknown) => manager.selectDepartment(String(value ?? ''))"
+                  @update:model-value="(value: unknown) => manager.selectDepartment(value === SELECT_NONE_VALUE ? '' : String(value ?? ''))"
                 />
               </UFormField>
             </div>

@@ -106,7 +106,7 @@
   border: 1px solid var(--ui-border-accented);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 16px;
   white-space: nowrap;
   opacity: 0;

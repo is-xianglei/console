@@ -86,7 +86,7 @@
   align-items: center;
   gap: 5px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .ag-heading > nav i {
@@ -151,7 +151,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 
 .ag-metrics {
@@ -191,7 +191,7 @@
 .ag-metrics span {
   min-width: 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .ag-metrics strong {
@@ -208,7 +208,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .ag-workspace {
@@ -341,7 +341,7 @@ button.active {
   border-bottom: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
@@ -431,12 +431,12 @@ button.active {
 .ag-table td > small {
   margin-top: 3px;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .ag-version {
   color: var(--accent-agent);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .ag-lifecycle {
@@ -449,7 +449,7 @@ button.active {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
 }
 
@@ -485,7 +485,7 @@ button.active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .ag-empty {
@@ -507,7 +507,7 @@ button.active {
 }
 
 .ag-empty p {
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 button.active {
@@ -529,7 +529,7 @@ button.active {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .ag-toast i {
@@ -756,7 +756,7 @@ button.active {
   min-height: 30px;
   padding: 0 10px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .ag-filter-tabs [data-slot='trigger'][data-state='active'] {
@@ -780,7 +780,7 @@ button.active {
   border-bottom: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -827,7 +827,7 @@ button.active {
 :global(.ag-confirm-modal) [data-slot='description'],
 .ag-modal-copy {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.65;
 }
 

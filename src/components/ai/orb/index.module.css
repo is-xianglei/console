@@ -22,7 +22,8 @@
 
 .pill-label {
   font-family: var(--font-ui);
-  font-size: 11.5px;
+  /* 承载中文状态文案（"推理中…"），归一到 12px 档而非 11.5px 半档。 */
+  font-size: var(--fs-sm);
   line-height: 1;
   color: var(--text-muted);
   white-space: nowrap;

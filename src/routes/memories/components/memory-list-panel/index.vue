@@ -156,13 +156,15 @@ async function onDelete() {
 
 <template>
   <section :class="styles.panel" aria-label="Memory 列表" @keydown="onKeydown">
-    <FilterPanel title="筛选条件" :collapsible="false" @search="onApplyFilters" @reset="onResetFilters">
+    <FilterPanel title="筛选条件" :collapsible="false" :columns="3" @search="onApplyFilters" @reset="onResetFilters">
       <template #default>
-        <UInput :model-value="manager.search.value" :class="styles.search" icon="i-lucide-search" placeholder="搜索名称、标识或正文" aria-label="搜索 Memory" @update:model-value="(v: unknown) => { manager.search.value = String(v ?? '') }" @keydown.enter="onApplyFilters">
-          <template v-if="manager.search.value" #trailing>
-            <UButton color="neutral" variant="ghost" square size="xs" icon="i-lucide-x" aria-label="清空搜索" @click="manager.search.value = ''; onApplyFilters()" />
-          </template>
-        </UInput>
+        <UFormField label="关键字">
+          <UInput :model-value="manager.search.value" :class="styles.search" icon="i-lucide-search" placeholder="搜索名称、标识或正文" aria-label="搜索 Memory" @update:model-value="(v: unknown) => { manager.search.value = String(v ?? '') }" @keydown.enter="onApplyFilters">
+            <template v-if="manager.search.value" #trailing>
+              <UButton color="neutral" variant="ghost" square size="xs" icon="i-lucide-x" aria-label="清空搜索" @click="manager.search.value = ''; onApplyFilters()" />
+            </template>
+          </UInput>
+        </UFormField>
         <UFormField label="类型">
           <USelect :model-value="manager.memoryType.value" :class="styles.typeFilter" :items="typeItems" aria-label="Memory 类型" @update:model-value="(v: unknown) => { manager.memoryType.value = String(v ?? 'all') as MemoryType | 'all'; onApplyFilters() }" />
         </UFormField>
@@ -181,6 +183,7 @@ async function onDelete() {
 
       <div :class="styles.tableWrap">
         <ResourceTable
+          v-if="manager.items.value.length || manager.loading.value"
           :columns="columns"
           :data="manager.items.value"
           :loading="manager.loading.value"
@@ -238,15 +241,15 @@ async function onDelete() {
               </UDropdownMenu>
             </div>
           </template>
-          <template #empty>
-            <UEmpty variant="naked" :icon="emptyMode === 'filtered' ? 'i-lucide-search' : 'i-lucide-database'" :title="emptyMode === 'filtered' ? '没有匹配的结果' : '暂无 Memory'" :description="emptyMode === 'filtered' ? '调整关键词或筛选条件后再试。' : '创建 Memory 后会显示在这里。'">
-              <template #actions>
-                <UButton v-if="emptyMode === 'filtered'" icon="i-lucide-rotate-ccw" label="清除筛选" @click="onResetFilters" />
-                <UButton v-else icon="i-lucide-plus" label="新建 Memory" @click="goToCreate" />
-              </template>
-            </UEmpty>
-          </template>
         </ResourceTable>
+        <div v-else-if="!manager.loadError.value" :class="styles.emptyState">
+          <UEmpty variant="naked" :icon="emptyMode === 'filtered' ? 'i-lucide-search' : 'i-lucide-database'" :title="emptyMode === 'filtered' ? '没有匹配的结果' : '暂无 Memory'" :description="emptyMode === 'filtered' ? '调整关键词或筛选条件后再试。' : '创建 Memory 后会显示在这里。'">
+            <template #actions>
+              <UButton v-if="emptyMode === 'filtered'" icon="i-lucide-rotate-ccw" label="清除筛选" @click="onResetFilters" />
+              <UButton v-else icon="i-lucide-plus" label="新建 Memory" @click="goToCreate" />
+            </template>
+          </UEmpty>
+        </div>
       </div>
 
       <template #footer>

@@ -2,4 +2,4 @@
 
 /* people 编辑页专用补充：加载态。 */
 .loading { flex: 1; min-width: 0; min-height: 0; color: var(--text-primary); background: var(--bg-deep); display: flex; align-items: center; justify-content: center; }
-.loadingInner { display: flex; align-items: center; gap: var(--space-sm); color: var(--text-dim); font-size: 11px; }
+.loadingInner { display: flex; align-items: center; gap: var(--space-sm); color: var(--text-dim); font-size: var(--fs-sm); }

@@ -44,10 +44,14 @@
   font-size: 12px;
 }
 
-.kicker,
+.kicker {
+  color: var(--text-dim);
+  font-size: var(--fs-micro);
+}
+
 .expiry {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .recordCount {
@@ -59,7 +63,7 @@
   color: var(--text-muted);
   display: inline-flex;
   align-items: center;
-  font-size: 9px;
+  font-size: var(--fs-xs);
 }
 
 .actions {

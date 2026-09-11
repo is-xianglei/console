@@ -27,7 +27,7 @@
 .right-head-badge {
   margin-left: auto;
   font-family: var(--font-data);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   background: var(--accent-agent-dim);
   color: var(--accent-agent);
@@ -46,7 +46,7 @@
 }
 .roster-empty {
   padding: 16px 10px;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--text-dim);
   text-align: center;
   line-height: 1.7;

@@ -25,7 +25,7 @@
 }
 .graph-mode {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 /* 把轮次/命中分支角标推到标题栏右上角 */
 .graph-spacer {
@@ -36,7 +36,7 @@
   border: 1px solid var(--ui-border-accented);
   border-radius: 999px;
   color: var(--accent-agent);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   line-height: 16px;
 }
 
@@ -82,7 +82,7 @@
   border-top: 1px solid var(--ui-border);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 .graph-status-mark {
   color: var(--accent-agent);

@@ -97,6 +97,7 @@ function onJump() {
           :page="clampedPage"
           :items-per-page="props.itemsPerPage"
           :total="props.total"
+          size="sm"
           @update:page="onPageChange"
         />
         <div :class="styles.jump">

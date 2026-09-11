@@ -40,6 +40,8 @@ export interface ResourcePage {
   action: string
   description: string
   stats: Array<[string, string]>
+  /** 是否在页面顶部渲染统计卡片；未设置时按 true 处理。Teams 暂不展示。 */
+  showStats?: boolean
   columns: string[]
   rows: ResourceRow[]
   featureTitle: string

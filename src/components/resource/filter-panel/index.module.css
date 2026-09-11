@@ -20,7 +20,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 650;
 }
 
@@ -29,15 +29,27 @@
   font-size: 13px;
 }
 
+/* 唯一收起/恢复筛选的按钮。内容是 10px 文字 + 12px 图标，
+   内容盒仅约 16×14（见审计 4.4）。用 ::before 把命中区撑到 24px 高、
+   横向各外扩 4px，保持收起态下不挤占相邻元素。 */
 .toggle {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   border: 0;
   background: transparent;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   cursor: pointer;
+}
+
+.toggle::before {
+  content: '';
+  position: absolute;
+  inset: 50% -4px auto -4px;
+  height: 24px;
+  transform: translateY(-50%);
 }
 
 .toggle:hover {
@@ -59,6 +71,17 @@
   grid-template-columns: repeat(var(--filter-cols, 3), minmax(0, 1fr));
   gap: 12px 24px;
   align-items: center;
+}
+
+/* UFormField 与 UInput/USelect 默认是 inline-flex，若不撑满栅格会留下大片空白。 */
+.grid > :global([data-slot='root']) {
+  width: 100%;
+  min-width: 0;
+}
+
+.grid > :global([data-slot='root']) > :global([data-slot='root']) {
+  width: 100%;
+  min-width: 0;
 }
 
 /* 窄屏降为 1 列。 */

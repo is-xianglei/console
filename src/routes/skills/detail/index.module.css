@@ -46,11 +46,11 @@
 
 .kicker {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 
 .ver {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--accent-agent);
   background: var(--accent-agent-dim);
@@ -111,7 +111,7 @@
 
 .metaK {
   font-family: var(--font-ui);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -134,7 +134,7 @@
   align-items: center;
   gap: 8px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -142,7 +142,7 @@
 }
 
 .count {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--text-dim);
   background: var(--bg-surface);
   border-radius: var(--radius-pill);
@@ -169,14 +169,14 @@
 .fmK {
   flex-shrink: 0;
   width: 140px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   color: var(--accent-agent);
 }
 
 .fmV {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   color: var(--text-secondary);
   word-break: break-word;
 }
@@ -209,7 +209,7 @@
   flex: 1;
   min-width: 0;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -217,7 +217,7 @@
 
 .resourceSize {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   flex-shrink: 0;
 }
 
@@ -235,7 +235,7 @@
   gap: 8px;
   padding: 32px 16px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   text-align: center;
 }
 

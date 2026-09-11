@@ -21,7 +21,7 @@
   padding: 0 var(--page-gutter);
 }
 
-.wf-not-found > :deep(.alert) {
+.wf-not-found > :global(.alert) {
   max-width: 560px;
   width: 100%;
 }
@@ -31,7 +31,7 @@
   align-items: center;
   gap: var(--space-sm);
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .wf-loading-back {
@@ -42,6 +42,6 @@
 
 .wf-modal-copy {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.65;
 }

@@ -46,7 +46,7 @@
 
 .kicker {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 
 .panelWrap {

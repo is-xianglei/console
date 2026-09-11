@@ -51,7 +51,7 @@
 }
 
 .drop :global([data-slot='description']) {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--text-dim);
   letter-spacing: 0;
 }
@@ -83,14 +83,14 @@
 .table :global([data-slot='th']) {
   height: 38px;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
 }
 
 .table :global([data-slot='td']) {
   height: 54px;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .alert {
@@ -169,7 +169,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -180,7 +180,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 
 .rowActions {

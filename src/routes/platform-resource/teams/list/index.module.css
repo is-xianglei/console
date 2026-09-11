@@ -1,0 +1,93 @@
+/* Teams 列表页：FilterPanel + ListCard 纵向两段，外层固定高、表格内部滚动，与 plans/list 对齐。 */
+
+.page {
+  /* 高度由 AppShell 的 flex 链分配（.shell:100dvh > .workspace-shell:flex:1 >
+     .page-stage:flex:1），不再用 100vh 减顶栏。原写法在移动端会连同
+     .workspace-shell 的底部导航 padding 一起溢出，分页条被裁掉。
+     min-height: 0 不能漏——缺了它 flex 子项不收缩，overflow: hidden 会再次裁底部。 */
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.workspaceName {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert { margin: 10px 10px 0; }
+
+.table { width: 100%; }
+.table :global([data-slot='tbody'] > tr) { cursor: pointer; }
+.table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
+.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: var(--fs-sm); text-transform: uppercase; }
+.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: var(--fs-sm); }
+
+.primaryCell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
+.primaryCell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
+.primaryCell strong { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--fs-sm); }
+.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
+.entityIcon { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-agent-dim); color: var(--accent-agent); }
+
+.statusBadge { text-transform: none; }
+
+.cellText { color: var(--text-primary); font-size: var(--fs-sm); }
+
+.memberAlert {
+  margin-top: 2px;
+  color: var(--status-warning);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+}
+
+.rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+.rowActions :global([data-slot='trigger']) { display: inline-flex; }
+
+.modalCopy { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.65; }
+
+.toast {
+  min-height: 42px;
+  padding: 0 14px;
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  border: 1px solid var(--border-visible);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.toast i {
+  color: var(--status-success);
+}
+
+:global(.tm-toast-enter-active),
+:global(.tm-toast-leave-active) {
+  transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
+}
+
+:global(.tm-toast-enter-from),
+:global(.tm-toast-leave-to) {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+}

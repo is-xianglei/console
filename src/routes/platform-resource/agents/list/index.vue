@@ -100,7 +100,7 @@ watch(
     <FilterPanel
       title="筛选条件"
       :collapsible="true"
-      :columns="2"
+      :columns="4"
       @search="onApplyFilters"
       @reset="onResetFilters"
     >
@@ -210,4 +210,3 @@ watch(
 </template>
 
 <style module src="./index.module.css"></style>
-

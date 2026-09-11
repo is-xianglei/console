@@ -65,7 +65,7 @@
 .ag-section-head > div > span {
   color: var(--accent-agent);
   font-family: var(--font-data);
-  font-size: 8px;
+  font-size: var(--fs-xs);
 }
 
 .ag-section-head h2 {
@@ -77,7 +77,7 @@
 .ag-section-head p {
   margin-top: 2px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .ag-field {
@@ -87,7 +87,7 @@
   flex-direction: column;
   gap: 6px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-field > span:first-child {
@@ -104,13 +104,13 @@
 .ag-field > span em {
   margin-left: auto;
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-xs);
   font-style: normal;
 }
 
 .ag-field > small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }
 
@@ -162,13 +162,13 @@
 
 .ag-readiness strong {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .ag-readiness small {
   margin-top: 2px;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-field input[type='range'] {
@@ -200,7 +200,7 @@
 
 .ag-readiness > span:last-child {
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-micro);
 }
 
 .ag-issue-list {
@@ -218,7 +218,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-issue-list li + li {
@@ -236,7 +236,7 @@
 
 .ag-issue-list em {
   font-family: var(--font-data);
-  font-size: 8px;
+  font-size: var(--fs-micro);
   font-style: normal;
   text-transform: uppercase;
 }
@@ -259,7 +259,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-test-console > header span {
@@ -293,12 +293,12 @@
 }
 
 .ag-test-result strong {
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-test-result small {
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-version-box {
@@ -321,12 +321,12 @@
 
 .ag-version-box strong {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-version-box small {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-sm);
 }
 
 .ag-version-box input {
@@ -374,7 +374,7 @@
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .ag-form .ag-field > [data-slot='label'] > span {
@@ -386,7 +386,7 @@
 .ag-form .ag-field > [data-slot='label'] em {
   margin-left: auto;
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: var(--fs-xs);
   font-style: normal;
 }
 
@@ -397,7 +397,7 @@
 .ag-form .ag-field [data-slot='help'] {
   padding-top: 5px;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }
 
@@ -409,7 +409,7 @@
 
 .ag-form .ag-field input,
 .ag-form .ag-field textarea,
-.ag-form .ag-field button[data-slot='base'],
+.ag-form .ag-field button[data-slot='base']:not([role='switch']),
 .ag-version-box input {
   border-color: var(--border);
   background: var(--bg-elevated);

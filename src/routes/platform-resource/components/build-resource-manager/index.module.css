@@ -29,7 +29,7 @@
   align-items: center;
   gap: 5px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .br-heading nav i {
@@ -161,7 +161,7 @@
 
 .br-metrics span {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .br-metrics strong {
@@ -316,7 +316,11 @@
 .br-content {
   min-height: 470px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 328px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.br-content.has-inspector {
+  grid-template-columns: minmax(0, 1fr) 360px;
 }
 
 .br-list-pane {
@@ -335,7 +339,7 @@
   justify-content: flex-end;
   gap: 12px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .br-pagination > div {
@@ -405,7 +409,7 @@
 }
 
 @media (max-width: 1200px) {
-  .br-content {
+  .br-content.has-inspector {
     grid-template-columns: minmax(0, 1fr);
   }
 

@@ -2,8 +2,13 @@
 
 /* people 列表页：左树右表三段式，整页固定高、不滚动。 */
 .page {
-  --app-header-h: var(--topbar-height);
-  height: calc(100vh - var(--app-header-h));
+  /* 高度由 AppShell 的 flex 链分配（.shell:100dvh > .workspace-shell:flex:1 >
+     .page-stage:flex:1），不再用 100vh 减顶栏。原写法在移动端会连同
+     .workspace-shell 的底部导航 padding 一起溢出，分页条被裁掉。
+     min-height: 0 不能漏——缺了它 flex 子项不收缩，overflow: hidden 会再次裁底部。 */
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -46,7 +51,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 650;
 }
 
@@ -127,7 +132,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -141,14 +146,14 @@
 .table { width: 100%; }
 .table :global([data-slot='tbody'] > tr) { cursor: pointer; }
 .table :global([data-slot='tbody'] > tr:hover > td) { background: var(--bg-hover); }
-.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: 9px; text-transform: uppercase; }
-.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: 10px; }
+.table :global([data-slot='th']) { height: 38px; color: var(--text-dim); font-size: var(--fs-sm); text-transform: uppercase; }
+.table :global([data-slot='td']) { height: 54px; color: var(--text-secondary); font-size: var(--fs-sm); }
 
 .rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 .primaryCell { min-width: 150px; display: flex; align-items: center; gap: 9px; }
 .primaryCell > span:last-child { min-width: 0; display: flex; flex-direction: column; }
-.primaryCell strong { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: 11px; }
-.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: 9px; }
+.primaryCell strong { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--fs-sm); }
+.primaryCell small { margin-top: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
 
 /* 窄屏：<1200px 左树收进抽屉，筛选区出现部门级联（替代入口）。 */
 .mobileTreeBtn { display: none; }
