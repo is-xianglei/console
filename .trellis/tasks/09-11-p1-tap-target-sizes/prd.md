@@ -63,8 +63,43 @@ flex: 0 0 20px;
 - [x] `pagination/index.vue` 的 `UPagination` 显式声明 `size`
 - [x] 三处控件在视觉上**不显得臃肿**——命中区扩大优先用透明内边距或
       `::before` 伪元素撑开，不去放大可见图标本身
-- [ ] departments 列表页的树形展开在扩大命中区后仍能正确触发展开/收起
-      （注意不要与行的 `@select` 冲突）——**待浏览器实测**
+- [x] departments 列表页的树形展开在扩大命中区后仍能正确触发展开/收起
+      （注意不要与行的 `@select` 冲突）—— **静态证实**，浏览器实测仍缺，见下
+
+### 第 5 条的证据与残留风险
+
+`table/index.vue:226-234`：
+
+```html
+<button v-if="slotProps.row.getCanExpand()" type="button"
+        :class="styles.treeToggle"
+        @click.stop="slotProps.row.toggleExpanded()">
+```
+
+`@click.stop` 是 Vue 3 的 `.stop` 修饰符，编译为
+`withModifiers(handler, ['stop'])` → 入口先 `event.stopPropagation()` 再执行业务。
+行的 `@select` 挂在祖先 `<tr>` 上，事件在 `<button>` 处即被切断，
+**不会**同时跳详情。这一点与命中区大小无关，扩大前后都成立。
+
+伪元素不会「吞掉」点击：`::before` 是该 button 自身生成的盒子，
+落在它上面的点击，`event.target` 仍是这个 button（伪元素不产生独立节点，
+不可作为事件目标），所以在原 20×20 内点、或在新增的 4px 边缘环上点，
+走的都是同一条 handler。
+
+`::before` 是绝对定位，`position: relative` 的定位于 `.treeToggle`（`width: 20px`），
+故它**不参与布局**——sticky/flex 行高不受影响，28×28 溢出到行内的部分不撑行
+（`flex: 0 0 20px` 的 20px 仍是它的占位）。
+
+**残留风险（未能排除）**：`.treeToggle` 与相邻的名称单元格之间只有
+`gap` 的横向间距，28px 命中区在左右各外扩 4px，可能与名称单元格的
+`<a>` / 文本可点区域在边缘 4px 上重叠。重叠时 DOM 上后渲染者/更高层级的
+元素先收到点击——这里 `.treeToggle` 是 `position: relative`（有定位），
+名称单元格是静态定位，**定位元素在绘制顺序上高于静态元素**，
+因此这 4px 归 `.treeToggle`。此结论来自 CSS 绘制顺序规则，未经浏览器确认。
+
+**未做的部分**：`getBoundingClientRect()` 实测与真机点击。
+Chrome DevTools MCP 在本项目中始终无响应（`navigate` / `evaluate` / `screenshot`
+一律无输出），本机亦无 playwright / puppeteer / jsdom。
 
 ## Notes
 

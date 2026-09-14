@@ -175,7 +175,7 @@ watch(
     </section>
 
     <UModal :open="pendingDelete" class="ag-confirm-modal" :title="`删除 ${detail?.name ?? '编排方案'}？`" description="删除后该方案将从当前工作区移除，已绑定的会话需要重新选择编排。" @update:open="(open) => { if (!open) pendingDelete = false }">
-      <template #body><p :class="styles['pl-modal-copy']">此操作会调用编排方案删除接口，无法在前端撤销。</p></template>
+      <template #body><p class="modal-copy">此操作会调用编排方案删除接口，无法在前端撤销。</p></template>
       <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="deleting" @click="pendingDelete = false" /><UButton label="确认删除" color="error" :loading="deleting" :disabled="deleting" @click="confirmDelete" /></template>
     </UModal>
   </main>

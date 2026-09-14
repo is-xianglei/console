@@ -168,11 +168,7 @@
   margin-right: auto;
 }
 
-.tm-modal-copy {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.65;
-}
+/* 弹窗说明文字改用全局 .modal-copy（src/assets/styles/index.css:326）。 */
 
 /* 详情页只读视图需要的页面级样式：pl- 前缀版本在 plans/shared 里，
    这里按 tm- 前缀重新声明，避免模板引用到别名模块不存在的类名。 */

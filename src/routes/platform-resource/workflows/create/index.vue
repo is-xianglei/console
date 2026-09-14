@@ -55,7 +55,7 @@ function requestListLeave() {
   />
 
   <UModal :open="leavePending" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存到后端，离开后将丢失。" @update:open="(open) => { if (!open) cancelGuardLeave() }">
-    <template #body><p class="wf-modal-copy">当前修改尚未保存到后端，离开后将丢失。</p></template>
+    <template #body><p class="modal-copy">当前修改尚未保存到后端，离开后将丢失。</p></template>
     <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="cancelGuardLeave" /><UButton label="放弃修改" color="error" @click="confirmGuardLeave" /></template>
   </UModal>
 </template>

@@ -56,6 +56,10 @@ function inferCodec(def: ListUrlValue): ListUrlCodec {
         return trimmed ? trimmed : undefined
       }
       if (Array.isArray(value)) return value.length ? value.join(',') : undefined
+      // 布尔必须写 '1'/'0'：decode 只认这两个字面量，其余一律回落默认值。
+      // 早先这里走 String(value) 写出 'true'，写进 URL 后被 query watcher 回读成
+      // 默认值，表现为布尔筛选「点了就弹回去」（部门页「全部展开/折叠」永久失效）。
+      if (typeof value === 'boolean') return value ? '1' : '0'
       return String(value)
     },
     decode(raw) {
@@ -186,7 +190,9 @@ export function useListUrlState<T extends Record<string, unknown>>(
       && key !== pageSizeKey
       && resetPageOn.includes(key as keyof T)
     ))
-    if (pageResetTriggered) {
+    // 仅当调用方确实声明了 page 字段时才复位；否则 defaults[pageKey] 是 undefined，
+    // 会在 state 上凭空长出一个 page: undefined 键污染快照。
+    if (pageResetTriggered && Object.prototype.hasOwnProperty.call(defaults, pageKey)) {
       const pageField = pageKey as keyof T
       internalMutation = true
       state[pageField] = defaults[pageField]

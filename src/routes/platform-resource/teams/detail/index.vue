@@ -197,7 +197,7 @@ watch(
     </section>
 
     <UModal :open="pendingDelete" class="ag-confirm-modal" :title="`删除 ${detail?.name ?? 'Team'}？`" description="删除后该 Team 将从内存草稿中移除，刷新页面会重新载入目录数据。" @update:open="(open) => { if (!open) pendingDelete = false }">
-      <template #body><p :class="styles['tm-modal-copy']">删除只影响当前会话的内存草稿，不会调用任何后端接口。</p></template>
+      <template #body><p class="modal-copy">删除只影响当前会话的内存草稿，不会调用任何后端接口。</p></template>
       <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="deleting" @click="pendingDelete = false" /><UButton label="确认删除" color="error" :loading="deleting" :disabled="deleting" @click="confirmDelete" /></template>
     </UModal>
   </main>

@@ -38,7 +38,10 @@ const columns: TableColumn<GroupResponse>[] = [
   { id: 'name', header: '群组', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
   { id: 'type', header: '类型', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
   { id: 'visibility', header: '可见性', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
-  { id: 'joinMode', header: '加入方式', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  // 本页 7 列若全部标语义类，fixed 布局下的盈余会按比例摊回所有列，把 220/104/150/112
+  // 全部等比放大（1440 视口实测 265.1/125.3/180.7/135），语义列宽就不再是全站唯一值。
+  // 留「加入方式」不标类作为自适应列吸收盈余——它文案最长，也最该吃剩余宽度。
+  { id: 'joinMode', header: '加入方式' },
   { id: 'state', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
   { id: 'createdAt', header: '创建时间', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
   { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },

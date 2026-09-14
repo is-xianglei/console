@@ -82,9 +82,14 @@ describe('useListUrlState', () => {
 
   it('布尔与数组编解码往返', () => {
     const boolCodec = listUrlCodec(false as boolean)
-    expect(boolCodec.encode(true)).toBe('true')
+    expect(boolCodec.encode(true)).toBe('1')
+    expect(boolCodec.encode(false)).toBe('0')
     expect(boolCodec.decode('0')).toBe(false)
     expect(boolCodec.decode('1')).toBe(true)
+    // 往返必须稳定：此前 encode 写 'true' 而 decode 只认 '1'，
+    // 布尔值写进 URL 后会被回读成默认值（部门页「全部展开/折叠」因此永久失效）。
+    expect(boolCodec.decode(boolCodec.encode(true)!)).toBe(true)
+    expect(boolCodec.decode(boolCodec.encode(false)!)).toBe(false)
     const arrCodec = listUrlCodec([] as string[])
     expect(arrCodec.encode(['a', 'b'])).toBe('a,b')
     expect(arrCodec.decode('a,b')).toEqual(['a', 'b'])

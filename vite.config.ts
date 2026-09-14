@@ -46,6 +46,18 @@ export default defineConfig({
           secondary: 'hyper',
           neutral: 'zinc',
         },
+        // Nuxt UI badge 的 size.xs 是 text-[8px]/3，sm 是 text-[10px]/3——两档都低于
+        // 「承载中文 ≥11px」的下限（见 index.css 字号 token 注释：状态徽章属于
+        //  --fs-sm 12px 档）。全站 28 处状态徽章都显式写 size="xs"，逐处改成 md 会
+        // 连带把 px-1 py-0.5 rounded-sm 变成 px-2 py-1 rounded-md，改掉列表密度；
+        // 这里只覆盖字号，紧凑内距与圆角保持原样。
+        badge: {
+          variants: {
+            size: {
+              xs: { base: 'text-[12px]/4' },
+            },
+          },
+        },
       },
     }),
   ],

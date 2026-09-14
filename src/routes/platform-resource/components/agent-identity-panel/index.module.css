@@ -185,13 +185,17 @@
 }
 
 .ag-form .ag-field [data-slot='container'] > [data-slot='root'],
-.ag-form .ag-field [data-slot='container'] > [data-slot='base'] {
+.ag-form .ag-field [data-slot='container'] > [data-slot='base']:not([role='switch']) {
   width: 100%;
 }
 
-/* Nuxt UI 输入控件的 root 默认是 inline-flex；显式撑满栅格，避免控件塌缩。 */
+/* Nuxt UI 输入控件的 root 默认是 inline-flex；显式撑满栅格，避免控件塌缩。
+   USwitch 的轨道同样是 [data-slot='base']，必须排除在外：轨道宽由主题固定给出
+   （size sm = w-8 = 32px），一旦被 width:100% 覆盖，轨道会塌缩到内容宽
+   （thumb 14px + 透明边框 4px = 18px），而 thumb 仍按 translate-x-3.5 位移
+   14px，选中态就会戳出轨道右缘 12px。 */
 .ag-form .ag-field :global([data-slot='root']),
-.ag-form .ag-field :global([data-slot='base']) {
+.ag-form .ag-field :global([data-slot='base']:not([role='switch'])) {
   width: 100%;
   min-width: 0;
 }

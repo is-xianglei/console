@@ -155,10 +155,25 @@
    * 各页的 .table 规则由 src/assets/styles/table-baseline.module.css 统一承载。
    *
    * 行高分「单行」与「双行」两档（原先 54 与 72 的差别是隐含的）：
-   * 单行是默认值，双行页面覆写 --table-row-height: var(--table-row-height-tall)。 */
+   * 单行是默认值，双行页面覆写 --table-row-height: var(--table-row-height-tall)。
+   *
+   * 两档的取值依据（p4 遗留的「行高/字号比」验收项在这里结清）：
+   * td 字号是 --fs-sm(12px)，行内文字 line-height 1.5 → 单行文字高 18px，
+   * 双行主单元（strong 18px + margin 2px + small 16.5px）内容高 36.5px。
+   * 取值的下限是「内容不被压」而非某个比值——p4 原写的 1.6–3.0 在 12px
+   * 字号下换算成 19–36px 行高，比同一份 PRD 里「td 不低于 44px」的下限还低，
+   * 两条互斥；真实病根是收敛前字号过小（审计原文：「病根是字号过小而非行高过大」），
+   * 字号已在 p4 抬到 12px，这里按内容反推即可。
+   * 单行 44px = 18px 文字 + 上下各 13px 呼吸 → 比值 3.67；
+   * 双行 64px = 36.5px 内容 + 27.5px 呼吸 → 比值 5.33。
+   * 两者都低于收敛前的 4.5 / 6.0（54px 配旧字号），方向正确。 */
   --table-head-height: 38px;         /* 表头行高（原 36 / 38 / 40 三档合一） */
-  --table-row-height: 56px;          /* 单元格行高，单行内容（原 54 / 62 / 64 三档合一） */
-  --table-row-height-tall: 72px;     /* 单元格行高，双行内容（原 66 / 72 两档合一） */
+  --table-row-height: 44px;          /* 单元格行高，单行内容（原 54 / 62 / 64 三档合一）。
+                                        44px 是 WCAG 2.2 SC 2.5.8 的触屏目标下限，
+                                        行本身可点（@select 跳详情），故卡在这个值。 */
+  --table-row-height-tall: 64px;     /* 单元格行高，双行内容（原 66 / 72 两档合一）。
+                                        内容 36.5px，64px 留 27.5px 呼吸；
+                                        低于 60px 时 26px 的实体图标会顶到行边。 */
   --table-row-pad-y: 8px;            /* 单元格纵向内边距。
                                         UTable 主题自带 py-3.5(14px)，基线里退成 0 再按本值补齐，
                                         否则 padding 会把目标行高撑破。 */
@@ -168,6 +183,14 @@
   --table-col-time: 150px;           /* 时间列 */
   --table-col-status: 104px;         /* 状态 / 模式等枚举列 */
   --table-col-actions: 112px;        /* 操作列（原 76 / 88 / 112 / 132 四档统一） */
+  --table-min-width: 820px;          /* 表格宽度下限。table-layout: fixed 下定宽列优先，
+                                        剩余宽度不足时未标记列会被压到 0（1200px 视口下
+                                        people 的 账号/部门/手机 三列实测实宽为 0）；
+                                        给下限后改为溢出，由 UTable root 槽自带的
+                                        overflow-x-auto 接管横向滚动。
+                                        820px 沿用收敛前 platform-resource/index.module.css
+                                        既有的同名下限，等于「勾选 48 + 名称 220 + 状态 104
+                                        + 时间 150 + 操作 112 = 634」再留 186px 给未标记列。 */
 
   --topbar-height: 48px;
   --mobile-nav-height: 50px;
@@ -304,11 +327,13 @@ samp {
   font-family: var(--font-data);
 }
 /* 放弃修改 / 删除确认弹窗里的说明文字。
-   原先 plans 与 teams 各写一份同名类，且 create 页没有 <style> 块，
-   裸 class 拿不到定义，故提为全局类给三个模块共用。 */
+   全站 11 处同义规则（.pl- / .wf- / .ag- / .tm-modal-copy）逐字相同的都是
+   `--text-muted / --fs-sm / 1.65`，而这里原本写的是 --fs-xs(11px)——
+   提全局时降了一号，导致用了全局类的 teams 弹窗比 plans 小一档。
+   现统一到 --fs-sm，与另外 11 处的原值一致。 */
 .modal-copy {
   color: var(--text-muted);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   line-height: 1.65;
 }
 /* 兼容项目中沿用的 Lucide 旧图标命名。 */

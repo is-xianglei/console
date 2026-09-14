@@ -124,8 +124,15 @@ export function useDepartmentManager() {
     })
   })
 
-  /** 平铺后的表格行（供 ResourceTable.data）。 */
-  const rows = computed<DepartmentTreeRow[]>(() => flattenDepartmentTree(filteredTree.value))
+  /** 平铺后的表格行：只用于「匹配 N 个」这类统计口径。 */
+  const flatRows = computed<DepartmentTreeRow[]>(() => flattenDepartmentTree(filteredTree.value))
+  /** 传给 ResourceTable 的树形数据：根节点带 children，展开交给表格的 getSubRows。
+   *
+   * 这里**必须**传树本身，不能传 flatRows——平铺列表里已经含子行，
+   * 根行又通过 children 提供同一批 subRows，展开时 TanStack 会把 subRows
+   * 追加到已平铺列表之后，子部门渲染两遍（实测 4 行 → 8 行）。
+   * 缩进（row.depth > 0）也只有走真树才有非 0 深度。 */
+  const rows = computed<DepartmentTreeRow[]>(() => filteredTree.value)
   const allCount = computed(() => departments.value.length)
   const stats = computed(() => ({
     all: departments.value.length,
@@ -234,6 +241,7 @@ export function useDepartmentManager() {
     loadingError,
     toast,
     rows,
+    flatRows,
     filteredTree,
     allCount,
     stats,

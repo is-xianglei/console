@@ -2,10 +2,6 @@
   width: 100%;
 }
 
-.resource-table :global([data-slot='base']) {
-  width: 100%;
-}
-
 .resource-table :global([data-slot='tbody'] > tr) {
   cursor: pointer;
   transition: background var(--dur-fast), box-shadow var(--dur-fast);
@@ -86,23 +82,61 @@
 }
 
 /* 勾选框本体在 size='sm' 下是 size-3.5（14×14），外层容器 h-4（16px），
-   两者都低于 WCAG 2.2 SC 2.5.8 的 24×24。
-   列宽 48px 且已有 8px 内边距，横向余量够，直接给本体补 5px 透明内边距
-   把命中区撑到 24×24；可见方块仍由 indicator 的 size-full 决定，视觉不变。 */
+   两者都低于 WCAG 2.2 SC 2.5.8 的 24×24。修法是把命中区扩到 24×24，
+   可见方块保持 14×14 不变。
+
+   两条走不通的路（都经浏览器实测证伪）：
+   1. padding: 5px —— 全局 reset 是 box-sizing: border-box，宽度由 size-3.5
+      决定，padding 只能从既定的 14px 里抠内容盒，元素反被压到 10×14；
+   2. min-width/min-height: 24px —— base 撑到 24×24 后 indicator（size-full）
+      跟着变成 24×24，可见方块被改坏（先点表头触发 checked 再量即可复现）。
+
+   为什么 ::after 必须挂在 **base 按钮本身**、而不是外层 container：
+   命中测试把伪元素归属给它的**宿主元素**。挂在 container 上，那块 24×24
+   透明区域会被判给 container（一个 div），而 Nuxt UI Checkbox 默认
+   variant='list'，root 渲染为 Primitive(div) 而非 Label，container 上也没有
+   任何点击处理 —— 于是这块板子既不能切换复选框，又因为 z 序在 base 之上
+   把按钮本体的点击全部吃掉（浏览器实测：中心点与四角全部无法切换，
+   elementsFromPoint 在正中心返回 [div[container], button[base], ...]）。
+   挂在 base 上时命中归属按钮，点击照常生效。
+
+   base 的主题类里带 overflow-hidden（用于把 indicator 裁进圆角），会把伸出
+   边界的 ::after 裁回 14×14，所以必须同时改成 overflow: visible；indicator
+   补 border-radius: inherit 自行收圆角，避免失去父级裁剪后露出方角。 */
 .selectCell :global([data-slot='base']) {
-  padding: 5px;
+  position: relative;
+  overflow: visible;
 }
 
-/* 树形首列：缩进由 depth 驱动，这里只承担 flex 布局。 */
-.treeCell {
-  padding-left: var(--tree-indent, 0) !important;
+.selectCell :global([data-slot='base'])::after {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
 }
 
+.selectCell :global([data-slot='indicator']) {
+  border-radius: inherit;
+}
+
+/* 树形首列：缩进由 row.depth 驱动（组件在插槽里写 --tree-indent），
+   这里同时承担 flex 布局与左缩进。 */
 .treeRow {
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 2px;
+  padding-left: var(--tree-indent, 0);
+}
+
+/* UTable 会为每个展开行额外渲染一条 <tr><td colspan=N><slot name="expanded"/></td></tr>。
+   本组件的子行由 getSubRows 平铺成真实行，从不使用 expanded 插槽，
+   这条行恒为空却带 td 的 padding，展开时会多出一条空白条纹行——隐藏它。
+   判据用 td[colspan]：只有这条行的 td 带 colspan，普通单元格不带。 */
+.resource-table tbody tr:has(> td[colspan]) {
+  display: none;
 }
 
 /* 树形展开是本组件唯一的展开入口（点行走 @select 跳详情），

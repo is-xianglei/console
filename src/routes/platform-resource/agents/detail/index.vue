@@ -128,7 +128,7 @@ watch(
     </section>
 
     <UModal :open="pendingDelete" class="ag-confirm-modal" :title="`删除 ${agent?.name ?? 'Agent'}？`" description="删除后该 Agent 将从当前工作区移除，已有会话记录不会被改绑。" @update:open="(open) => { if (!open) pendingDelete = false }">
-      <template #body><p :class="styles['ag-modal-copy']">此操作会调用 Agents 删除接口，无法在前端撤销。</p></template>
+      <template #body><p class="modal-copy">此操作会调用 Agents 删除接口，无法在前端撤销。</p></template>
       <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="deleting" @click="pendingDelete = false" /><UButton label="确认删除" color="error" :loading="deleting" :disabled="deleting" @click="confirmDelete" /></template>
     </UModal>
   </main>

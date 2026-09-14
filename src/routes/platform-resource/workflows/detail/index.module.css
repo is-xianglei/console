@@ -155,8 +155,4 @@
   margin-right: auto;
 }
 
-.wf-modal-copy {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.65;
-}
+/* 弹窗说明文字改用全局 .modal-copy（src/assets/styles/index.css:326）。 */

@@ -824,8 +824,9 @@ button.active {
   font-size: 15px;
 }
 
-:global(.ag-confirm-modal) [data-slot='description'],
-.ag-modal-copy {
+/* 弹窗说明文字（body 里的 <p>）改用全局 .modal-copy（src/assets/styles/index.css:326）；
+   这里只留 Nuxt UI 自己的 description 槽位。 */
+:global(.ag-confirm-modal) [data-slot='description'] {
   color: var(--text-muted);
   font-size: var(--fs-sm);
   line-height: 1.65;

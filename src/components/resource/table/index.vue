@@ -1,10 +1,12 @@
 <script setup lang="ts" generic="T extends Record<string, any>">
-import { computed, nextTick, onBeforeUnmount, ref, useCssModule, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useCssModule, useSlots, watch } from 'vue'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 
 defineOptions({ name: 'ResourceTable' })
 
 const styles = useCssModule()
+// 模板里的 $slots 走渲染上下文，脚本里拿不到，需要 useSlots()。
+const $slots = useSlots()
 
 const props = withDefaults(
   defineProps<{
@@ -58,8 +60,11 @@ const emit = defineEmits<{
   'clear-filters': []
 }>()
 
-// 仅暴露我们需要的树形 API；不强依赖 UTable 的具体实例类型。
-const tableRef = ref<{ tableApi: { expandAll: () => void; collapseAll: () => void } } | null>(null)
+// 仅声明我们需要的树形 API。这里必须照抄 TanStack 的真实方法名：
+// table-core 只有 toggleAllRowsExpanded(expanded?)，没有 expandAll / collapseAll。
+// 写错名字时 `?.` 会静默吞掉调用（表现为工具栏「全部展开/折叠」点了没反应），
+// 所以类型按真实签名收紧，让改错名直接编译报错。
+const tableRef = ref<{ tableApi?: { toggleAllRowsExpanded: (expanded?: boolean) => void } } | null>(null)
 
 // ===== highlightId：命中行高亮（CSS 负责淡出）+ 滚动到该行（E-3），定时器卸载清理 =====
 let highlightTimer: ReturnType<typeof setTimeout> | undefined
@@ -144,6 +149,10 @@ const columnPinning = computed(() => (
 // ===== 树形：首列缩进 & 展开箭头 =====
 const treeColumnId = computed(() => (props.treeChildrenKey ? props.columns[0]?.id : undefined))
 
+// 只放 tr：UTable 的 td/th 类名与内联样式取自**列级** columnDef.meta，
+// 表级 meta 仅 class.tr 被读取（见 @nuxt/ui Table.vue：tr 用
+// tableApi.options.meta?.class?.tr，td 用 cell.column.columnDef.meta?.class?.td）。
+// 树形缩进因此改由下方树形插槽按 row.depth 直接给 .treeRow 设 --tree-indent。
 const tableMeta = computed(() => ({
   class: {
     tr: (row: TableRow<T>) => [
@@ -151,16 +160,6 @@ const tableMeta = computed(() => ({
       props.highlightId != null && props.rowKey(row.original) === props.highlightId ? styles.highlighted : '',
       `highlight-row-${props.rowKey(row.original)}`,
     ].filter(Boolean).join(' '),
-    td: (cell: { column: { id: string }; row: { depth: number } }) => (
-      treeColumnId.value && cell.column.id === treeColumnId.value && cell.row.depth > 0 ? styles.treeCell : null
-    ),
-    style: {
-      td: (cell: { column: { id: string }; row: { depth: number } }) => (
-        treeColumnId.value && cell.column.id === treeColumnId.value && cell.row.depth > 0
-          ? { '--tree-indent': `${cell.row.depth * 16}px` }
-          : null
-      ),
-    },
   },
 }))
 
@@ -177,11 +176,11 @@ function clearFilters() {
 }
 
 function expandAll() {
-  tableRef.value?.tableApi?.expandAll()
+  tableRef.value?.tableApi?.toggleAllRowsExpanded(true)
 }
 
 function collapseAll() {
-  tableRef.value?.tableApi?.collapseAll()
+  tableRef.value?.tableApi?.toggleAllRowsExpanded(false)
 }
 
 // 本组件已接管、不再由透传渲染的插槽名，避免与显式模板重复渲染。
@@ -194,6 +193,16 @@ const ownedSlots = computed(() => new Set([
   ...(props.selectable ? ['select-header', 'select-cell'] : []),
   ...(treeColumnId.value ? [`${treeColumnId.value}-cell`] : []),
 ]))
+
+// 真正需要透传给 UTable 的插槽名白名单。
+//
+// 不能直接 v-for 遍历 $slots：模板的 `<template v-for="(_, name) in $slots" #[name]>`
+// 会被编译到所有静态具名槽**之后**，而 Vue 的 createSlots 是「后者胜」
+// （runtime-core 里对 dynamicSlots 按序赋值 slots[name] = fn）。于是父组件传入的
+// #<首列 id>-cell 会把上面那个树形槽整个顶掉——表现为树形表格的展开箭头消失、
+// 子行缩进失效，而父组件只提供了单元格内容、并未想接管整格。
+// 用白名单控制遍历来源，让树形/勾选/内置槽保留在本组件手里。
+const passthroughSlots = computed(() => Object.keys($slots).filter((name) => !ownedSlots.value.has(name)))
 
 defineExpose<{ expandAll: () => void; collapseAll: () => void }>({ expandAll, collapseAll })
 </script>
@@ -222,7 +231,7 @@ defineExpose<{ expandAll: () => void; collapseAll: () => void }>({ expandAll, co
 
     <!-- 树形首列：缩进 + 展开箭头。父组件仍通过 #<treeColumnId>-cell 提供内容。 -->
     <template v-if="treeColumnId" #[`${treeColumnId}-cell`]="slotProps">
-      <div :class="styles.treeRow">
+      <div :class="styles.treeRow" :style="slotProps.row.depth > 0 ? { '--tree-indent': `${slotProps.row.depth * 16}px` } : undefined">
         <button
           v-if="slotProps.row.getCanExpand()"
           type="button"
@@ -263,9 +272,9 @@ defineExpose<{ expandAll: () => void; collapseAll: () => void }>({ expandAll, co
       </div>
     </template>
 
-    <!-- 透传父组件其余列 cell 插槽（跳过已接管的选择/树形/内置插槽）。 -->
-    <template v-for="(_, name) in $slots" :key="name" #[name]="slotProps">
-      <slot v-if="!ownedSlots.has(name)" :name="name" v-bind="slotProps" />
+    <!-- 透传父组件其余列 cell 插槽（source 已滤掉已接管的选择/树形/内置插槽）。 -->
+    <template v-for="name in passthroughSlots" :key="name" #[name]="slotProps">
+      <slot :name="name" v-bind="slotProps" />
     </template>
   </UTable>
 </template>

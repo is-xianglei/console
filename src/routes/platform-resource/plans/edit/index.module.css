@@ -42,8 +42,6 @@
   left: var(--page-gutter);
 }
 
-.pl-modal-copy {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.65;
-}
+/* 弹窗说明文字改用全局 .modal-copy（src/assets/styles/index.css:326）——
+   全站 12 处同义规则值完全相同，且 create 页没有 <style> 块用不了模块类，
+   留着模块副本只会让「模块 12px / 全局 11px」这种分叉再次发生。 */

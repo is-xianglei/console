@@ -197,7 +197,7 @@ watch(
       </ResourceTable>
 
       <template #footer>
-        <div :class="styles.countBar">共 {{ manager.allCount.value }} 个部门<span v-if="manager.state.keyword"> · 匹配 {{ manager.rows.value.length }} 个</span></div>
+        <div :class="styles.countBar">共 {{ manager.allCount.value }} 个部门<span v-if="manager.state.keyword"> · 匹配 {{ manager.flatRows.value.length }} 个</span></div>
       </template>
     </ListCard>
 

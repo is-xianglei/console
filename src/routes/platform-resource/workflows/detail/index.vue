@@ -169,7 +169,7 @@ watch(
     </section>
 
     <UModal :open="pendingDelete" class="ag-confirm-modal" :title="`删除 ${detail?.name ?? 'Workflow'}？`" description="删除后不可恢复，请确认是否继续。" @update:open="(open) => { if (!open) pendingDelete = false }">
-      <template #body><p :class="styles['wf-modal-copy']">此操作会调用 Workflow 删除接口，删除后该 Workflow 将从当前工作区移除，无法在前端撤销。</p></template>
+      <template #body><p class="modal-copy">此操作会调用 Workflow 删除接口，删除后该 Workflow 将从当前工作区移除，无法在前端撤销。</p></template>
       <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="deleting" @click="pendingDelete = false" /><UButton label="确认删除" color="error" :loading="deleting" :disabled="deleting" @click="confirmDelete" /></template>
     </UModal>
   </main>

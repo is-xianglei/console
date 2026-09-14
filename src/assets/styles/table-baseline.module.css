@@ -24,14 +24,43 @@
 
 /* 表格本体：占满容器、固定布局、内容超长省略。
  * 固定布局是把「列宽可控」和「长文本不撑破」这两件事一起解决的，
- * 因此它是基线的一部分，不再由各页重复声明。 */
+ * 因此它是基线的一部分，不再由各页重复声明。
+ *
+ * 这里**不能**再写 `.table :global([data-slot='base']) { width: 100% }`——
+ * 那是 p5 之前留下的孤儿规则，且是有害的：
+ * 1. `:class="styles.table"` 落在 UTable 的**根元素**上，而 `<table data-slot="base">`
+ *    是它的子元素，所以后代形式的 `[data-slot='base']` 永远命中不到 table 自己；
+ * 2. 表内唯一带 `data-slot='base'` 的组件是勾选列的 UCheckbox（`button[data-slot='base']`，
+ *    见 Checkbox.vue），于是这条规则实际只打到勾选框上；
+ * 3. 勾选框尺寸来自 `size-3.5`（14×14），而 `width: 100%` 作为普通 CSS 规则
+ *    压过 utilities 层里的 `.size-3\\.5`，把它拉成表格可用宽度、高度仍是 14——
+ *    实测每个勾选框都被压成约 0×14 的可见方块。
+ * 表格自身的铺满由 UTable 主题 base 槽的 `min-w-full` 负责，不需要这里再声明。
+ *
+ * 但**直接子**形式是安全且必需的：`table-class` 经 ResourceTable 落在 UTable 的
+ * `:class` 上，而 UTable 主题的 root 槽是外层 div（带 overflow-x-auto），base 槽
+ * 才是 <table>。写在 .table 自身上的 table-layout 因此作用于 div，对表格无效——
+ * 浏览器实测 7 个 list 页的 <table> 全部是 table-layout: auto。
+ * 用 `>` 只命中 table（勾选框的 button[data-slot='base'] 在 td 深处，不是直接子），
+ * 既拿回固定布局，又避开上面说的勾选框误伤。
+ * agents/teams/departments 此前"看起来正常"只是列宽合计小于容器、auto 布局顺手
+ * 尊重了声明值；people 有 8 列、内容最小宽 845.6px 挤不进容器，auto 就把定宽列
+ * 压成了 部门 56 / 手机 44 / 状态 52（标准值 104），并让包裹层横向滚动 100px。
+ *
+ * min-width 是固定布局的必备搭档：fixed 下定宽列优先，剩余宽度不足时未标记列
+ * 会被压到 0（实测 1200px 视口下 people 的 账号/部门/手机 三列实宽全为 0，内容
+ * 完全不可见）。给表格一个下限，宽度不够时改为溢出、由 root 槽自带的
+ * overflow-x-auto 接管横向滚动——这才是「语义类定宽 + 未标记列自占剩余」的完整
+ * 形态。下限只能写在**表格自身**上：th 的 min-width 在 fixed 布局下被忽略
+ * （三种 th 写法实测均无效，未标记列仍为 0）。 */
 .table {
   width: 100%;
-  table-layout: fixed;
 }
 
-.table :global([data-slot='base']) {
+.table > :global([data-slot='base']) {
   width: 100%;
+  min-width: var(--table-min-width);
+  table-layout: fixed;
 }
 
 /* 表头：38px（原 36 / 38 / 40 三档合一）。

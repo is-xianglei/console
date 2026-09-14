@@ -255,7 +255,11 @@
 
 /* Nuxt UI 控件 root 默认 inline-flex，表单栅格内统一撑满可用宽度。 */
 .pl-field :global([data-slot='root']),
-.pl-field :global([data-slot='base']) {
+/* USwitch 的轨道同样是 [data-slot='base']，必须排除在外：轨道宽由主题固定给出
+   （size sm = w-8 = 32px），一旦被 width:100% 覆盖，轨道会塌缩到内容宽
+   （thumb 14px + 透明边框 4px = 18px），thumb 仍按 translate-x-3.5 位移 14px，
+   选中态会戳出轨道右缘 12px。 */
+.pl-field :global([data-slot='base']:not([role='switch'])) {
   width: 100%;
   min-width: 0;
 }
