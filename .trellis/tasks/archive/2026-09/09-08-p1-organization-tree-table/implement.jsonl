@@ -1,6 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "前端约定入口（待 spec-bootstrap 填充）"}
-{"file": ".trellis/tasks/09-08-console-crud-refactor/research/audit-findings.md", "reason": "全站审计：差距证据（文件:行号）与改法"}
-{"file": ".trellis/tasks/09-08-console-crud-refactor/research/ruoyi-layout-reference.md", "reason": "若依式 左树右表 / 树形表格 布局参照"}
-{"file": ".trellis/tasks/09-08-console-crud-refactor/design.md", "reason": "父任务共享层技术设计（useListUrlState / 布局组件 / 表格分页 / 反馈闭环）"}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "组件规范：列表页三段式骨架/ResourceTable 用法与禁忌"}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "状态规范：URL 状态唯一来源/loadPage/store 分页样板"}
