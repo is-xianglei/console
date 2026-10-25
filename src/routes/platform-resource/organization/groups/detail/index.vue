@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useCssModule, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import GroupFormModal from '../components/group-form-modal/index.vue'
 import { groupJoinModeLabel, groupTypeLabel, groupVisibilityLabel } from '@/hooks/useGroupEditor'
 import { useGroupManager } from '@/hooks/useGroupManager'
 import { useOrganizationSupport } from '@/hooks/useOrganizationSupport'
@@ -80,8 +81,11 @@ function goToList() {
   void router.push({ name: 'platform-resource', params: { module: 'organization', resource: 'groups' } })
 }
 
+/** 编辑弹窗：保存后 store.saveGroup 已重拉目录并重选本群组，详情原地刷新，无需额外处理。 */
+const formOpen = ref(false)
+
 function goToEdit() {
-  void router.push({ name: 'group-edit', params: { id: String(groupId.value) }, query: { from: 'detail' } })
+  formOpen.value = true
 }
 
 async function load() {
@@ -290,6 +294,8 @@ watch(
       <template #body><UAlert color="error" variant="subtle" icon="i-lucide-triangle-alert" title="请确认该群组没有仍需保留的成员或引用。" /></template>
       <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="deleting" @click="pendingDelete = false" /><UButton label="确认删除" icon="i-lucide-trash-2" color="error" :loading="deleting" :disabled="deleting" @click="confirmDelete" /></template>
     </UModal>
+
+    <GroupFormModal v-model:open="formOpen" :group-id="groupId" />
   </main>
   <Transition name="dept-toast"><div v-if="toast" :class="styles.toast" role="status"><i class="icon icon-circle-check-big"></i>{{ toast }}</div></Transition>
 </template>

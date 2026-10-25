@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { computed, useCssModule, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { FilterPanel, ListCard, ResourceTable } from '@/components'
+import DepartmentFormModal from '../components/department-form-modal/index.vue'
 import { useDepartmentManager, type DepartmentEnabledFilter, type DepartmentTreeRow } from '@/hooks/useDepartmentManager'
 import { useOrganizationSupport } from '@/hooks/useOrganizationSupport'
 import { useHighlightFromQuery } from '@/hooks/useSaveFeedback'
@@ -14,6 +15,7 @@ const styles = useCssModule()
 const manager = useDepartmentManager()
 const support = useOrganizationSupport()
 const authStore = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 
 const highlight = useHighlightFromQuery()
@@ -47,12 +49,22 @@ const deleteTitle = computed(() => manager.pendingDelete.value ? `删除部门�
 /** 删除确认是否可点：无阻断信息时允许；有阻断信息且非「仅后端原因」时禁用。 */
 const deleteConfirmDisabled = computed(() => Boolean(manager.deleteBlockers.value && (manager.deleteBlockers.value.childrenCount > 0 || manager.deleteBlockers.value.memberCount > 0)))
 
+const formOpen = ref(false)
+const formDepartmentId = ref<number | null>(null)
+const formParentId = ref<number | null>(null)
+
+function openForm(departmentId: number | null, parentId: number | null = null) {
+  formDepartmentId.value = departmentId
+  formParentId.value = parentId
+  formOpen.value = true
+}
+
 function goToCreate() {
-  void router.push({ name: 'department-create' })
+  openForm(null)
 }
 
 function goToCreateChild(item: DepartmentTreeRow) {
-  void router.push({ name: 'department-create', query: { parent: String(item.id) } })
+  openForm(null, item.id)
 }
 
 function goToDetail(item: DepartmentTreeRow) {
@@ -60,7 +72,12 @@ function goToDetail(item: DepartmentTreeRow) {
 }
 
 function goToEdit(item: DepartmentTreeRow) {
-  void router.push({ name: 'department-edit', params: { id: String(item.id) } })
+  openForm(item.id)
+}
+
+/** 保存成功：store 已重拉目录；保留当前 query（筛选 / 展开状态）只合并 highlight，高亮刚保存的行。 */
+function onSaved(id: number | null) {
+  if (id != null) void router.replace({ query: { ...route.query, highlight: String(id) } })
 }
 
 function goToDeleteDetail() {
@@ -217,6 +234,8 @@ watch(
         <UButton label="确认删除" icon="i-lucide-trash-2" color="error" :loading="manager.deleting.value" :disabled="manager.deleting.value || deleteConfirmDisabled" @click="manager.confirmDelete" />
       </template>
     </UModal>
+
+    <DepartmentFormModal v-model:open="formOpen" :department-id="formDepartmentId" :parent-id="formParentId" :user-options="support.userOptions.value" @saved="onSaved" />
   </main>
   <Transition name="dept-toast"><div v-if="manager.toast.value" :class="styles.toast" role="status"><i class="icon icon-circle-check-big"></i>{{ manager.toast.value }}</div></Transition>
 </template>

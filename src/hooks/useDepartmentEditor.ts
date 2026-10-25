@@ -1,10 +1,14 @@
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useToast } from '@nuxt/ui/composables'
 import type { DepartmentCreateRequest, DepartmentUpdateRequest } from '@/interfaces/department/api'
 import type { DepartmentResponse } from '@/interfaces/department/model'
 import { useAuthStore } from '@/stores/auth'
 import { useDepartmentsStore } from '@/stores/departments'
-import { useSaveFeedback } from './useSaveFeedback'
+
+export interface DepartmentSaveOptions {
+  /** 保存成功（已 toast）后调用；弹窗在此关闭并让来源页原地刷新。id 为本次保存的部门。 */
+  onSaved?: (id: number | null) => void
+}
 
 /** 部门表单模型：下拉值统一用字符串('' 表示未选择)，与 USelect 对齐。 */
 export interface DepartmentFormModel {
@@ -70,34 +74,20 @@ export function departmentFormToPayload(form: DepartmentFormModel): DepartmentCr
   }
 }
 
-/** 新建/编辑/保存：与列表逻辑(useDepartmentManager)分离，供 create/edit 路由页实例化。 */
+/** 新建/编辑/保存：与列表逻辑(useDepartmentManager)分离，供部门表单弹窗实例化；保存后不跳转路由。 */
 export function useDepartmentEditor() {
-  const router = useRouter()
+  const toast = useToast()
   const authStore = useAuthStore()
   const departmentsStore = useDepartmentsStore()
-  const feedback = useSaveFeedback({
-    listRoute: { name: 'platform-resource', params: { module: 'organization', resource: 'departments' } },
-    detailRoute: { name: 'department-detail' },
-  })
   const draft = ref<DepartmentFormModel>(emptyDepartmentForm())
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
-  /** 编辑来源（D）：'detail' 表示从详情页进入，保存后留在详情而非回列表。 */
-  const from = ref<string | undefined>(undefined)
 
   const issues = computed<DepartmentValidationIssue[]>(() => validateDepartment(draft.value))
   const workspaceId = computed<number | null>(() => (
     authStore.currentWorkspaceId ?? authStore.currentWorkspace?.id ?? departmentsStore.state.workspaceId
   ))
-
-  function goToList() {
-    void router.push({ name: 'platform-resource', params: { module: 'organization', resource: 'departments' } })
-  }
-
-  function goToDetail(id: number) {
-    void router.push({ name: 'department-detail', params: { id: String(id) } })
-  }
 
   /** 保证 store 已绑定当前工作区并拿到部门列表(供上级部门下拉)。返回错误文案或 null。 */
   async function ensureCatalog(): Promise<string | null> {
@@ -109,7 +99,6 @@ export function useDepartmentEditor() {
 
   async function openCreate(parentId?: number): Promise<void> {
     error.value = ''
-    from.value = undefined
     draft.value = emptyDepartmentForm()
     if (parentId != null) draft.value.parentId = String(parentId)
     loadingDetail.value = true
@@ -121,10 +110,9 @@ export function useDepartmentEditor() {
     }
   }
 
-  async function openEdit(id: number, source?: string): Promise<boolean> {
+  async function openEdit(id: number): Promise<boolean> {
     draft.value = emptyDepartmentForm()
     error.value = ''
-    from.value = source
     loadingDetail.value = true
     try {
       const catalogError = await ensureCatalog()
@@ -145,8 +133,11 @@ export function useDepartmentEditor() {
     }
   }
 
-  /** 校验通过后调用 store.saveDepartment；成功跳转详情页并返回 true。 */
-  async function saveDraft(): Promise<boolean> {
+  /**
+   * 校验通过后调用 store.saveDepartment（store 内部会重拉目录与详情）。
+   * 成功：toast + onSaved(id) 并返回 true；失败写入 error，不回调。不做路由跳转。
+   */
+  async function saveDraft(options?: DepartmentSaveOptions): Promise<boolean> {
     if (saving.value) return false
     if (validateDepartment(draft.value).length) return false
     saving.value = true
@@ -165,15 +156,8 @@ export function useDepartmentEditor() {
       error.value = ''
       const savedId = departmentsStore.state.selectedId ?? targetId ?? null
       if (departmentsStore.state.detail) draft.value = departmentToForm(departmentsStore.state.detail)
-      // 保存成功 → toast + 按来源分流（D）：从详情进入编辑则留在详情，否则回列表并带 ?highlight=<id>。
-      const message = `部门「${departmentsStore.state.detail?.name ?? draft.value.name}」已保存`
-      if (savedId != null && from.value === 'detail') {
-        await feedback.afterSaveToDetail({ id: savedId, message })
-      } else if (savedId != null) {
-        await feedback.afterSave({ id: savedId, message })
-      } else {
-        goToList()
-      }
+      toast.add({ title: `部门「${departmentsStore.state.detail?.name ?? draft.value.name}」已保存`, color: 'success' })
+      options?.onSaved?.(savedId)
       return true
     } finally {
       saving.value = false
@@ -187,11 +171,8 @@ export function useDepartmentEditor() {
     saving,
     error,
     workspaceId,
-    from,
     openCreate,
     openEdit,
     saveDraft,
-    goToList,
-    goToDetail,
   }
 }

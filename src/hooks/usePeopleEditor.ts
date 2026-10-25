@@ -1,12 +1,16 @@
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useToast } from '@nuxt/ui/composables'
 import { ApiError } from '@/http'
 import { createUser, getUserDetail, updateUser } from '@/http/user'
 import { inviteWorkspaceMember } from '@/http/workspace'
 import type { UserCreateRequest, UserUpdateRequest } from '@/interfaces/user/api'
 import type { UserResponse } from '@/interfaces/user/model'
 import { useAuthStore } from '@/stores/auth'
-import { useSaveFeedback } from './useSaveFeedback'
+
+export interface PersonSaveOptions {
+  /** 保存成功（已 toast）后调用；弹窗在此关闭并让来源页原地刷新。id 为本次保存的用户。 */
+  onSaved?: (id: number) => void
+}
 
 /**
  * 人员表单模型：新建 = 姓名/用户名/邮箱/初始密码/邀请开关；
@@ -88,20 +92,14 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback
 }
 
-/** 新建/编辑/保存：与列表逻辑(usePeopleManager)分离，供 create/edit 路由页实例化。 */
+/** 新建/编辑/保存：与列表逻辑(usePeopleManager)分离，供人员表单弹窗实例化；保存后不跳转路由。 */
 export function usePeopleEditor() {
-  const router = useRouter()
+  const toast = useToast()
   const authStore = useAuthStore()
-  const feedback = useSaveFeedback({
-    listRoute: { name: 'platform-resource', params: { module: 'organization', resource: 'people' } },
-    detailRoute: { name: 'person-detail' },
-  })
   const draft = ref<PersonFormModel>(emptyPersonForm())
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
-  /** 编辑来源（D）：'detail' 表示从详情页进入，保存后留在详情而非回列表。 */
-  const from = ref<string | undefined>(undefined)
   /**
    * 两步创建(createUser → inviteWorkspaceMember)中第一步已成功的用户；
    * 第二步失败时保留，再次 saveDraft 只重发邀请而不重复创建。
@@ -114,26 +112,16 @@ export function usePeopleEditor() {
   ))
   const createdUserId = computed(() => createdUser.value?.id ?? null)
 
-  function goToList() {
-    void router.push({ name: 'platform-resource', params: { module: 'organization', resource: 'people' } })
-  }
-
-  function goToDetail(id: number) {
-    void router.push({ name: 'person-detail', params: { id: String(id) } })
-  }
-
   function openCreate(): void {
     error.value = ''
-    from.value = undefined
     createdUser.value = null
     draft.value = emptyPersonForm()
   }
 
   /** getUserDetail 填充 draft；失败返回 false 并写入 error。 */
-  async function openEdit(id: number, source?: string): Promise<boolean> {
+  async function openEdit(id: number): Promise<boolean> {
     draft.value = emptyPersonForm()
     error.value = ''
-    from.value = source
     createdUser.value = null
     loadingDetail.value = true
     try {
@@ -155,9 +143,9 @@ export function usePeopleEditor() {
   /**
    * 新建：createUser → (开关开启时) inviteWorkspaceMember，两步不是一个事务：
    * 第一步失败 → 「用户创建失败」；第二步失败 → 「用户已创建但邀请失败」，保留 createdUser，
-   * 再次保存只重发邀请，页面可选择直接前往详情。成功后跳详情页。
+   * 再次保存只重发邀请，弹窗也可以放弃邀请(skipInvite)。全部成功后 toast + onSaved。
    */
-  async function saveCreate(): Promise<boolean> {
+  async function saveCreate(options?: PersonSaveOptions): Promise<boolean> {
     let user = createdUser.value
     if (!user) {
       try {
@@ -183,49 +171,49 @@ export function usePeopleEditor() {
     }
     error.value = ''
     createdUser.value = null
-    // 保存成功 → toast + 回列表并带 ?highlight=<id>（D）。
-    await feedback.afterSave({ id: user.id, message: `人员「${user.full_name || user.username}」已创建` })
+    toast.add({ title: `人员「${user.full_name || user.username}」已创建`, color: 'success' })
+    options?.onSaved?.(user.id)
     return true
   }
 
-  /** 编辑：updateUser(用户名/邮箱不可改)，成功后按来源分流（D）：留在详情或回列表高亮。 */
-  async function saveEdit(id: number): Promise<boolean> {
+  /** 编辑：updateUser(用户名/邮箱不可改)；成功 toast + onSaved，失败写入 error。 */
+  async function saveEdit(id: number, options?: PersonSaveOptions): Promise<boolean> {
+    let updated: UserResponse
     try {
-      const updated = await updateUser(id, personFormToPayload(draft.value) as UserUpdateRequest)
-      draft.value = personToForm(updated)
-      error.value = ''
-      const message = `人员「${updated.full_name || updated.username}」已保存`
-      if (from.value === 'detail') {
-        await feedback.afterSaveToDetail({ id: updated.id, message })
-      } else {
-        await feedback.afterSave({ id: updated.id, message })
-      }
-      return true
+      updated = await updateUser(id, personFormToPayload(draft.value) as UserUpdateRequest)
     } catch (caught) {
       error.value = errorMessage(caught, '用户更新失败')
       return false
     }
+    draft.value = personToForm(updated)
+    error.value = ''
+    toast.add({ title: `人员「${updated.full_name || updated.username}」已保存`, color: 'success' })
+    options?.onSaved?.(updated.id)
+    return true
   }
 
-  /** 校验通过后按 draft.id 分流新建/编辑；成功跳转详情页并返回 true。 */
-  async function saveDraft(): Promise<boolean> {
+  /** 校验通过后按 draft.id 分流新建/编辑；成功返回 true 并调用 onSaved，不做路由跳转。 */
+  async function saveDraft(options?: PersonSaveOptions): Promise<boolean> {
     if (saving.value) return false
     if (validatePerson(draft.value).length) return false
     saving.value = true
     try {
-      return draft.value.id == null ? await saveCreate() : await saveEdit(draft.value.id)
+      return draft.value.id == null ? await saveCreate(options) : await saveEdit(draft.value.id, options)
     } finally {
       saving.value = false
     }
   }
 
-  /** 创建成功但邀请失败后，放弃重试邀请直接进入已创建用户的详情页。 */
-  function skipInvite() {
+  /**
+   * 创建成功但邀请失败后放弃重试：清掉 error 与 createdUser，返回已创建用户的 id
+   * （弹窗据此关闭并刷新列表，或前往详情）；没有待处理的已创建用户时返回 null。
+   */
+  function skipInvite(): number | null {
     const user = createdUser.value
-    if (!user) return
+    if (!user) return null
     error.value = ''
     createdUser.value = null
-    goToDetail(user.id)
+    return user.id
   }
 
   return {
@@ -236,12 +224,9 @@ export function usePeopleEditor() {
     error,
     workspaceId,
     createdUserId,
-    from,
     openCreate,
     openEdit,
     saveDraft,
     skipInvite,
-    goToList,
-    goToDetail,
   }
 }

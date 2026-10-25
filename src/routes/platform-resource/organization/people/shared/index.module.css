@@ -1,4 +1,4 @@
-/* people 三页共用：直接复用 departments 抽取的页面壳、指标条、工具栏、表格、详情与表单外壳样式，仅补 people 专有类。 */
+/* people 三页共用：直接复用 departments 抽取的页面壳、指标条、工具栏、表格与详情样式，仅补 people 专有类。 */
 @import '../../departments/shared/index.module.css';
 
 /* 角色/归属徽标里的英文角色值不做大写转换；「我」徽标紧跟姓名。 */

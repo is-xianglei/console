@@ -1,0 +1,7 @@
+/* 编辑弹窗加载详情时的骨架，高度接近一屏表单，避免加载完成后弹窗跳动过大。 */
+.loading {
+  min-height: 220px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}

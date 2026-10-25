@@ -7,15 +7,14 @@ import { SELECT_NONE_VALUE, type SelectOption } from '@/hooks/useOrganizationSup
 defineOptions({ name: 'DepartmentForm' })
 
 const props = defineProps<{
+  /** UForm 的 id；弹窗 footer 的提交按钮用 form 属性指向它。 */
+  formId: string
   model: DepartmentFormModel
-  /** true 为新建，false 为编辑。 */
-  creating: boolean
   issues: DepartmentValidationIssue[]
   parentOptions: SelectOption[]
   userOptions: SelectOption[]
-  saving: boolean
 }>()
-const emit = defineEmits<{ cancel: []; save: [] }>()
+const emit = defineEmits<{ save: [] }>()
 
 const styles = useCssModule()
 const managerOptions = computed<SelectOption[]>(() => [{ value: SELECT_NONE_VALUE, label: '暂不设置' }, ...props.userOptions])
@@ -33,7 +32,7 @@ function submit() {
 </script>
 
 <template>
-  <UForm :state="model" :validate="() => formErrors" :class="styles.form" @submit="submit">
+  <UForm :id="formId" :state="model" :validate="() => formErrors" :class="styles.form" @submit="submit">
     <div :class="styles.grid">
       <UFormField label="部门名称" name="name" required><UInput v-model="model.name" :class="styles.field" autofocus placeholder="例如：设备工程部" /></UFormField>
       <UFormField label="部门编码" name="code"><UInput v-model="model.code" :class="[styles.field, 'mono']" placeholder="例如：DEV-ENG" /></UFormField>
@@ -45,10 +44,6 @@ function submit() {
     <UFormField label="排序" name="sortOrder" description="数值越小越靠前。"><UInputNumber v-model="model.sortOrder" :class="styles.field" :min="0" /></UFormField>
     <UFormField label="描述" name="description"><UTextarea v-model="model.description" :class="styles.field" autoresize :maxrows="6" placeholder="部门职责、范围或备注" /></UFormField>
     <div :class="styles.toggle"><span><strong>启用部门</strong><small>停用后仍保留组织与成员关系。</small></span><USwitch v-model="model.isActive" /></div>
-    <div :class="styles.actions">
-      <UButton color="neutral" variant="outline" label="取消" :disabled="saving" @click="emit('cancel')" />
-      <UButton type="submit" icon="i-lucide-save" :label="creating ? '创建部门' : '保存修改'" :loading="saving" />
-    </div>
   </UForm>
 </template>
 

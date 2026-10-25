@@ -43,6 +43,3 @@
 :global(.dept-toast-enter-active), :global(.dept-toast-leave-active) { transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out); }
 :global(.dept-toast-enter-from), :global(.dept-toast-leave-to) { opacity: 0; transform: translateX(-50%) translateY(8px); }
 @media (max-width: 720px) { .page { padding: 22px 12px calc(76px + env(safe-area-inset-bottom)); }.header { flex-direction: column; gap: 14px; }.headerActions { width: 100%; }.metrics { grid-template-columns: repeat(2, 1fr); }.metrics > div:nth-child(3) { border-top: 1px solid var(--border-subtle); border-left: 0; }.metrics > div:nth-child(4) { border-top: 1px solid var(--border-subtle); }.toolbar { flex-wrap: wrap; }.search { width: 100%; }.table :global([data-slot='th']:nth-child(n + 3):not(:last-child)),.table :global([data-slot='td']:nth-child(n + 3):not(:last-child)) { display: none; } }
-/* 表单页(create/edit)外壳。 */
-.formShell { margin-top: 16px; max-width: 760px; padding: 20px 22px; border: 1px solid var(--border); background: var(--bg-panel); }
-.formLoading { min-height: 220px; display: grid; gap: 14px; align-content: start; }

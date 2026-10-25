@@ -4,9 +4,15 @@ import type { GroupResponse } from '@/interfaces/group/model'
 import { useGroupsStore } from '@/stores/groups'
 import { emptyGroupForm, groupFormToPayload, groupToForm, useGroupEditor, validateGroup } from './useGroupEditor'
 
+// 编辑器已不依赖路由；保留 router mock 只为断言「保存后不跳转」。
 const routerPush = vi.fn()
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush, replace: vi.fn() }),
+}))
+
+const toastAdd = vi.fn()
+vi.mock('@nuxt/ui/composables', () => ({
+  useToast: () => ({ add: toastAdd }),
 }))
 
 function group(): GroupResponse {
@@ -32,6 +38,7 @@ type Mock = ReturnType<typeof vi.fn>
 describe('useGroupEditor', () => {
   beforeEach(() => {
     routerPush.mockReset()
+    toastAdd.mockReset()
     vi.stubGlobal('localStorage', {
       getItem: vi.fn(() => null),
       setItem: vi.fn(),
@@ -106,33 +113,49 @@ describe('useGroupEditor', () => {
     expect(store.saveGroup).not.toHaveBeenCalled()
   })
 
-  it('saveDraft 成功后回列表并带 highlight', async () => {
+  it('saveDraft 新建成功：toast + onSaved(新 id)，不跳转路由', async () => {
     const store = useGroupsStore()
     ;(store.saveGroup as Mock).mockImplementation(async () => {
       store.state.selectedId = 9
       store.state.detail = { ...group(), id: 9, name: '质量协作组', slug: 'quality' }
       return null
     })
+    const onSaved = vi.fn()
     const editor = useGroupEditor()
     await editor.openCreate()
     editor.draft.value.name = '质量协作组'
     editor.draft.value.slug = 'quality'
     editor.draft.value.joinMode = 'open'
-    const ok = await editor.saveDraft()
+    const ok = await editor.saveDraft({ onSaved })
     expect(ok).toBe(true)
     expect(store.saveGroup).toHaveBeenCalledWith(
       expect.objectContaining({ name: '质量协作组', slug: 'quality', join_mode: 'open', description: null }),
       undefined,
     )
     expect((store.saveGroup as Mock).mock.calls[0][0]).not.toHaveProperty('is_active')
-    expect(routerPush).toHaveBeenCalledWith({
-      name: 'platform-resource',
-      params: { module: 'organization', resource: 'groups' },
-      query: { highlight: '9' },
-    })
+    expect(toastAdd).toHaveBeenCalledWith({ title: '群组「质量协作组」已保存', color: 'success' })
+    expect(onSaved).toHaveBeenCalledWith(9)
+    expect(routerPush).not.toHaveBeenCalled()
   })
 
-  it('saveDraft 编辑态传 id 与 is_active，失败时写入 error 且不跳转', async () => {
+  it('saveDraft 编辑成功：onSaved 收到原 id，不跳转', async () => {
+    const store = useGroupsStore()
+    ;(store.selectGroup as Mock).mockImplementation(async () => {
+      store.state.selectedId = 7
+      store.state.detail = group()
+      return null
+    })
+    const onSaved = vi.fn()
+    const editor = useGroupEditor()
+    await editor.openEdit(7)
+    editor.draft.value.name = '设备协作二组'
+    expect(await editor.saveDraft({ onSaved })).toBe(true)
+    expect(store.saveGroup).toHaveBeenCalledWith(expect.objectContaining({ name: '设备协作二组' }), 7)
+    expect(onSaved).toHaveBeenCalledWith(7)
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  it('saveDraft 编辑态传 id 与 is_active，失败时写入 error、不回调、不跳转', async () => {
     const store = useGroupsStore()
     ;(store.selectGroup as Mock).mockImplementation(async () => {
       store.state.selectedId = 7
@@ -140,13 +163,16 @@ describe('useGroupEditor', () => {
       return null
     })
     ;(store.saveGroup as Mock).mockResolvedValue('群组更新失败')
+    const onSaved = vi.fn()
     const editor = useGroupEditor()
     await editor.openEdit(7)
     editor.draft.value.isActive = false
-    const ok = await editor.saveDraft()
+    const ok = await editor.saveDraft({ onSaved })
     expect(ok).toBe(false)
     expect(store.saveGroup).toHaveBeenCalledWith(expect.objectContaining({ name: '设备协作组', is_active: false }), 7)
     expect(editor.error.value).toBe('群组更新失败')
+    expect(onSaved).not.toHaveBeenCalled()
+    expect(toastAdd).not.toHaveBeenCalled()
     expect(routerPush).not.toHaveBeenCalled()
   })
 })

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import { computed, useCssModule, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref, useCssModule, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { FilterPanel, ListCard, ResourcePagination, ResourceTable } from '@/components'
+import GroupFormModal from '../components/group-form-modal/index.vue'
 import { groupJoinModeLabel, groupTypeLabel, groupVisibilityLabel } from '@/hooks/useGroupEditor'
 import { useGroupManager, type GroupEnabledFilter } from '@/hooks/useGroupManager'
 import { useHighlightFromQuery } from '@/hooks/useSaveFeedback'
@@ -14,6 +15,7 @@ defineOptions({ name: 'GroupResourceList' })
 const styles = useCssModule()
 const manager = useGroupManager()
 const authStore = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 
 const highlight = useHighlightFromQuery()
@@ -51,8 +53,12 @@ const workspaceId = computed(() => authStore.currentWorkspaceId ?? authStore.cur
 const deleteTitle = computed(() => manager.pendingDelete.value ? `删除群组「${manager.pendingDelete.value.name}」？` : '删除群组？')
 const deleteConfirmDisabled = computed(() => Boolean(manager.deleteBlockers.value && manager.deleteBlockers.value.memberCount > 0))
 
+const formOpen = ref(false)
+const formGroupId = ref<number | null>(null)
+
 function goToCreate() {
-  void router.push({ name: 'group-create' })
+  formGroupId.value = null
+  formOpen.value = true
 }
 
 function goToDetail(item: GroupResponse) {
@@ -60,7 +66,14 @@ function goToDetail(item: GroupResponse) {
 }
 
 function goToEdit(item: GroupResponse) {
-  void router.push({ name: 'group-edit', params: { id: String(item.id) } })
+  formGroupId.value = item.id
+  formOpen.value = true
+}
+
+/** 保存成功：按当前筛选重拉列表；保留当前 query（筛选 / 分页）只合并 highlight，高亮刚保存的行。 */
+function onSaved(id: number | null) {
+  void manager.loadAll(workspaceId.value)
+  if (id != null) void router.replace({ query: { ...route.query, highlight: String(id) } })
 }
 
 function goToDeleteDetail() {
@@ -218,6 +231,8 @@ watch(
         <UButton label="确认删除" icon="i-lucide-trash-2" color="error" :loading="manager.deleting.value" :disabled="manager.deleting.value || deleteConfirmDisabled" @click="manager.confirmDelete" />
       </template>
     </UModal>
+
+    <GroupFormModal v-model:open="formOpen" :group-id="formGroupId" @saved="onSaved" />
   </main>
   <Transition name="dept-toast"><div v-if="manager.toast.value" :class="styles.toast" role="status"><i class="icon icon-circle-check-big"></i>{{ manager.toast.value }}</div></Transition>
 </template>

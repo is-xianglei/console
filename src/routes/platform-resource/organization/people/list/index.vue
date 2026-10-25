@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { computed, onMounted, ref, useCssModule, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { FilterPanel, ListCard, ResourcePagination, ResourceTable } from '@/components'
+import PersonFormModal from '../components/person-form-modal/index.vue'
 import { usePeopleManager, USER_LIST_LIMIT, type PersonRow } from '@/hooks/usePeopleManager'
 import { useHighlightFromQuery } from '@/hooks/useSaveFeedback'
 import type { DepartmentTreeResponse } from '@/interfaces/department/model'
@@ -15,6 +16,7 @@ const TREE_COLLAPSED_KEY = 'console.list.people.treeCollapsed'
 const styles = useCssModule()
 const manager = usePeopleManager()
 const authStore = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 
 // 左树折叠态记入 localStorage（A7）。
@@ -90,8 +92,12 @@ function personName(item: PersonRow) {
   return item.full_name || item.username
 }
 
+const formOpen = ref(false)
+const formUserId = ref<number | null>(null)
+
 function goToCreate() {
-  void router.push({ name: 'person-create' })
+  formUserId.value = null
+  formOpen.value = true
 }
 
 function goToDetail(item: PersonRow) {
@@ -99,7 +105,14 @@ function goToDetail(item: PersonRow) {
 }
 
 function goToEdit(item: PersonRow) {
-  void router.push({ name: 'person-edit', params: { id: String(item.id) } })
+  formUserId.value = item.id
+  formOpen.value = true
+}
+
+/** 保存成功（或已创建但放弃邀请）：重拉 users + 工作区成员；保留当前 query 只合并 highlight。 */
+function onSaved(id: number) {
+  void manager.refresh()
+  void router.replace({ query: { ...route.query, highlight: String(id) } })
 }
 
 async function onRefresh() {
@@ -359,6 +372,8 @@ watch(
         <UButton label="确认删除" icon="i-lucide-trash-2" color="error" :loading="manager.deleting.value" :disabled="manager.deleting.value" @click="onBatchDeleteConfirm" />
       </template>
     </UModal>
+
+    <PersonFormModal v-model:open="formOpen" :user-id="formUserId" @saved="onSaved" />
   </main>
   <Transition name="dept-toast"><div v-if="manager.toast.value" :class="styles.toast" role="status"><i class="icon icon-circle-check-big"></i>{{ manager.toast.value }}</div></Transition>
 </template>

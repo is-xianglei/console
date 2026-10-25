@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useCssModule, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import PersonFormModal from '../components/person-form-modal/index.vue'
 import { ApiError } from '@/http'
 import { getUserDetail } from '@/http/user'
 import { WORKSPACE_ROLE_OPTIONS, usePeopleManager, workspaceRoleLabel } from '@/hooks/usePeopleManager'
@@ -44,8 +45,10 @@ function goToList() {
   void router.push({ name: 'platform-resource', params: { module: 'organization', resource: 'people' } })
 }
 
+const formOpen = ref(false)
+
 function goToEdit() {
-  void router.push({ name: 'person-edit', params: { id: String(userId.value) }, query: { from: 'detail' } })
+  formOpen.value = true
 }
 
 /** getUserDetail 失败时返回错误文案，便于与 manager.loadAll 并行。 */
@@ -200,6 +203,9 @@ watch(
       <template #body><UAlert color="error" variant="subtle" icon="i-lucide-triangle-alert" title="删除后该用户的工作区成员关系与归属一并失效，请确认没有仍需保留的引用。" /></template>
       <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="manager.deleting.value" @click="pendingDelete = false" /><UButton label="确认删除" icon="i-lucide-trash-2" color="error" :loading="manager.deleting.value" :disabled="manager.deleting.value" @click="confirmDelete" /></template>
     </UModal>
+
+    <!-- 保存后留在详情页：person 是本地 ref，手动重新加载。 -->
+    <PersonFormModal v-model:open="formOpen" :user-id="userId" @saved="load" />
   </main>
   <Transition name="dept-toast"><div v-if="manager.toast.value" :class="styles.toast" role="status"><i class="icon icon-circle-check-big"></i>{{ manager.toast.value }}</div></Transition>
 </template>

@@ -6,13 +6,14 @@ import type { PersonFormModel, PersonValidationIssue } from '@/hooks/usePeopleEd
 defineOptions({ name: 'PersonForm' })
 
 const props = defineProps<{
+  /** UForm 的 id；弹窗 footer 的提交按钮用 form 属性指向它。 */
+  formId: string
   model: PersonFormModel
   /** create：姓名/用户名/邮箱/初始密码/邀请开关；edit：姓名/头像 URL/手机号，用户名与邮箱只读。 */
   mode: 'create' | 'edit'
   issues: PersonValidationIssue[]
-  saving: boolean
 }>()
-const emit = defineEmits<{ cancel: []; save: [] }>()
+const emit = defineEmits<{ save: [] }>()
 
 const styles = useCssModule()
 const creating = computed(() => props.mode === 'create')
@@ -26,7 +27,7 @@ function submit() {
 </script>
 
 <template>
-  <UForm :state="model" :validate="() => formErrors" :class="styles.form" @submit="submit">
+  <UForm :id="formId" :state="model" :validate="() => formErrors" :class="styles.form" @submit="submit">
     <div :class="styles.grid">
       <UFormField label="姓名" name="fullName" required><UInput v-model="model.fullName" :class="styles.field" autofocus placeholder="例如：张三" /></UFormField>
       <UFormField label="用户名" name="username" :required="creating" :description="creating ? undefined : '用户名创建后不可修改。'"><UInput v-model="model.username" :class="[styles.field, 'mono']" :disabled="!creating" placeholder="例如：zhangsan" autocomplete="username" /></UFormField>
@@ -38,10 +39,6 @@ function submit() {
       <UFormField label="手机号" name="phone"><UInput v-model="model.phone" :class="styles.field" type="tel" placeholder="可选" /></UFormField>
     </template>
     <div v-if="creating" :class="styles.toggle"><span><strong>邀请加入当前工作区</strong><small>创建用户后同步以「成员」角色发送工作区邀请；邀请失败不影响用户已创建。</small></span><USwitch v-model="model.inviteToWorkspace" aria-label="邀请加入当前工作区" /></div>
-    <div :class="styles.actions">
-      <UButton color="neutral" variant="outline" label="取消" :disabled="saving" @click="emit('cancel')" />
-      <UButton type="submit" icon="i-lucide-save" :label="creating ? (model.inviteToWorkspace ? '创建并邀请' : '创建用户') : '保存修改'" :loading="saving" />
-    </div>
   </UForm>
 </template>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useCssModule, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import DepartmentFormModal from '../components/department-form-modal/index.vue'
 import { useOrganizationSupport } from '@/hooks/useOrganizationSupport'
 import type { DepartmentMemberResponse } from '@/interfaces/department/model'
 import { useAuthStore } from '@/stores/auth'
@@ -55,12 +56,28 @@ function goToList() {
   void router.push({ name: 'platform-resource', params: { module: 'organization', resource: 'departments' } })
 }
 
+const formOpen = ref(false)
+const formDepartmentId = ref<number | null>(null)
+const formParentId = ref<number | null>(null)
+
 function goToEdit() {
-  void router.push({ name: 'department-edit', params: { id: String(departmentId.value) }, query: { from: 'detail' } })
+  formDepartmentId.value = departmentId.value
+  formParentId.value = null
+  formOpen.value = true
 }
 
 function goToCreateChild() {
-  void router.push({ name: 'department-create', query: { parent: String(departmentId.value) } })
+  formDepartmentId.value = null
+  formParentId.value = departmentId.value
+  formOpen.value = true
+}
+
+/**
+ * 保存成功后留在详情页：编辑当前部门时 store 已重拉目录并重选本部门；
+ * 新建下级时 store 会选中新部门，这里重新加载当前部门（含下级列表）。
+ */
+function onSaved(id: number | null) {
+  if (id !== departmentId.value) void load()
 }
 
 function goToDepartment(id: number) {
@@ -217,6 +234,8 @@ watch(
       <template #body><UAlert color="error" variant="subtle" icon="i-lucide-triangle-alert" title="请确认该部门没有仍需保留的成员或下级部门。" /></template>
       <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="deleting" @click="pendingDelete = false" /><UButton label="确认删除" icon="i-lucide-trash-2" color="error" :loading="deleting" :disabled="deleting" @click="confirmDelete" /></template>
     </UModal>
+
+    <DepartmentFormModal v-model:open="formOpen" :department-id="formDepartmentId" :parent-id="formParentId" :user-options="support.userOptions.value" @saved="onSaved" />
   </main>
   <Transition name="dept-toast"><div v-if="toast" :class="styles.toast" role="status"><i class="icon icon-circle-check-big"></i>{{ toast }}</div></Transition>
 </template>

@@ -12,15 +12,9 @@ import PlatformResourceLoader from './platform-resource/Loader.vue'
 import AgentCreateLoader from './platform-resource/agents/create/Loader.vue'
 import AgentDetailLoader from './platform-resource/agents/detail/Loader.vue'
 import AgentEditLoader from './platform-resource/agents/edit/Loader.vue'
-import DepartmentCreateLoader from './platform-resource/organization/departments/create/Loader.vue'
 import DepartmentDetailLoader from './platform-resource/organization/departments/detail/Loader.vue'
-import DepartmentEditLoader from './platform-resource/organization/departments/edit/Loader.vue'
-import GroupCreateLoader from './platform-resource/organization/groups/create/Loader.vue'
 import GroupDetailLoader from './platform-resource/organization/groups/detail/Loader.vue'
-import GroupEditLoader from './platform-resource/organization/groups/edit/Loader.vue'
-import PersonCreateLoader from './platform-resource/organization/people/create/Loader.vue'
 import PersonDetailLoader from './platform-resource/organization/people/detail/Loader.vue'
-import PersonEditLoader from './platform-resource/organization/people/edit/Loader.vue'
 import PlanCreateLoader from './platform-resource/plans/create/Loader.vue'
 import PlanDetailLoader from './platform-resource/plans/detail/Loader.vue'
 import PlanEditLoader from './platform-resource/plans/edit/Loader.vue'
@@ -192,27 +186,9 @@ const router = createRouter({
           meta: { requiresAuth: true, platform: true, module: 'build' },
         },
         {
-          path: 'platform/organization/departments/create',
-          name: 'department-create',
-          component: DepartmentCreateLoader,
-          meta: { requiresAuth: true, platform: true, module: 'organization' },
-        },
-        {
           path: 'platform/organization/departments/:id(\\d+)',
           name: 'department-detail',
           component: DepartmentDetailLoader,
-          meta: { requiresAuth: true, platform: true, module: 'organization' },
-        },
-        {
-          path: 'platform/organization/departments/:id(\\d+)/edit',
-          name: 'department-edit',
-          component: DepartmentEditLoader,
-          meta: { requiresAuth: true, platform: true, module: 'organization' },
-        },
-        {
-          path: 'platform/organization/groups/create',
-          name: 'group-create',
-          component: GroupCreateLoader,
           meta: { requiresAuth: true, platform: true, module: 'organization' },
         },
         {
@@ -222,27 +198,9 @@ const router = createRouter({
           meta: { requiresAuth: true, platform: true, module: 'organization' },
         },
         {
-          path: 'platform/organization/groups/:id(\\d+)/edit',
-          name: 'group-edit',
-          component: GroupEditLoader,
-          meta: { requiresAuth: true, platform: true, module: 'organization' },
-        },
-        {
-          path: 'platform/organization/people/create',
-          name: 'person-create',
-          component: PersonCreateLoader,
-          meta: { requiresAuth: true, platform: true, module: 'organization' },
-        },
-        {
           path: 'platform/organization/people/:id(\\d+)',
           name: 'person-detail',
           component: PersonDetailLoader,
-          meta: { requiresAuth: true, platform: true, module: 'organization' },
-        },
-        {
-          path: 'platform/organization/people/:id(\\d+)/edit',
-          name: 'person-edit',
-          component: PersonEditLoader,
           meta: { requiresAuth: true, platform: true, module: 'organization' },
         },
         {
