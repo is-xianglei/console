@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { isNavigationFailure, useRoute, useRouter } from 'vue-router'
+import { useMediaQuery } from '@vueuse/core'
 
 defineOptions({ name: 'ActivityRail' })
 
@@ -32,6 +33,11 @@ const activeModule = computed(() => {
   if (route.name === 'platform-resource') return route.params.module
   return ''
 })
+
+// 桌面端导航栏在左侧，气泡朝右；760px 以下导航栏移到底部，气泡朝上。
+// sideOffset 0：箭头尖端贴住按钮边缘（框架默认留 8px 空隙）
+const isBottomNav = useMediaQuery('(max-width: 760px)')
+const tooltipContent = computed(() => ({ side: isBottomNav.value ? 'top' as const : 'right' as const, sideOffset: 0 }))
 
 const indicatorStyle = computed(() => ({
   transform: `translate3d(${indicatorX.value}px, ${indicatorY.value}px, 0)`,
@@ -97,49 +103,50 @@ onBeforeUnmount(() => {
       :style="indicatorStyle"
       aria-hidden="true"
     ></span>
-    <UButton
-      v-for="item in items"
-      :key="item.key"
-      color="neutral"
-      variant="ghost"
-      square
-      :class="[$style['rail-item'], { [$style.active]: activeModule === item.key }]"
-      data-activity-item
-      :data-active="activeModule === item.key"
-      :title="item.label"
-      :aria-label="item.label"
-      :aria-current="activeModule === item.key ? 'page' : undefined"
-      @click="navigate(item.to, $event)"
-    >
-      <i :class="`icon icon-${item.icon}`"></i>
-    </UButton>
+    <UTooltip v-for="item in items" :key="item.key" :text="item.label" :content="tooltipContent" arrow>
+      <UButton
+        color="neutral"
+        variant="ghost"
+        square
+        :class="[$style['rail-item'], { [$style.active]: activeModule === item.key }]"
+        data-activity-item
+        :data-active="activeModule === item.key"
+        :aria-label="item.label"
+        :aria-current="activeModule === item.key ? 'page' : undefined"
+        @click="navigate(item.to, $event)"
+      >
+        <i :class="`icon icon-${item.icon}`"></i>
+      </UButton>
+    </UTooltip>
     <div :class="$style['rail-spacer']"></div>
-    <UButton
-      color="neutral"
-      variant="ghost"
-      square
-      :class="[$style['rail-item'], { [$style.active]: route.name === 'profile' }]"
-      data-activity-item
-      :data-active="route.name === 'profile'"
-      title="个人资料"
-      aria-label="个人资料"
-      @click="navigate('/profile', $event)"
-    >
-      <i class="icon icon-circle-user-round"></i>
-    </UButton>
-    <UButton
-      color="neutral"
-      variant="ghost"
-      square
-      :class="[$style['rail-item'], { [$style.active]: route.name === 'settings' }]"
-      data-activity-item
-      :data-active="route.name === 'settings'"
-      title="平台设置"
-      aria-label="平台设置"
-      @click="navigate('/settings', $event)"
-    >
-      <i class="icon icon-settings"></i>
-    </UButton>
+    <UTooltip text="个人资料" :content="tooltipContent" arrow>
+      <UButton
+        color="neutral"
+        variant="ghost"
+        square
+        :class="[$style['rail-item'], { [$style.active]: route.name === 'profile' }]"
+        data-activity-item
+        :data-active="route.name === 'profile'"
+        aria-label="个人资料"
+        @click="navigate('/profile', $event)"
+      >
+        <i class="icon icon-circle-user-round"></i>
+      </UButton>
+    </UTooltip>
+    <UTooltip text="平台设置" :content="tooltipContent" arrow>
+      <UButton
+        color="neutral"
+        variant="ghost"
+        square
+        :class="[$style['rail-item'], { [$style.active]: route.name === 'settings' }]"
+        data-activity-item
+        :data-active="route.name === 'settings'"
+        aria-label="平台设置"
+        @click="navigate('/settings', $event)"
+      >
+        <i class="icon icon-settings"></i>
+      </UButton>
+    </UTooltip>
   </nav>
 </template>
 
