@@ -39,26 +39,33 @@
   font-size: var(--fs-sm);
 }
 
+.wf-builder-title nav i {
+  font-size: 11px;
+}
+
+/* 面包屑：列表名与分隔符不收缩（中文不逐字折行），只有末项名称过长时省略；四个 Builder 写法一致。 */
+.wf-builder-title nav > span,
+.wf-builder-title nav > i {
+  flex: none;
+  white-space: nowrap;
+}
+
 .wf-builder-title nav strong {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-muted);
   font-weight: 500;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .wf-builder-title h1 {
   margin-top: 2px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  overflow: hidden;
   font-size: 15px;
   font-weight: 650;
-}
-
-.wf-builder-title h1 span {
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wf-builder-actions {
@@ -124,71 +131,24 @@
   box-shadow: none;
 }
 
-.wf-builder-body {
-  flex: 1;
-  min-height: 0;
-  padding: var(--space-lg) var(--page-gutter) 48px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  overflow-y: auto;
-}
-
-.wf-section {
-  max-width: 1100px;
-  width: 100%;
+/* 当前步骤的表单：在 BuilderSteps 滚动区内居中，与步骤条同宽。 */
+.wf-step {
+  width: min(980px, calc(100% - 24px));
   margin: 0 auto;
-  padding: var(--space-md);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
+  padding: var(--space-md) 0 48px;
 }
 
-.wf-section-head {
-  margin-bottom: var(--space-md);
+/* 选择成员：搜索框 + 已选数量。 */
+.wf-member-toolbar {
+  margin-bottom: var(--space-sm);
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.wf-section-icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-elevated);
-  color: var(--accent-agent);
-  font-size: 15px;
-}
-
-.wf-section-head > div {
-  min-width: 0;
-  flex: 1;
-}
-
-.wf-section-head > div > span {
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
-  font-weight: 650;
-}
-
-.wf-section-head h2 {
-  margin-top: 1px;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.wf-section-head p {
-  margin-top: 3px;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.55;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
 }
 
 .wf-member-count {
+  flex: 0 0 auto;
   padding: 3px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
@@ -307,28 +267,13 @@
   line-height: 1.5;
 }
 
-/* 模式卡片下方的成员数量说明。 */
-.wf-mode-note {
-  margin: var(--space-sm) 0 0;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-sm);
-}
-
-.wf-mode-note i {
-  color: var(--status-warning);
-  font-size: 11px;
-}
-
 .wf-agent-search {
   width: min(360px, 100%);
-  margin-bottom: var(--space-sm);
+  min-width: 0;
 }
 
+/* 单独成步后列表随步骤滚动区整体滚动，不再限高内滚。 */
 .wf-agent-list {
-  max-height: 300px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
@@ -404,23 +349,13 @@
   font-size: var(--fs-xs);
 }
 
-.wf-agent-meta {
+.wf-agent-status {
   flex: 0 0 auto;
-  text-align: right;
-}
-
-.wf-agent-meta strong {
-  display: block;
-  color: var(--accent-agent);
-  font-size: var(--fs-xs);
-}
-
-.wf-agent-meta small {
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
 
-.wf-agent-meta small.offline {
+.wf-agent-status.offline {
   color: var(--status-error);
 }
 
@@ -484,13 +419,11 @@
 
 .wf-member-main strong {
   display: block;
+  overflow: hidden;
   font-size: 12px;
   font-weight: 600;
-}
-
-.wf-member-main small {
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 成员 Agent 被停用或删除时的红色提示。 */
@@ -509,73 +442,15 @@
   gap: 2px;
 }
 
-
-/* 底部检查清单：校验问题按区块分组展示。 */
-.wf-issue-groups {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
+/* 步骤区较窄时，成员不可用警告换到成员名下方独占一行，避免把名称挤成多行。 */
+@container (max-width: 640px) {
+  .wf-member-warning {
+    order: 1;
+    flex-basis: 100%;
+  }
 }
 
-.wf-issue-group {
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--status-warning) 30%, transparent);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--status-warning) 6%, transparent);
-}
-
-.wf-issue-group > strong {
-  color: var(--text-secondary);
-  font-size: var(--fs-sm);
-  font-weight: 650;
-}
-
-.wf-issue-group ul {
-  margin-top: 6px;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.wf-issue-group li {
-  color: var(--status-warning);
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-}
-
-.wf-issue-group li i {
-  margin-top: 1px;
-  font-size: 11px;
-}
-
-/* 校验通过时的绿色确认条。 */
-.wf-issue-clear {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--status-success) 28%, transparent);
-  border-radius: var(--radius-control);
-  color: var(--status-success);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--fs-sm);
-}
-
-.wf-builder-footer {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-}
-
+/* 窄屏：表单单列；页头保存按钮是唯一的保存入口，始终保留。 */
 @media (max-width: 900px) {
   .wf-form-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -583,9 +458,5 @@
 
   .wf-span-2 {
     grid-column: auto;
-  }
-
-  .wf-builder-actions {
-    display: none;
   }
 }

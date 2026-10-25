@@ -42,6 +42,5 @@
   left: var(--page-gutter);
 }
 
-/* 弹窗说明文字改用全局 .modal-copy（src/assets/styles/index.css:326）——
-   全站 12 处同义规则值完全相同，且 create 页没有 <style> 块用不了模块类，
-   留着模块副本只会让「模块 12px / 全局 11px」这种分叉再次发生。 */
+/* 离开确认弹窗的说明文字只走 UModal 的 description（同时作为对话框的 aria-describedby），
+   不要再在 #body 里写一遍，否则同一句会显示两次。 */

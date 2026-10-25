@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { MAX_CONCURRENCY, MIN_TEAM_MEMBERS } from '../interfaces/platform-team/model'
-import { toRow, useTeamsStore, validateTeam } from './teams'
+import { MAX_TEAM_TIMEOUT_SECONDS, MIN_TEAM_TIMEOUT_SECONDS, toRow, useTeamsStore, validateTeam } from './teams'
 
 describe('teams store 播种与转换', () => {
   beforeEach(() => {
@@ -106,5 +106,22 @@ describe('validateTeam 校验', () => {
     draft.concurrency = MAX_CONCURRENCY + 1
     const issues = validateTeam(draft)
     expect(issues.some((issue) => issue.section === 'runtime')).toBe(true)
+  })
+
+  it('每条 issue 都带 field，且 field 与 section 对应（不靠消息文本区分）', () => {
+    const draft = draftWithMembers(0)
+    draft.name = ''
+    draft.concurrency = MAX_CONCURRENCY + 1
+    draft.timeoutSeconds = MAX_TEAM_TIMEOUT_SECONDS + 1
+    const pairs = validateTeam(draft).map((issue) => `${issue.section}:${issue.field}`)
+    expect(pairs).toEqual(['basic:name', 'members:members', 'runtime:concurrency', 'runtime:timeoutSeconds'])
+  })
+
+  it('超时边界值通过校验，越界给出 timeoutSeconds 问题', () => {
+    const draft = draftWithMembers(2)
+    draft.timeoutSeconds = MIN_TEAM_TIMEOUT_SECONDS
+    expect(validateTeam(draft)).toHaveLength(0)
+    draft.timeoutSeconds = MIN_TEAM_TIMEOUT_SECONDS - 1
+    expect(validateTeam(draft).map((issue) => issue.field)).toEqual(['timeoutSeconds'])
   })
 })

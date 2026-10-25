@@ -10,6 +10,7 @@ import {
   validateWorkflow,
   workflowResponseToForm,
 } from './useWorkflowManager'
+import type { SaveOptions } from './useAgentEditor'
 import { useSaveFeedback } from './useSaveFeedback'
 
 /**
@@ -100,7 +101,7 @@ export function useWorkflowEditor() {
   }
 
   /** 校验通过后提交草稿；成功 toast + 回列表并带 ?highlight=<id>，失败把错误留在页面顶部。 */
-  async function saveDraft(): Promise<boolean> {
+  async function saveDraft(options?: SaveOptions): Promise<boolean> {
     if (validateWorkflow(draft.value).length) return false
     if (saving.value) return false
     saving.value = true
@@ -120,6 +121,8 @@ export function useWorkflowEditor() {
       // item 与 error 同时为空表示工作区已切换，本次结果直接放弃。
       if (!result.item) return false
       error.value = ''
+      // 先让页面重置脏检查快照，再跳转；否则离开守卫会把这次跳转当成「未保存离开」拦下。
+      options?.onSaved?.()
       await feedback.afterSave({ id: result.item.id, message: `Workflow「${result.item.name}」已保存` })
       return true
     } finally {

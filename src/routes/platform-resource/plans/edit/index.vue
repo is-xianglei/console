@@ -52,17 +52,18 @@ function requestListLeave() {
   requestGuardLeave(listTarget)
 }
 
-/** Builder 内保存成功后回写基线快照，使脏检查进入已保存态。 */
+/**
+ * Builder 内保存成功后回写基线快照，使脏检查进入已保存态。
+ * 必须在 editor 跳回列表之前重置（onSaved），否则离开守卫会用旧快照拦下这次跳转。
+ */
+const saveOptions = { onSaved: () => snapshot.reset() }
+
 function onSave() {
-  void editor.saveDraft().then((ok) => {
-    if (ok) snapshot.reset()
-  })
+  void editor.saveDraft(saveOptions)
 }
 
 function onPublish() {
-  void editor.publish().then((ok) => {
-    if (ok) snapshot.reset()
-  })
+  void editor.publish(saveOptions)
 }
 </script>
 
@@ -87,7 +88,6 @@ function onPublish() {
   </main>
 
   <UModal :open="leavePending" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存到后端，离开后将丢失。" @update:open="(open) => { if (!open) cancelGuardLeave() }">
-    <template #body><p class="modal-copy">当前修改尚未保存到后端，离开后将丢失。</p></template>
     <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="cancelGuardLeave" /><UButton label="放弃修改" color="error" @click="confirmGuardLeave" /></template>
   </UModal>
 </template>

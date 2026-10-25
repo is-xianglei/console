@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TeamBuilder from '../../components/team-builder/index.vue'
 import { useTeamEditor } from '@/hooks/useTeamEditor'
-import { useSaveFeedback } from '@/hooks/useSaveFeedback'
 import { useSnapshotDirty, useUnsavedGuard } from '@/hooks/useFormHelpers'
 
 defineOptions({ name: 'TeamResourceCreate' })
@@ -11,9 +10,6 @@ defineOptions({ name: 'TeamResourceCreate' })
 const route = useRoute()
 const router = useRouter()
 const editor = useTeamEditor()
-const saveFeedback = useSaveFeedback({
-  listRoute: { name: 'platform-resource', params: { module: 'build', resource: 'teams' } },
-})
 
 /** ?duplicate=<id>：复制已有 Team 作为草稿起点。 */
 const duplicateId = computed(() => {
@@ -36,9 +32,15 @@ const guard = useUnsavedGuard(snapshot.dirty, {
 })
 const { pending: leavePending, requestLeave: requestGuardLeave, confirmLeave: confirmGuardLeave, cancelLeave: cancelGuardLeave } = guard
 
+/** 草稿是否已从复制源预填：仅 ?duplicate 命中已有 Team 时为 true，供步骤条直接标记已完成的步骤。 */
+const prefilled = ref(false)
+
 watch(
   () => [route.fullPath, duplicateId.value] as const,
-  () => { editor.openCreate(duplicateId.value); snapshot.reset() },
+  () => {
+    prefilled.value = editor.openCreate(duplicateId.value)
+    snapshot.reset()
+  },
   { immediate: true },
 )
 
@@ -47,13 +49,17 @@ function requestListLeave() {
   requestGuardLeave(listTarget)
 }
 
-/** 保存草稿成功后回列表并高亮该 Team，失败时留在页面处理校验问题。 */
+/** 保存成功、跳回列表之前重置基线快照，避免离开守卫把保存后的跳转当成「未保存离开」。 */
+const saveOptions = { onSaved: () => snapshot.reset() }
+
+/** 「保存草稿」：按表单当前状态保存，成功后回列表并高亮该 Team。 */
 function onSave() {
-  void editor.saveDraft().then(async (ok) => {
-    if (!ok) return
-    snapshot.reset()
-    await saveFeedback.afterSave({ id: editor.draft.value.id, message: `Team「${editor.draft.value.name}」已保存` })
-  })
+  void editor.saveDraft(saveOptions)
+}
+
+/** 「保存并启用」：走 editor.publish（状态置为启用）。 */
+function onPublish() {
+  void editor.publish(saveOptions)
 }
 </script>
 
@@ -64,13 +70,13 @@ function onSave() {
     :issues="editor.issues.value"
     :saving="editor.saving.value"
     :error="editor.error.value"
+    :prefilled="prefilled"
     @close="requestListLeave"
     @save="onSave"
-    @publish="onSave"
+    @publish="onPublish"
   />
 
   <UModal :open="leavePending" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存，离开后将丢失。" @update:open="(open) => { if (!open) cancelGuardLeave() }">
-    <template #body><p class="modal-copy">当前修改尚未保存，离开后将丢失。</p></template>
     <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="cancelGuardLeave" /><UButton label="放弃修改" color="error" @click="confirmGuardLeave" /></template>
   </UModal>
 </template>

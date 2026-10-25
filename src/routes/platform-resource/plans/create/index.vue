@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PlanBuilder from '../../components/plan-builder/index.vue'
 import { usePlanEditor } from '@/hooks/usePlanEditor'
@@ -30,15 +30,37 @@ const guard = useUnsavedGuard(snapshot.dirty, {
 })
 const { pending: leavePending, requestLeave: requestGuardLeave, confirmLeave: confirmGuardLeave, cancelLeave: cancelGuardLeave } = guard
 
+/** 草稿是否已从复制源预填：仅 ?duplicate 加载成功时为 true，供步骤条直接标记已完成的步骤。 */
+const prefilled = ref(false)
+
 watch(
   () => [route.fullPath, duplicateId.value] as const,
-  () => { void editor.openCreate(duplicateId.value).then(() => snapshot.reset()) },
+  () => {
+    const sourceId = duplicateId.value
+    prefilled.value = false
+    void editor.openCreate(sourceId).then(() => {
+      // openCreate 在复制源加载失败时写 error 并回落为空草稿。
+      prefilled.value = sourceId != null && !editor.error.value
+      snapshot.reset()
+    })
+  },
   { immediate: true },
 )
 
 /** Builder 返回键 / Esc 统一声请离开；干净时直达列表，脏时弹确认。 */
 function requestListLeave() {
   requestGuardLeave(listTarget)
+}
+
+/** 保存成功、跳回列表之前重置基线快照，避免离开守卫把保存后的跳转当成「未保存离开」。 */
+const saveOptions = { onSaved: () => snapshot.reset() }
+
+function onSave() {
+  void editor.saveDraft(saveOptions)
+}
+
+function onPublish() {
+  void editor.publish(saveOptions)
 }
 </script>
 
@@ -50,13 +72,13 @@ function requestListLeave() {
     :agents="editor.agents.value"
     :saving="editor.saving.value"
     :error="editor.error.value"
+    :prefilled="prefilled"
     @close="requestListLeave"
-    @save="editor.saveDraft"
-    @publish="editor.publish"
+    @save="onSave"
+    @publish="onPublish"
   />
 
   <UModal :open="leavePending" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存到后端，离开后将丢失。" @update:open="(open) => { if (!open) cancelGuardLeave() }">
-    <template #body><p class="modal-copy">当前修改尚未保存到后端，离开后将丢失。</p></template>
     <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="cancelGuardLeave" /><UButton label="放弃修改" color="error" @click="confirmGuardLeave" /></template>
   </UModal>
 </template>

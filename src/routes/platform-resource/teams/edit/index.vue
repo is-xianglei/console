@@ -3,7 +3,6 @@ import { computed, useCssModule, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TeamBuilder from '../../components/team-builder/index.vue'
 import { useTeamEditor } from '@/hooks/useTeamEditor'
-import { useSaveFeedback } from '@/hooks/useSaveFeedback'
 import { useSnapshotDirty, useUnsavedGuard } from '@/hooks/useFormHelpers'
 
 defineOptions({ name: 'TeamResourceEdit' })
@@ -14,11 +13,9 @@ const router = useRouter()
 const editor = useTeamEditor()
 /**
  * 回列表的目标路由，供 Builder 返回 / Esc / 取消走外层守卫。
- * 编辑页保存后跳到详情页（afterSaveToDetail），回列表仍走 listTarget。
+ * 编辑页保存后由 editor 跳到详情页，回列表仍走 listTarget。
  */
 const listTarget = { name: 'platform-resource', params: { module: 'build', resource: 'teams' } } as const
-const detailTarget = { name: 'team-detail' } as const
-const saveFeedback = useSaveFeedback({ listRoute: listTarget, detailRoute: detailTarget })
 
 /** Teams 的 id 是「TEAM-0001」形态的目录编号，取路径参数原样使用。 */
 const teamId = computed(() => {
@@ -60,13 +57,17 @@ function requestListLeave() {
   requestGuardLeave(listTarget)
 }
 
-/** Builder 内保存成功后回写基线快照，使脏检查进入已保存态。 */
+/** 保存成功、跳去详情页之前重置基线快照，使脏检查进入已保存态，离开守卫不拦这次跳转。 */
+const saveOptions = { onSaved: () => snapshot.reset() }
+
+/** 「保存草稿」：按表单当前状态保存。 */
 function onSave() {
-  void editor.saveDraft().then(async (ok) => {
-    if (!ok) return
-    snapshot.reset()
-    await saveFeedback.afterSaveToDetail({ id: editor.draft.value.id, message: `Team「${editor.draft.value.name}」已保存` })
-  })
+  void editor.saveDraft(saveOptions)
+}
+
+/** 「保存并启用」：走 editor.publish（状态置为启用）。 */
+function onPublish() {
+  void editor.publish(saveOptions)
 }
 </script>
 
@@ -80,7 +81,7 @@ function onSave() {
     :error="editor.error.value"
     @close="requestListLeave"
     @save="onSave"
-    @publish="onSave"
+    @publish="onPublish"
   />
   <main v-else-if="editor.loadingDetail.value" :class="styles['tm-loading']">
     <div :class="styles['tm-loading-inner']"><UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" :class="styles['tm-loading-back']" aria-label="返回列表" @click="requestListLeave" /><span class="mono">正在加载 Team 定义…</span></div>
@@ -90,7 +91,6 @@ function onSave() {
   </main>
 
   <UModal :open="leavePending" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存，离开后将丢失。" @update:open="(open) => { if (!open) cancelGuardLeave() }">
-    <template #body><p class="modal-copy">当前修改尚未保存，离开后将丢失。</p></template>
     <template #footer><UButton label="继续编辑" color="neutral" variant="outline" @click="cancelGuardLeave" /><UButton label="放弃修改" color="error" @click="confirmGuardLeave" /></template>
   </UModal>
 </template>

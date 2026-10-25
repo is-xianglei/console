@@ -90,10 +90,11 @@ export function validateWorkflow(form: WorkflowFormModel): WorkflowValidationIss
   const issues: WorkflowValidationIssue[] = []
   const name = form.name.trim()
   if (!name) {
-    issues.push({ section: 'basic', message: '名称不能为空。' })
+    issues.push({ section: 'basic', step: 'basic', message: '名称不能为空。' })
   } else if (name.length > MAX_WORKFLOW_NAME_LENGTH) {
     issues.push({
       section: 'basic',
+      step: 'basic',
       message: `名称不能超过 ${MAX_WORKFLOW_NAME_LENGTH} 个字符，当前 ${name.length} 个。`,
     })
   }
@@ -102,6 +103,7 @@ export function validateWorkflow(form: WorkflowFormModel): WorkflowValidationIss
   if (form.members.length < minMembers) {
     issues.push({
       section: 'members',
+      step: 'members',
       message: `${WORKFLOW_MODE_LABEL[form.mode]}至少需要 ${minMembers} 个成员，当前 ${form.members.length} 个。`,
     })
   }
@@ -118,14 +120,17 @@ export function validateWorkflow(form: WorkflowFormModel): WorkflowValidationIss
   if (duplicated.length) {
     issues.push({
       section: 'members',
+      step: 'members',
       message: `${duplicated.join('、')} 重复加入，同一 Agent 只能出现一次。`,
     })
   }
 
+  // 不可用警告显示在「成员配置」步骤的成员行上，问题也归到该步。
   const unavailable = form.members.filter((member) => !member.isAvailable)
   if (unavailable.length) {
     issues.push({
       section: 'members',
+      step: 'config',
       message: `${unavailable.map((member) => member.agentName).join('、')} 已停用或已删除，请移除后再保存。`,
     })
   }

@@ -37,6 +37,8 @@ describe('useAgentEditor', () => {
       setItem: vi.fn(),
       removeItem: vi.fn(),
     })
+    // routerPush / toastAdd 是模块级 mock，逐例清空调用记录，避免断言串到上一个用例。
+    vi.clearAllMocks()
     setActivePinia(createPinia())
     const agentsStore = useAgentsStore()
     agentsStore.loadAgentDetail = vi.fn()
@@ -103,5 +105,38 @@ describe('useAgentEditor', () => {
     expect(routerPush).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'platform-resource', query: { highlight: '5' } }),
     )
+  })
+
+  // 回归：保存成功后页面要先重置脏检查快照（onSaved），再跳回列表；顺序反了会被离开守卫拦下误弹确认。
+  describe.each(['saveDraft', 'publish'] as const)('%s 的 onSaved 时序', (method) => {
+    async function validEditor() {
+      const editor = useAgentEditor()
+      await editor.openCreate()
+      editor.draft.value.name = '设备诊断'
+      editor.draft.value.systemPrompt = '依据证据分析。'
+      return editor
+    }
+
+    it('保存成功：先 onSaved，再 router.push', async () => {
+      ;(useAgentsStore().saveAgent as ReturnType<typeof vi.fn>).mockResolvedValue({ item: agent(), error: null })
+      const onSaved = vi.fn()
+      const editor = await validEditor()
+      const ok = await editor[method]({ onSaved })
+      expect(ok).toBe(true)
+      expect(onSaved).toHaveBeenCalledTimes(1)
+      expect(routerPush).toHaveBeenCalledTimes(1)
+      expect(onSaved.mock.invocationCallOrder[0]!).toBeLessThan(routerPush.mock.invocationCallOrder[0]!)
+    })
+
+    it('保存失败：不调 onSaved，也不跳转', async () => {
+      ;(useAgentsStore().saveAgent as ReturnType<typeof vi.fn>).mockResolvedValue({ item: null, error: '后端返回 500' })
+      const onSaved = vi.fn()
+      const editor = await validEditor()
+      const ok = await editor[method]({ onSaved })
+      expect(ok).toBe(false)
+      expect(editor.error.value).toBe('后端返回 500')
+      expect(onSaved).not.toHaveBeenCalled()
+      expect(routerPush).not.toHaveBeenCalled()
+    })
   })
 })

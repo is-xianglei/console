@@ -23,7 +23,6 @@
 .workspace { margin-top: 12px; min-height: 420px; border: 1px solid var(--border); background: var(--bg-panel); }
 .toolbar { min-height: 55px; padding: 9px 11px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
 .search { width: min(390px, 100%); }
-.workspaceName { margin-left: auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .alert { margin: 10px; }
 .listPane { min-width: 0; overflow: auto; }
 /* .primaryCell / .entityIcon 已移入 table-baseline.module.css（本文件第 6 行导入），
@@ -37,12 +36,13 @@
 .sectionHeader { margin-top: 20px; display: flex; align-items: flex-end; justify-content: space-between; }
 .sectionHeader span { color: var(--accent-agent); font-family: var(--font-data); font-size: var(--fs-micro); }
 .sectionHeader h3 { margin-top: 2px; color: var(--text-primary); font-size: var(--fs-sm); }
-.modalCopy { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.65; }
+/* 离开确认弹窗的说明文字只走 UModal 的 description（同时作为对话框的 aria-describedby），
+   不要再在 #body 里写一遍，否则同一句会显示两次。 */
 .toast { min-height: 42px; padding: 0 14px; position: fixed; bottom: 26px; left: 50%; z-index: 60; transform: translateX(-50%); border: 1px solid var(--border-visible); border-radius: var(--radius-md); background: var(--bg-elevated); color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .toast i { color: var(--status-success); }
 :global(.dept-toast-enter-active), :global(.dept-toast-leave-active) { transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out); }
 :global(.dept-toast-enter-from), :global(.dept-toast-leave-to) { opacity: 0; transform: translateX(-50%) translateY(8px); }
-@media (max-width: 720px) { .page { padding: 22px 12px calc(76px + env(safe-area-inset-bottom)); }.header { flex-direction: column; gap: 14px; }.headerActions { width: 100%; }.metrics { grid-template-columns: repeat(2, 1fr); }.metrics > div:nth-child(3) { border-top: 1px solid var(--border-subtle); border-left: 0; }.metrics > div:nth-child(4) { border-top: 1px solid var(--border-subtle); }.toolbar { flex-wrap: wrap; }.search { width: 100%; }.workspaceName { margin-left: 0; flex: 1; }.table :global([data-slot='th']:nth-child(n + 3):not(:last-child)),.table :global([data-slot='td']:nth-child(n + 3):not(:last-child)) { display: none; } }
+@media (max-width: 720px) { .page { padding: 22px 12px calc(76px + env(safe-area-inset-bottom)); }.header { flex-direction: column; gap: 14px; }.headerActions { width: 100%; }.metrics { grid-template-columns: repeat(2, 1fr); }.metrics > div:nth-child(3) { border-top: 1px solid var(--border-subtle); border-left: 0; }.metrics > div:nth-child(4) { border-top: 1px solid var(--border-subtle); }.toolbar { flex-wrap: wrap; }.search { width: 100%; }.table :global([data-slot='th']:nth-child(n + 3):not(:last-child)),.table :global([data-slot='td']:nth-child(n + 3):not(:last-child)) { display: none; } }
 /* 表单页(create/edit)外壳。 */
 .formShell { margin-top: 16px; max-width: 760px; padding: 20px 22px; border: 1px solid var(--border); background: var(--bg-panel); }
 .formLoading { min-height: 220px; display: grid; gap: 14px; align-content: start; }

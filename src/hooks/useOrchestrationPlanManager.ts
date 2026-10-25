@@ -1,7 +1,9 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { PlanMode, PlanResponse } from '@/interfaces/orchestration-plan/api'
 import type {
+  PlanBuilderStep,
   PlanFormModel,
+  PlanIssueField,
   PlanMemberFormModel,
   PlanValidationIssue,
 } from '@/interfaces/orchestration-plan/model'
@@ -89,44 +91,75 @@ export function isPlanMemberAvailable(member: PlanResponse['members'][number]): 
   return member.is_available
 }
 
-/** 任一成员失效即视为方案成员失效，列表统计与详情告警共用该判定。 */
-export function hasUnavailablePlanMember(plan: PlanResponse): boolean {
-  return plan.members.some((member) => !member.is_available)
-}
-
-/** 与后端 Service 校验规则对齐，让用户在提交前就看到问题；有任一问题即阻止保存。 */
+/**
+ * 与后端 Service 校验规则对齐，让用户在提交前就看到问题；有任一问题即阻止保存。
+ * 每条问题带 field（routeKey / when 另带 memberIndex），Builder 据此定位步骤与字段，不依赖消息文本。
+ */
 export function validatePlan(plan: PlanFormModel): PlanValidationIssue[] {
   const issues: PlanValidationIssue[] = []
-  if (!plan.name.trim()) issues.push({ section: 'basic', message: '名称不能为空。' })
+  if (!plan.name.trim()) issues.push({ section: 'basic', field: 'name', message: '名称不能为空。' })
   if (plan.members.length < MIN_MEMBERS || plan.members.length > MAX_MEMBERS) {
-    issues.push({ section: 'members', message: `成员数量需在 ${MIN_MEMBERS}-${MAX_MEMBERS} 个之间，当前 ${plan.members.length} 个。` })
+    issues.push({ section: 'members', field: 'members', message: `成员数量需在 ${MIN_MEMBERS}-${MAX_MEMBERS} 个之间，当前 ${plan.members.length} 个。` })
+  }
+  const agentIds = plan.members.map((member) => member.agentId)
+  const duplicated = plan.members.filter((member, index) => agentIds.indexOf(member.agentId) !== index)
+  if (duplicated.length) {
+    issues.push({ section: 'members', field: 'members', message: `${duplicated.map((member) => member.agentName).join('、')} 重复加入，同一 Agent 只能加入一次。` })
   }
   const unavailable = plan.members.filter((member) => !member.isAvailable)
   if (unavailable.length) {
-    issues.push({ section: 'members', message: `${unavailable.map((member) => member.agentName).join('、')} 已停用，方案将无法运行。` })
+    issues.push({ section: 'members', field: 'members', message: `${unavailable.map((member) => member.agentName).join('、')} 已停用，方案将无法运行。` })
   }
   if (plan.mode === 'loop') {
     if (!Number.isInteger(plan.maxIterations)
       || plan.maxIterations < MIN_ITERATIONS
       || plan.maxIterations > MAX_ITERATIONS) {
-      issues.push({ section: 'config', message: `循环轮数必须是 ${MIN_ITERATIONS}-${MAX_ITERATIONS} 的整数。` })
+      issues.push({ section: 'config', field: 'maxIterations', message: `循环轮数必须是 ${MIN_ITERATIONS}-${MAX_ITERATIONS} 的整数。` })
     }
   }
   if (plan.mode === 'routing') {
     const routeKeys = plan.members.map((member) => member.routeKey.trim())
     plan.members.forEach((member, index) => {
-      if (!routeKeys[index]) issues.push({ section: 'config', message: `成员 ${member.agentName} 缺少路由标识。` })
-      else if (routeKeys.indexOf(routeKeys[index]!) !== index) {
-        issues.push({ section: 'config', message: `路由标识 ${routeKeys[index]} 重复，方案内必须唯一。` })
+      if (!routeKeys[index]) {
+        issues.push({ section: 'config', field: 'routeKey', memberIndex: index, message: `成员 ${member.agentName} 缺少路由标识。` })
+      } else if (routeKeys.indexOf(routeKeys[index]!) !== index) {
+        // 重复的那一行（第二次及以后出现）报错，字段级提示落在该行的路由标识上。
+        issues.push({ section: 'config', field: 'routeKey', memberIndex: index, message: `路由标识 ${routeKeys[index]} 重复，方案内必须唯一。` })
       }
-      if (!member.when.trim()) issues.push({ section: 'config', message: `成员 ${member.agentName} 缺少触发条件描述。` })
+      if (!member.when.trim()) {
+        issues.push({ section: 'config', field: 'when', memberIndex: index, message: `成员 ${member.agentName} 缺少触发条件描述。` })
+      }
     })
     const fallback = plan.fallback.trim()
     if (fallback && !routeKeys.includes(fallback)) {
-      issues.push({ section: 'config', message: `兜底路由 ${fallback} 未命中任何成员的路由标识。` })
+      issues.push({ section: 'config', field: 'fallback', message: `兜底路由 ${fallback} 未命中任何成员的路由标识。` })
     }
   }
   return issues
+}
+
+/** 校验问题字段 → Builder 步骤：每个字段都有归属，类型保证不会漏映射。 */
+const PLAN_ISSUE_STEP: Record<PlanIssueField, PlanBuilderStep> = {
+  name: 'basic',
+  members: 'members',
+  routeKey: 'order',
+  when: 'order',
+  maxIterations: 'config',
+  fallback: 'config',
+}
+
+/** 校验问题所在的 Builder 步骤。 */
+export function planIssueStep(issue: PlanValidationIssue): PlanBuilderStep {
+  return PLAN_ISSUE_STEP[issue.field]
+}
+
+/**
+ * 校验问题 → UFormField name：routeKey / when 落到对应成员行（`routeKey-<下标>` / `when-<下标>`），
+ * 其余即字段名。members 没有单独的输入控件，只由步骤内问题提示展示。
+ */
+export function planIssueFieldName(issue: PlanValidationIssue): string {
+  if (issue.field === 'routeKey' || issue.field === 'when') return `${issue.field}-${issue.memberIndex ?? 0}`
+  return issue.field
 }
 
 /** 列表页状态：加载、筛选、启停、删除；不含编辑/详情/保存。 */
@@ -214,13 +247,6 @@ export function useOrchestrationPlanManager() {
     return filteredPlans.value.filter((item) => set.has(String(item.id)))
   })
   const selectedCount = computed(() => selectedPlans.value.length)
-
-  const stats = computed(() => ({
-    all: plansStore.state.total,
-    enabled: plans.value.filter((plan) => plan.is_enabled).length,
-    disabled: plans.value.filter((plan) => !plan.is_enabled).length,
-    broken: plans.value.filter((plan) => hasUnavailablePlanMember(plan)).length,
-  }))
 
   function showToast(message: string) {
     toast.value = message
@@ -413,7 +439,6 @@ export function useOrchestrationPlanManager() {
     clampedPage,
     pagedItems,
     filteredPlans,
-    stats,
     validatePlan,
     showToast,
     loadAll,

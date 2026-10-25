@@ -10,6 +10,7 @@ import {
   planResponseToForm,
   validatePlan,
 } from './useOrchestrationPlanManager'
+import type { SaveOptions } from './useAgentEditor'
 import { useSaveFeedback } from './useSaveFeedback'
 
 /**
@@ -108,7 +109,7 @@ export function usePlanEditor() {
    * 保存草稿（保留草稿自带的启用状态）；校验通过后提交。
    * 成功跳详情页，失败把错误留在页面顶部。
    */
-  async function saveDraft(): Promise<boolean> {
+  async function saveDraft(options?: SaveOptions): Promise<boolean> {
     if (validatePlan(draft.value).length) return false
     if (saving.value) return false
     saving.value = true
@@ -134,6 +135,8 @@ export function usePlanEditor() {
       // item 与 error 同时为空表示工作区已切换，本次结果直接放弃。
       if (!result.item) return false
       error.value = ''
+      // 先让页面重置脏检查快照，再跳转；否则离开守卫会把这次跳转当成「未保存离开」拦下。
+      options?.onSaved?.()
       await feedback.afterSave({ id: result.item.id, message: `编排方案「${result.item.name}」已保存` })
       return true
     } finally {
@@ -142,7 +145,7 @@ export function usePlanEditor() {
   }
 
   /** 校验通过后以启用态提交，立即对会话开放；成功 toast + 回列表并带 ?highlight=<id>。 */
-  async function publish(): Promise<boolean> {
+  async function publish(options?: SaveOptions): Promise<boolean> {
     if (validatePlan(draft.value).length) return false
     if (saving.value) return false
     saving.value = true
@@ -167,6 +170,7 @@ export function usePlanEditor() {
       }
       if (!result.item) return false
       error.value = ''
+      options?.onSaved?.()
       await feedback.afterSave({ id: result.item.id, message: `编排方案「${result.item.name}」已发布` })
       return true
     } finally {

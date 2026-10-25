@@ -42,4 +42,5 @@
   left: var(--page-gutter);
 }
 
-/* 弹窗说明文字改用全局 .modal-copy（src/assets/styles/index.css:326）。 */
+/* 离开确认弹窗的说明文字只走 UModal 的 description（同时作为对话框的 aria-describedby），
+   不要再在 #body 里写一遍，否则同一句会显示两次。 */

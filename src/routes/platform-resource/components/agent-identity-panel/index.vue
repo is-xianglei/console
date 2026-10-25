@@ -7,11 +7,7 @@ defineProps<{ agent: AgentFormModel }>()
 </script>
 
 <template>
-  <section :class="$style['ag-editor-section']" aria-labelledby="agent-identity-title">
-    <header :class="$style['ag-section-head']">
-      <span :class="$style['ag-section-icon']"><i class="icon icon-id-card"></i></span>
-      <div><span>01</span><h2 id="agent-identity-title">基本信息</h2><p>设置 Agent 名称、用途描述和启用状态。</p></div>
-    </header>
+  <section :class="$style['ag-editor-section']" aria-label="基本信息">
     <UForm :class="[$style['ag-form-grid'], $style['ag-form']]" :state="agent">
       <UFormField :class="$style['ag-field']" label="名称" name="name" required>
         <UInput v-model="agent.name" autocomplete="off" maxlength="128" placeholder="例如：设备诊断 Agent" />

@@ -4,6 +4,7 @@ import type { AgentResponse } from '@/interfaces/agent/api'
 import type { WorkflowResponse } from '@/interfaces/workflow/api'
 import { useAgentsStore } from '@/stores/agents'
 import { useWorkflowsStore } from '@/stores/workflows'
+import { groupIssuesByStep } from './useBuilderSteps'
 import { useWorkflowEditor } from './useWorkflowEditor'
 
 const routerPush = vi.fn()
@@ -54,6 +55,8 @@ describe('useWorkflowEditor', () => {
       setItem: vi.fn(),
       removeItem: vi.fn(),
     })
+    // routerPush / toastAdd 是模块级 mock，逐例清空调用记录，避免断言串到上一个用例。
+    vi.clearAllMocks()
     setActivePinia(createPinia())
     // 编辑页需要 Agent 目录，但测试不真发请求；预填充 items 让 ensureAgents 跳过加载。
     useAgentsStore().state.items = [agent(7, '设备诊断')]
@@ -88,6 +91,21 @@ describe('useWorkflowEditor', () => {
     expect(ok).toBe(true)
     expect(editor.draft.value.id).toBe(5)
     expect(editor.draft.value.mode).toBe('parallel')
+  })
+
+  // Builder 用 issue.step 按步骤分组：成员不可用的提示要落在「成员配置」，数量不足落在「选择成员」。
+  it('openEdit 后不可用成员的 issue 归到 config 步骤', async () => {
+    useAgentsStore().state.items = [agent(7, '设备诊断', false)]
+    const workflowsStore = useWorkflowsStore()
+    ;(workflowsStore.loadWorkflowDetail as ReturnType<typeof vi.fn>).mockResolvedValue(workflow())
+    const editor = useWorkflowEditor()
+    await editor.openEdit(5)
+    const byStep = groupIssuesByStep(editor.issues.value, (issue) => issue.step)
+    expect(byStep.config).toEqual(['设备诊断 已停用或已删除，请移除后再保存。'])
+    // workflow() 是并行模式且只有 1 个成员：数量不足归到 members。
+    expect(byStep.members).toEqual([expect.stringContaining('至少需要 2 个成员')])
+    expect(byStep.basic).toBeUndefined()
+    expect(byStep).not.toHaveProperty('mode')
   })
 
   it('openEdit 详情缺失时返回 false 并设置 notFound', async () => {
@@ -126,5 +144,39 @@ describe('useWorkflowEditor', () => {
     expect(routerPush).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'platform-resource', query: { highlight: '5' } }),
     )
+  })
+
+  // 回归：保存成功后页面要先重置脏检查快照（onSaved），再跳回列表；顺序反了会被离开守卫拦下误弹确认。
+  // Workflow 只有 saveDraft 一条保存路径（Builder 只 emit save）。
+  describe('saveDraft 的 onSaved 时序', () => {
+    async function validEditor() {
+      const editor = useWorkflowEditor()
+      await editor.openCreate()
+      editor.draft.value.name = '故障诊断'
+      editor.draft.value.members = [{ agentId: 7, agentName: '设备诊断', isAvailable: true }]
+      return editor
+    }
+
+    it('保存成功：先 onSaved，再 router.push', async () => {
+      ;(useWorkflowsStore().saveWorkflow as ReturnType<typeof vi.fn>).mockResolvedValue({ item: workflow(), error: null })
+      const onSaved = vi.fn()
+      const editor = await validEditor()
+      const ok = await editor.saveDraft({ onSaved })
+      expect(ok).toBe(true)
+      expect(onSaved).toHaveBeenCalledTimes(1)
+      expect(routerPush).toHaveBeenCalledTimes(1)
+      expect(onSaved.mock.invocationCallOrder[0]!).toBeLessThan(routerPush.mock.invocationCallOrder[0]!)
+    })
+
+    it('保存失败：不调 onSaved，也不跳转', async () => {
+      ;(useWorkflowsStore().saveWorkflow as ReturnType<typeof vi.fn>).mockResolvedValue({ item: null, error: '后端返回 500' })
+      const onSaved = vi.fn()
+      const editor = await validEditor()
+      const ok = await editor.saveDraft({ onSaved })
+      expect(ok).toBe(false)
+      expect(editor.error.value).toBe('后端返回 500')
+      expect(onSaved).not.toHaveBeenCalled()
+      expect(routerPush).not.toHaveBeenCalled()
+    })
   })
 })

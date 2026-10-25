@@ -42,19 +42,14 @@ function onToolToggle(tool: ToolResponse, value: boolean | 'indeterminate') {
 </script>
 
 <template>
-  <section :class="$style['ag-editor-section']" aria-labelledby="agent-capabilities-title">
-    <header :class="$style['ag-section-head']">
-      <span :class="$style['ag-section-icon']"><i class="icon icon-blocks"></i></span>
-      <div><span>04</span><h2 id="agent-capabilities-title">能力</h2><p>从当前工作区目录绑定 Skill，并选择 Agent 可调用的内置工具。</p></div>
-    </header>
+  <section :class="$style['ag-editor-section']" aria-label="能力">
     <UTabs v-model="activeTab" :class="$style['ag-capability-tabs']" :items="capabilityTabs" :content="false" variant="link" aria-label="能力配置类型" />
 
     <div v-if="loading" :class="$style['ag-capability-pane']">
-      <div :class="$style['ag-pane-intro']"><span><strong>正在加载能力目录</strong><small>获取当前工作区的 Skills 与 Tools。</small></span><UIcon name="i-lucide-loader-circle" class="spinning" /></div>
+      <div :class="$style['ag-pane-loading']" role="status"><UIcon name="i-lucide-loader-circle" class="spinning" /><span>正在加载能力目录</span></div>
     </div>
 
     <div v-else-if="activeTab === 'skills'" :class="$style['ag-capability-pane']">
-      <div :class="$style['ag-pane-intro']"><span><strong>选择 Skill</strong><small>保存时以数字 ID 全量替换 Agent 的 Skill 绑定。</small></span></div>
       <label v-for="skill in skills" :key="skill.id" :class="[$style['ag-select-row'], { [$style.selected]: hasSkill(skill.id) }]">
         <UCheckbox :model-value="hasSkill(skill.id)" @update:model-value="onSkillToggle(skill.id, $event)" />
         <span :class="$style['ag-select-icon']"><i class="icon icon-wrench"></i></span>
@@ -66,7 +61,6 @@ function onToolToggle(tool: ToolResponse, value: boolean | 'indeterminate') {
     </div>
 
     <div v-else :class="$style['ag-capability-pane']">
-      <div :class="$style['ag-pane-intro']"><span><strong>选择内置工具</strong><small>已停用工具仅在原本绑定时保留展示，不能新增绑定。</small></span></div>
       <div v-if="tools.length" :class="$style['ag-tool-table']">
         <div :class="$style['ag-tool-head']"><span>工具</span><span>类型</span><span>来源</span><span>状态</span></div>
         <div v-for="tool in tools" :key="tool.id" :class="$style['ag-tool-row']">

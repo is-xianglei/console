@@ -3,7 +3,9 @@ import { computed, reactive } from 'vue'
 import { RESOURCE_PAGES } from '../constants/platform-catalog'
 import type { ResourceRow, ResourceStatus } from '../interfaces/platform/model'
 import {
+  MAX_CONCURRENCY,
   MAX_TEAM_MEMBERS,
+  MIN_CONCURRENCY,
   MIN_TEAM_MEMBERS,
   type TeamFormModel,
   type TeamMember,
@@ -166,32 +168,48 @@ export const useTeamsStore = defineStore('teams', () => {
   return { state, teamCount, ensureLoaded, findTeam, nextId, createDraft, duplicateDraft, upsert, removeTeam, setStatus }
 })
 
+/** Team 名称最长字符数：校验与 Builder 输入框的 maxlength 共用。 */
+export const MAX_TEAM_NAME_LENGTH = 40
+/** 单次运行超时秒数的范围：校验与 Builder 数字输入的 min / max 共用。 */
+export const MIN_TEAM_TIMEOUT_SECONDS = 10
+export const MAX_TEAM_TIMEOUT_SECONDS = 600
+
+/** 校验问题落到的表单字段，与 TeamBuilder 里 UFormField 的 name 一一对应。 */
+export type TeamIssueField = 'name' | 'members' | 'concurrency' | 'timeoutSeconds'
+
+/** 在 TeamValidationIssue 上追加 field（不改原有字段），Builder 据此标记出错字段，不再匹配消息文本。 */
+export interface TeamIssue extends TeamValidationIssue {
+  field: TeamIssueField
+}
+
 /** 与 PlanValidationIssue 同构的校验，供编辑页与详情页共用。 */
-export function validateTeam(team: TeamFormModel): TeamValidationIssue[] {
-  const issues: TeamValidationIssue[] = []
-  if (!team.name.trim()) issues.push({ section: 'basic', message: '请输入 Team 名称' })
-  if (team.name.trim().length > 40) issues.push({ section: 'basic', message: 'Team 名称不能超过 40 个字符' })
+export function validateTeam(team: TeamFormModel): TeamIssue[] {
+  const issues: TeamIssue[] = []
+  if (!team.name.trim()) issues.push({ section: 'basic', field: 'name', message: '请输入 Team 名称' })
+  if (team.name.trim().length > MAX_TEAM_NAME_LENGTH) {
+    issues.push({ section: 'basic', field: 'name', message: `Team 名称不能超过 ${MAX_TEAM_NAME_LENGTH} 个字符` })
+  }
   if (team.members.length < MIN_TEAM_MEMBERS) {
-    issues.push({ section: 'members', message: `至少需要 ${MIN_TEAM_MEMBERS} 个成员 Agent` })
+    issues.push({ section: 'members', field: 'members', message: `至少需要 ${MIN_TEAM_MEMBERS} 个成员 Agent` })
   }
   if (team.members.length > MAX_TEAM_MEMBERS) {
-    issues.push({ section: 'members', message: `成员 Agent 不能超过 ${MAX_TEAM_MEMBERS} 个` })
+    issues.push({ section: 'members', field: 'members', message: `成员 Agent 不能超过 ${MAX_TEAM_MEMBERS} 个` })
   }
   if (team.members.some((member) => !member.agentName.trim())) {
-    issues.push({ section: 'members', message: '存在未指定 Agent 的成员行' })
+    issues.push({ section: 'members', field: 'members', message: '存在未指定 Agent 的成员行' })
   }
   const names = team.members.map((member) => member.agentName.trim()).filter(Boolean)
   if (new Set(names).size !== names.length) {
-    issues.push({ section: 'members', message: '同一个 Agent 不能重复加入 Team' })
+    issues.push({ section: 'members', field: 'members', message: '同一个 Agent 不能重复加入 Team' })
   }
   if (team.members.length && (team.entryIndex < 0 || team.entryIndex >= team.members.length)) {
-    issues.push({ section: 'members', message: '请指定入口 Agent' })
+    issues.push({ section: 'members', field: 'members', message: '请指定入口 Agent' })
   }
-  if (team.concurrency < 1 || team.concurrency > 8) {
-    issues.push({ section: 'runtime', message: '并发上限需要在 1 到 8 之间' })
+  if (team.concurrency < MIN_CONCURRENCY || team.concurrency > MAX_CONCURRENCY) {
+    issues.push({ section: 'runtime', field: 'concurrency', message: `并发上限需要在 ${MIN_CONCURRENCY} 到 ${MAX_CONCURRENCY} 之间` })
   }
-  if (team.timeoutSeconds < 10 || team.timeoutSeconds > 600) {
-    issues.push({ section: 'runtime', message: '超时时间需要在 10 到 600 秒之间' })
+  if (team.timeoutSeconds < MIN_TEAM_TIMEOUT_SECONDS || team.timeoutSeconds > MAX_TEAM_TIMEOUT_SECONDS) {
+    issues.push({ section: 'runtime', field: 'timeoutSeconds', message: `超时时间需要在 ${MIN_TEAM_TIMEOUT_SECONDS} 到 ${MAX_TEAM_TIMEOUT_SECONDS} 秒之间` })
   }
   return issues
 }

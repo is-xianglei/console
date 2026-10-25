@@ -111,6 +111,7 @@ describe('validateWorkflow', () => {
   it('名称去空格后不能为空', () => {
     expect(validateWorkflow(form({ name: '   ' }))).toContainEqual({
       section: 'basic',
+      step: 'basic',
       message: '名称不能为空。',
     })
   })
@@ -127,6 +128,7 @@ describe('validateWorkflow', () => {
     }))
     expect(issues).toContainEqual({
       section: 'members',
+      step: 'members',
       message: expect.stringContaining('至少需要 2 个成员'),
     })
   })
@@ -152,6 +154,53 @@ describe('validateWorkflow', () => {
 
   it('合法表单不产生问题', () => {
     expect(validateWorkflow(form())).toEqual([])
+  })
+
+  // 每条 issue 都带 Builder 步骤（step），供分步提示与「跳到首个问题步骤」使用。
+  describe('issue 对应的 Builder 步骤', () => {
+    function stepOf(issues: ReturnType<typeof validateWorkflow>, keyword: string) {
+      return issues.find((issue) => issue.message.includes(keyword))?.step
+    }
+
+    it('名称为空 / 超长归到 basic', () => {
+      expect(stepOf(validateWorkflow(form({ name: '' })), '名称不能为空')).toBe('basic')
+      expect(stepOf(validateWorkflow(form({ name: 'a'.repeat(129) })), '128')).toBe('basic')
+    })
+
+    it('成员数量不足归到 members', () => {
+      const issues = validateWorkflow(form({ mode: 'llm_routing', members: [] }))
+      expect(stepOf(issues, '至少需要 2 个成员')).toBe('members')
+    })
+
+    it('成员重复归到 members', () => {
+      const issues = validateWorkflow(form({
+        members: [
+          { agentId: 7, agentName: '设备诊断', isAvailable: true },
+          { agentId: 7, agentName: '设备诊断', isAvailable: true },
+        ],
+      }))
+      expect(stepOf(issues, '重复加入')).toBe('members')
+    })
+
+    it('成员不可用归到 config（警告显示在成员配置步骤的成员行上），section 仍为 members', () => {
+      const issues = validateWorkflow(form({
+        members: [{ agentId: 7, agentName: '设备诊断', isAvailable: false }],
+      }))
+      expect(issues).toEqual([{
+        section: 'members',
+        step: 'config',
+        message: '设备诊断 已停用或已删除，请移除后再保存。',
+      }])
+    })
+
+    it('多类问题同时存在时各自归到所属步骤，不出现 mode', () => {
+      const issues = validateWorkflow(form({
+        name: '',
+        mode: 'parallel',
+        members: [{ agentId: 9, agentName: '排程优化', isAvailable: false }],
+      }))
+      expect(issues.map((issue) => issue.step)).toEqual(['basic', 'members', 'config'])
+    })
   })
 })
 

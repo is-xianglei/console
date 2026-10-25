@@ -10,6 +10,11 @@ import {
 } from './useAgentManager'
 import { useSaveFeedback } from './useSaveFeedback'
 
+export interface SaveOptions {
+  /** 保存成功、跳转回列表之前调用；页面用它重置脏检查快照，避免离开守卫拦下保存后的跳转。 */
+  onSaved?: () => void
+}
+
 /** 新建/编辑/复制/保存：与列表逻辑(useAgentManager)分离，供 create/edit 路由页实例化。 */
 export function useAgentEditor() {
   const router = useRouter()
@@ -112,28 +117,33 @@ export function useAgentEditor() {
     return result.item
   }
 
-  async function saveDraft(): Promise<boolean> {
+  /**
+   * 保存成功后：先回调 onSaved（页面在此重置脏检查快照），再 toast + 回列表。
+   * 顺序不能反：persist 已用后端返回值替换 draft，若先跳转，onBeforeRouteLeave
+   * 会用旧快照判脏并拦下这次跳转，误弹「放弃未保存的修改？」。保存失败不回调，守卫照常生效。
+   */
+  async function commit(enabled: boolean, verb: string, options?: SaveOptions): Promise<boolean> {
     if (saving.value) return false
     saving.value = true
     try {
-      const saved = await persist(draft.value.isEnabled)
-      if (saved) await feedback.afterSave({ id: saved.id, message: `Agent「${saved.name}」已保存` })
-      return Boolean(saved)
+      const saved = await persist(enabled)
+      if (!saved) return false
+      options?.onSaved?.()
+      await feedback.afterSave({ id: saved.id, message: `Agent「${saved.name}」已${verb}` })
+      return true
     } finally {
       saving.value = false
     }
   }
 
-  async function publish(): Promise<boolean> {
-    if (saving.value) return false
-    saving.value = true
-    try {
-      const saved = await persist(true)
-      if (saved) await feedback.afterSave({ id: saved.id, message: `Agent「${saved.name}」已发布` })
-      return Boolean(saved)
-    } finally {
-      saving.value = false
-    }
+  /** 「保存配置」：按表单当前 isEnabled 保存。 */
+  function saveDraft(options?: SaveOptions): Promise<boolean> {
+    return commit(draft.value.isEnabled, '保存', options)
+  }
+
+  /** 「保存并启用」：强制 isEnabled = true。 */
+  function publish(options?: SaveOptions): Promise<boolean> {
+    return commit(true, '发布', options)
   }
 
   return {

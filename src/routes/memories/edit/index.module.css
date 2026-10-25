@@ -92,11 +92,8 @@
   padding: 18px;
 }
 
-.modalCopy {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
+/* 离开确认弹窗的说明文字只走 UModal 的 description（同时作为对话框的 aria-describedby），
+   不要再在 #body 里写一遍，否则同一句会显示两次。 */
 
 @media (max-width: 920px) {
   .page {

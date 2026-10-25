@@ -58,6 +58,8 @@ describe('usePlanEditor', () => {
       setItem: vi.fn(),
       removeItem: vi.fn(),
     })
+    // routerPush / toastAdd 是模块级 mock，逐例清空调用记录，避免断言串到上一个用例。
+    vi.clearAllMocks()
     setActivePinia(createPinia())
     // 编辑页需要 Agent 目录，但测试不真发请求；预填充 items 让 ensureAgents 跳过加载。
     useAgentsStore().state.items = [agent(7, '设备诊断'), agent(8, '日志分析')]
@@ -152,5 +154,63 @@ describe('usePlanEditor', () => {
     expect(routerPush).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'platform-resource', query: { highlight: '5' } }),
     )
+  })
+
+  it('issues 随草稿实时重算并带字段定位；兜底路由未命中时不提交', async () => {
+    const saveMock = (useOrchestrationPlansStore().savePlan as ReturnType<typeof vi.fn>)
+    const editor = usePlanEditor()
+    await editor.openCreate()
+    editor.draft.value.name = '故障诊断'
+    editor.draft.value.mode = 'routing'
+    editor.draft.value.fallback = 'ghost'
+    editor.draft.value.members = [
+      { agentId: 7, agentName: '设备诊断', routeKey: 'device', when: '设备问题', isAvailable: true },
+      { agentId: 8, agentName: '日志分析', routeKey: 'logs', when: '日志问题', isAvailable: true },
+    ]
+    expect(editor.issues.value).toEqual([
+      expect.objectContaining({ section: 'config', field: 'fallback', message: '兜底路由 ghost 未命中任何成员的路由标识。' }),
+    ])
+    expect(await editor.saveDraft()).toBe(false)
+    expect(saveMock).not.toHaveBeenCalled()
+
+    // 切回 sequential：routing 专属的兜底校验随之消失。
+    editor.draft.value.mode = 'sequential'
+    expect(editor.issues.value).toEqual([])
+  })
+
+  // 回归：保存成功后页面要先重置脏检查快照（onSaved），再跳回列表；顺序反了会被离开守卫拦下误弹确认。
+  describe.each(['saveDraft', 'publish'] as const)('%s 的 onSaved 时序', (method) => {
+    async function validEditor() {
+      const editor = usePlanEditor()
+      await editor.openCreate()
+      editor.draft.value.name = '故障诊断'
+      editor.draft.value.members = [
+        { agentId: 7, agentName: '设备诊断', routeKey: '', when: '', isAvailable: true },
+        { agentId: 8, agentName: '日志分析', routeKey: '', when: '', isAvailable: true },
+      ]
+      return editor
+    }
+
+    it('保存成功：先 onSaved，再 router.push', async () => {
+      ;(useOrchestrationPlansStore().savePlan as ReturnType<typeof vi.fn>).mockResolvedValue({ item: plan(), error: null })
+      const onSaved = vi.fn()
+      const editor = await validEditor()
+      const ok = await editor[method]({ onSaved })
+      expect(ok).toBe(true)
+      expect(onSaved).toHaveBeenCalledTimes(1)
+      expect(routerPush).toHaveBeenCalledTimes(1)
+      expect(onSaved.mock.invocationCallOrder[0]!).toBeLessThan(routerPush.mock.invocationCallOrder[0]!)
+    })
+
+    it('保存失败：不调 onSaved，也不跳转', async () => {
+      ;(useOrchestrationPlansStore().savePlan as ReturnType<typeof vi.fn>).mockResolvedValue({ item: null, error: '后端返回 500' })
+      const onSaved = vi.fn()
+      const editor = await validEditor()
+      const ok = await editor[method]({ onSaved })
+      expect(ok).toBe(false)
+      expect(editor.error.value).toBe('后端返回 500')
+      expect(onSaved).not.toHaveBeenCalled()
+      expect(routerPush).not.toHaveBeenCalled()
+    })
   })
 })

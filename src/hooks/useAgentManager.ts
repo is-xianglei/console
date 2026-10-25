@@ -18,7 +18,8 @@ export function emptyAgentForm(): AgentFormModel {
     description: '',
     systemPrompt: '',
     modelName: '',
-    isEnabled: true,
+    // 新建默认停用：「保存配置」按表单值保存为停用，「保存并启用」由 publish 强制启用。
+    isEnabled: false,
     toolIds: [],
     skillIds: [],
     createdAt: '',
@@ -135,13 +136,6 @@ export function useAgentManager() {
     return filteredAgents.value.filter((item) => set.has(String(item.id)))
   })
   const selectedCount = computed(() => selectedAgents.value.length)
-
-  const stats = computed(() => ({
-    all: agentsStore.state.total,
-    enabled: agents.value.filter((agent) => agent.is_enabled).length,
-    disabled: agents.value.filter((agent) => !agent.is_enabled).length,
-    unbound: agents.value.filter((agent) => !(agent.tool_ids?.length || agent.skill_ids?.length)).length,
-  }))
 
   function showToast(message: string) {
     toast.value = message
@@ -319,7 +313,6 @@ export function useAgentManager() {
     pagedItems,
     filteredAgents,
     selectedAgent,
-    stats,
     showToast,
     loadAll,
     resetView,

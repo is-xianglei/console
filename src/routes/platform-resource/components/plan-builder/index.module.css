@@ -39,26 +39,33 @@
   font-size: var(--fs-sm);
 }
 
+.pl-builder-title nav i {
+  font-size: 11px;
+}
+
+/* 面包屑：列表名与分隔符不收缩（中文不逐字折行），只有末项名称过长时省略；四个 Builder 写法一致。 */
+.pl-builder-title nav > span,
+.pl-builder-title nav > i {
+  flex: none;
+  white-space: nowrap;
+}
+
 .pl-builder-title nav strong {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-muted);
   font-weight: 500;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .pl-builder-title h1 {
   margin-top: 2px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  overflow: hidden;
   font-size: 15px;
   font-weight: 650;
-}
-
-.pl-builder-title h1 span {
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pl-builder-actions {
@@ -142,80 +149,24 @@
   box-shadow: none;
 }
 
-.pl-builder-body {
-  flex: 1;
-  min-height: 0;
-  padding: var(--space-lg) var(--page-gutter) 48px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  overflow-y: auto;
-}
-
-/* 单个 UForm 包住整个 body，让 :validate 的错误能落到各 UFormField 下方。 */
-.pl-builder-form {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.pl-section {
-  max-width: 1100px;
-  width: 100%;
+/* 当前步骤的单步表单：与步骤条同宽居中，不再套卡片。 */
+.pl-step {
+  width: min(980px, calc(100% - 24px));
   margin: 0 auto;
-  padding: var(--space-md);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
+  padding: var(--space-md) 0 48px;
 }
 
-.pl-section-head {
-  margin-bottom: var(--space-md);
+/* 选择成员：搜索框 + 「n / 5」计数。 */
+.pl-member-toolbar {
+  margin-bottom: var(--space-sm);
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.pl-section-icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-elevated);
-  color: var(--accent-agent);
-  font-size: 15px;
-}
-
-.pl-section-head > div {
-  min-width: 0;
-  flex: 1;
-}
-
-.pl-section-head > div > span {
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  font-weight: 650;
-}
-
-.pl-section-head h2 {
-  margin-top: 1px;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.pl-section-head p {
-  margin-top: 3px;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.55;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
 }
 
 .pl-member-count {
+  flex: 0 0 auto;
   padding: 3px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
@@ -322,11 +273,6 @@
   font-weight: 650;
 }
 
-.pl-mode-main small {
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
-}
-
 .pl-mode-hint {
   grid-column: 1 / -1;
   color: var(--text-muted);
@@ -336,11 +282,11 @@
 
 .pl-agent-search {
   width: min(360px, 100%);
-  margin-bottom: var(--space-sm);
+  min-width: 0;
 }
 
+/* 列表随单步表单一起在 BuilderSteps 滚动区里滚动，不再单独限高。 */
 .pl-agent-list {
-  max-height: 300px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
@@ -418,18 +364,9 @@
 
 .pl-agent-meta {
   flex: 0 0 auto;
-  text-align: right;
-}
-
-.pl-agent-meta strong {
-  display: block;
-  color: var(--accent-agent);
-  font-size: var(--fs-xs);
-}
-
-.pl-agent-meta small {
   color: var(--text-dim);
   font-size: var(--fs-sm);
+  text-align: right;
 }
 
 .pl-member-list {
@@ -496,11 +433,6 @@
   font-weight: 600;
 }
 
-.pl-member-main small {
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-}
-
 /* 成员 Agent 被停用时的红色提示。 */
 .pl-member-warning {
   color: var(--status-error);
@@ -524,72 +456,6 @@
   display: grid;
   grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
   gap: var(--space-md);
-}
-
-/* 底部检查清单：校验问题按编辑器区块分组展示。 */
-.pl-issue-groups {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.pl-issue-group {
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--status-warning) 30%, transparent);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--status-warning) 6%, transparent);
-}
-
-.pl-issue-group > strong {
-  color: var(--text-secondary);
-  font-size: var(--fs-sm);
-  font-weight: 650;
-}
-
-.pl-issue-group ul {
-  margin-top: 6px;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.pl-issue-group li {
-  color: var(--status-warning);
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-}
-
-.pl-issue-group li i {
-  margin-top: 1px;
-  font-size: 11px;
-}
-
-/* 校验通过时的绿色确认条。 */
-.pl-issue-clear {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--status-success) 28%, transparent);
-  border-radius: var(--radius-control);
-  color: var(--status-success);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--fs-sm);
-}
-
-.pl-builder-footer {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-sm);
 }
 
 @media (max-width: 900px) {

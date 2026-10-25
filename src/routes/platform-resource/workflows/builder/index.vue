@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { WORKFLOW_MODE_OPTIONS, minWorkflowMembers } from '@/constants/workflow'
 import type { AgentResponse } from '@/interfaces/agent/api'
 import type {
+  WorkflowBuilderStep,
   WorkflowFormModel,
   WorkflowValidationIssue,
 } from '@/interfaces/workflow/model'
-import { focusFirstError } from '@/hooks/useFormHelpers'
+import BuilderSteps from '@/components/resource/builder-steps/index.vue'
+import { groupIssuesByStep, useBuilderSteps, type BuilderStepDef } from '@/hooks/useBuilderSteps'
 
 defineOptions({ name: 'WorkflowBuilder' })
 
@@ -17,20 +19,47 @@ const props = defineProps<{
   agents: AgentResponse[]
   saving: boolean
   error?: string | null
+  /** 新建页草稿已从已有 Workflow 预填（?duplicate= 复制成功）；编辑模式无需传。 */
+  prefilled?: boolean
 }>()
 const emit = defineEmits<{ close: []; save: [] }>()
+
+/** 步骤标题固定，不随编排模式变化。 */
+const steps: BuilderStepDef<WorkflowBuilderStep>[] = [
+  { id: 'basic', label: '基本信息' },
+  { id: 'mode', label: '编排模式' },
+  { id: 'members', label: '选择成员' },
+  { id: 'config', label: '成员配置' },
+]
 
 const saveAttempted = ref(false)
 const builderRoot = ref<HTMLElement | null>(null)
 const agentSearch = ref('')
 
-/** 把校验问题映射到 UFormField 的 name 上（B-8）：名称 / 成员数落到对应字段下方。 */
+/** validateWorkflow 的每条 issue 自带所属步骤（step），直接分组。 */
+const stepIssues = computed(() => groupIssuesByStep(props.issues, (issue) => issue.step))
+
+/** 把基本信息的校验问题映射到名称字段（B-8）；其余步骤没有对应的表单字段。 */
 const formErrors = computed(() =>
-  props.issues.map((issue) => ({
-    name: issue.section === 'members' ? 'members' : 'name',
-    message: issue.message,
-  })),
+  props.issues
+    .filter((issue) => issue.step === 'basic')
+    .map((issue) => ({ name: 'name', message: issue.message })),
 )
+
+function isStepComplete(step: WorkflowBuilderStep) {
+  if (step === 'basic') return Boolean(props.workflow.name.trim()) && !stepIssues.value.basic?.length
+  if (step === 'mode') return true
+  if (step === 'members') return !stepIssues.value.members?.length
+  return props.workflow.members.length > 0 && !stepIssues.value.config?.length
+}
+
+const { active: activeStep, items: stepItems, focusFirstIssue } = useBuilderSteps({
+  steps,
+  issues: stepIssues,
+  attempted: saveAttempted,
+  fromExisting: () => props.mode === 'edit' || Boolean(props.prefilled),
+  isComplete: isStepComplete,
+})
 // 拖拽排序状态：仅当从把手按下后行才可拖动，避免输入框内选中文本触发拖拽。
 const dragArmedIndex = ref<number | null>(null)
 const dragIndex = ref<number | null>(null)
@@ -40,31 +69,12 @@ const filteredAgents = computed(() => {
   const query = agentSearch.value.trim().toLowerCase()
   if (!query) return props.agents
   return props.agents.filter((agent) =>
-    [agent.id, agent.name, agent.description ?? ''].join(' ').toLowerCase().includes(query),
+    [agent.name, agent.description ?? ''].join(' ').toLowerCase().includes(query),
   )
 })
-/** 顺序模式展示执行顺序并允许排序；并行与智能路由只看成员集合。 */
+/** 顺序模式展示执行顺序（序号 + 排序）；并行与智能路由只看成员集合。 */
 const orderSensitive = computed(() => props.workflow.mode === 'sequential')
-const activeModeOption = computed(() =>
-  WORKFLOW_MODE_OPTIONS.find((option) => option.value === props.workflow.mode)
-    ?? WORKFLOW_MODE_OPTIONS[0]!,
-)
 const minimumMembers = computed(() => minWorkflowMembers(props.workflow.mode))
-
-/** 校验问题按编辑器区块分组，供底部检查清单展示。 */
-const SECTION_LABELS: Record<WorkflowValidationIssue['section'], string> = {
-  basic: '基本信息',
-  members: '成员 Agent',
-}
-const groupedIssues = computed(() =>
-  (['basic', 'members'] as const)
-    .map((section) => ({
-      section,
-      label: SECTION_LABELS[section],
-      messages: props.issues.filter((issue) => issue.section === section).map((issue) => issue.message),
-    }))
-    .filter((group) => group.messages.length > 0),
-)
 
 function memberIndex(agentId: number) {
   return props.workflow.members.findIndex((member) => member.agentId === agentId)
@@ -132,30 +142,14 @@ function onCloseRequest() {
   emit('close')
 }
 
-/** section → 分区标题节点 id；用于无字段级问题的成员数告警滚到对应分区。 */
-const SECTION_ANCHOR: Record<WorkflowValidationIssue['section'], string> = {
-  basic: 'workflow-basic-title',
-  members: 'workflow-members-title',
-}
-
-/** 定位到首个问题的分区：优先字段级 aria-invalid，若整区无字段（如成员数）则滚到分区标题。 */
-function focusIssueSection(section: WorkflowValidationIssue['section']) {
-  if (builderRoot.value && focusFirstError(builderRoot.value)) return
-  document.getElementById(SECTION_ANCHOR[section])?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-}
-
-async function onSave() {
+/** 点过保存：有问题时跳到第一个有问题的步骤并聚焦错误字段，不提交。 */
+function onSave() {
   saveAttempted.value = true
   if (props.issues.length) {
-    await nextTick()
-    focusIssueSection(props.issues[0]!.section)
+    focusFirstIssue(builderRoot)
     return
   }
   emit('save')
-}
-
-function onCancel() {
-  onCloseRequest()
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -185,18 +179,14 @@ onBeforeUnmount(() => {
   <main ref="builderRoot" :class="$style['wf-builder']">
     <header :class="$style['wf-builder-head']">
       <UTooltip text="返回 Workflows"><UButton :class="$style['wf-icon-button']" icon="i-lucide-arrow-left" color="neutral" variant="ghost" square aria-label="返回 Workflows" @click="onCloseRequest" /></UTooltip>
-      <div :class="$style['wf-builder-title']"><nav><span>构建资源</span><i class="icon icon-chevron-right"></i><strong>Workflows</strong></nav><h1>{{ mode === 'create' ? '创建 Workflow' : `编辑：${workflow.name}` }}<span class="mono">API CONFIG</span></h1></div>
+      <div :class="$style['wf-builder-title']"><nav><span>Workflows</span><template v-if="mode === 'edit'"><i class="icon icon-chevron-right"></i><strong>{{ workflow.name }}</strong></template></nav><h1>{{ mode === 'create' ? '创建 Workflow' : '编辑 Workflow' }}</h1></div>
       <div :class="$style['wf-builder-actions']"><UButton :class="$style['wf-primary-button']" icon="i-lucide-save" label="保存" :loading="saving" :disabled="saving" @click="onSave" /></div>
     </header>
     <UAlert v-if="error" :class="$style['wf-validation-banner']" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="error" />
-    <UAlert v-else-if="saveAttempted && issues.length" :class="$style['wf-validation-banner']" color="warning" variant="subtle" icon="i-lucide-triangle-alert" :title="`共 ${issues.length} 处问题，已定位并滚动到首个错误字段。`" />
+    <UAlert v-else-if="saveAttempted && issues.length" :class="$style['wf-validation-banner']" color="warning" variant="subtle" icon="i-lucide-triangle-alert" :title="`还有 ${issues.length} 项配置需要处理。`" />
 
-    <div :class="$style['wf-builder-body']">
-      <section :class="$style['wf-section']" aria-labelledby="workflow-basic-title">
-        <header :class="$style['wf-section-head']">
-          <span :class="$style['wf-section-icon']"><i class="icon icon-id-card"></i></span>
-          <div><span>01</span><h2 id="workflow-basic-title">基本信息</h2><p>设置 Workflow 名称、用途描述和启用状态；名称在工作区内唯一。</p></div>
-        </header>
+    <BuilderSteps v-model="activeStep" :items="stepItems">
+      <section v-if="activeStep === 'basic'" :class="$style['wf-step']" aria-label="基本信息">
         <UForm :class="$style['wf-form-grid']" :state="workflow" :validate="() => formErrors">
           <UFormField :class="$style['wf-field']" label="名称" name="name" required>
             <UInput v-model="workflow.name" autocomplete="off" maxlength="128" placeholder="例如：故障诊断三段式 Workflow" />
@@ -210,11 +200,7 @@ onBeforeUnmount(() => {
         </UForm>
       </section>
 
-      <section :class="$style['wf-section']" aria-labelledby="workflow-mode-title">
-        <header :class="$style['wf-section-head']">
-          <span :class="$style['wf-section-icon']"><i class="icon icon-workflow"></i></span>
-          <div><span>02</span><h2 id="workflow-mode-title">编排模式</h2><p>决定成员 Agent 如何协作处理会话消息。</p></div>
-        </header>
+      <section v-else-if="activeStep === 'mode'" :class="$style['wf-step']" aria-label="编排模式">
         <div :class="$style['wf-mode-grid']" role="radiogroup" aria-label="编排模式">
           <button
             v-for="option in WORKFLOW_MODE_OPTIONS"
@@ -226,20 +212,17 @@ onBeforeUnmount(() => {
             @click="workflow.mode = option.value"
           >
             <span :class="$style['wf-mode-icon']"><i :class="`icon icon-${option.icon}`"></i></span>
-            <span :class="$style['wf-mode-main']"><strong>{{ option.label }}</strong><small class="mono">{{ option.value.toUpperCase() }}</small></span>
+            <span :class="$style['wf-mode-main']"><strong>{{ option.label }}</strong></span>
             <small :class="$style['wf-mode-hint']">{{ option.hint }}</small>
           </button>
         </div>
-        <p :class="$style['wf-mode-note']"><i class="icon icon-triangle-alert"></i>顺序执行最少 {{ minWorkflowMembers('sequential') }} 个成员，并行与智能路由最少 {{ minWorkflowMembers('parallel') }} 个成员。</p>
       </section>
 
-      <section :class="$style['wf-section']" aria-labelledby="workflow-members-title">
-        <header :class="$style['wf-section-head']">
-          <span :class="$style['wf-section-icon']"><i class="icon icon-bot"></i></span>
-          <div><span>03</span><h2 id="workflow-members-title">成员 Agent</h2><p>从当前工作区勾选已启用的 Agent，同一 Agent 不能重复加入；已停用或已删除的成员需移除后才能保存。</p></div>
-          <span :class="[$style['wf-member-count'], 'mono', { [$style.invalid]: workflow.members.length < minimumMembers }]">{{ workflow.members.length }} 人</span>
-        </header>
-        <UInput v-model="agentSearch" :class="$style['wf-agent-search']" icon="i-lucide-search" placeholder="搜索 Agent 名称、ID 或描述" aria-label="搜索 Agent" />
+      <section v-else-if="activeStep === 'members'" :class="$style['wf-step']" aria-label="选择成员">
+        <div :class="$style['wf-member-toolbar']">
+          <UInput v-model="agentSearch" :class="$style['wf-agent-search']" icon="i-lucide-search" placeholder="搜索 Agent 名称或描述" aria-label="搜索 Agent" />
+          <span :class="[$style['wf-member-count'], 'mono', { [$style.invalid]: workflow.members.length < minimumMembers }]">已选 {{ workflow.members.length }} 个</span>
+        </div>
         <div :class="$style['wf-agent-list']">
           <label
             v-for="agent in filteredAgents"
@@ -254,18 +237,14 @@ onBeforeUnmount(() => {
             />
             <span :class="$style['wf-agent-glyph']"><i class="icon icon-bot"></i></span>
             <span :class="$style['wf-agent-main']"><strong>{{ agent.name }}</strong><small>{{ agent.description || '未填写用途描述' }}</small></span>
-            <span :class="$style['wf-agent-meta']"><strong class="mono">AGT-{{ String(agent.id).padStart(4, '0') }}</strong><small :class="{ [$style.offline]: !agent.is_enabled }">{{ agent.is_enabled ? '已启用' : '已停用' }}</small></span>
+            <small :class="[$style['wf-agent-status'], { [$style.offline]: !agent.is_enabled }]">{{ agent.is_enabled ? '已启用' : '已停用' }}</small>
           </label>
           <UEmpty v-if="!filteredAgents.length" icon="i-lucide-search-x" title="没有匹配的 Agent" description="调整关键词，或先在 Agents 页创建并启用 Agent。" variant="naked" />
         </div>
       </section>
 
-      <section :class="$style['wf-section']" aria-labelledby="workflow-order-title">
-        <header :class="$style['wf-section-head']">
-          <span :class="$style['wf-section-icon']"><i :class="`icon icon-${activeModeOption.icon}`"></i></span>
-          <div><span>04</span><h2 id="workflow-order-title">{{ orderSensitive ? '执行顺序' : '参与成员' }}</h2><p>{{ orderSensitive ? '拖动把手或使用按钮调整执行顺序，成员将按列表顺序依次运行。' : workflow.mode === 'llm_routing' ? '由模型根据成员描述选出最合适的一个成员，顺序不影响结果。' : '并行模式下所有成员同时处理任务，顺序不影响结果。' }}</p></div>
-        </header>
-        <UEmpty v-if="!workflow.members.length" icon="i-lucide-users-round" :title="orderSensitive ? '尚未选择成员' : '尚未选择参与成员'" :description="`先在上方勾选至少 ${minimumMembers} 个 Agent。`" variant="naked" />
+      <section v-else :class="$style['wf-step']" aria-label="成员配置">
+        <UEmpty v-if="!workflow.members.length" icon="i-lucide-users-round" title="尚未选择成员" :description="`先在「选择成员」中勾选至少 ${minimumMembers} 个 Agent。`" variant="naked" />
         <ul v-else :class="$style['wf-member-list']">
           <li
             v-for="(member, index) in workflow.members"
@@ -283,11 +262,8 @@ onBeforeUnmount(() => {
               aria-label="拖动调整顺序"
               @pointerdown="dragArmedIndex = index"
             ><i class="icon icon-grip-vertical"></i></span>
-            <span :class="[$style['wf-member-index'], 'mono']">{{ String(index + 1).padStart(2, '0') }}</span>
-            <span :class="$style['wf-member-main']">
-              <strong>{{ member.agentName }}</strong>
-              <small class="mono">AGT-{{ String(member.agentId).padStart(4, '0') }}</small>
-            </span>
+            <span v-if="orderSensitive" :class="[$style['wf-member-index'], 'mono']">{{ String(index + 1).padStart(2, '0') }}</span>
+            <span :class="$style['wf-member-main']"><strong>{{ member.agentName }}</strong></span>
             <span v-if="!member.isAvailable" :class="$style['wf-member-warning']"><i class="icon icon-triangle-alert"></i>该 Agent 已停用或已删除，Workflow 将无法运行</span>
             <span :class="$style['wf-member-actions']">
               <template v-if="orderSensitive">
@@ -299,25 +275,7 @@ onBeforeUnmount(() => {
           </li>
         </ul>
       </section>
-
-      <section :class="$style['wf-section']" aria-labelledby="workflow-review-title">
-        <header :class="$style['wf-section-head']">
-          <span :class="$style['wf-section-icon']"><i class="icon icon-circle-check-big"></i></span>
-          <div><span>05</span><h2 id="workflow-review-title">检查与保存</h2><p>按区块处理校验问题后保存；启用状态决定保存后是否立即对会话开放。</p></div>
-        </header>
-        <div v-if="groupedIssues.length" :class="$style['wf-issue-groups']" aria-label="校验问题列表">
-          <div v-for="group in groupedIssues" :key="group.section" :class="$style['wf-issue-group']">
-            <strong>{{ group.label }}</strong>
-            <ul><li v-for="(message, messageIndex) in group.messages" :key="messageIndex"><i class="icon icon-triangle-alert"></i>{{ message }}</li></ul>
-          </div>
-        </div>
-        <div v-else :class="$style['wf-issue-clear']"><i class="icon icon-circle-check-big"></i>校验通过，可以保存 Workflow。</div>
-        <footer :class="$style['wf-builder-footer']">
-          <UButton label="取消" color="neutral" variant="outline" :disabled="saving" @click="onCancel" />
-          <UButton :class="$style['wf-primary-button']" icon="i-lucide-save" label="保存 Workflow" :loading="saving" :disabled="saving" @click="onSave" />
-        </footer>
-      </section>
-    </div>
+    </BuilderSteps>
   </main>
 </template>
 

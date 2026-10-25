@@ -40,26 +40,33 @@
   font-size: var(--fs-sm);
 }
 
+.tm-builder-title nav i {
+  font-size: 11px;
+}
+
+/* 面包屑：列表名与分隔符不收缩（中文不逐字折行），只有末项名称过长时省略；四个 Builder 写法一致。 */
+.tm-builder-title nav > span,
+.tm-builder-title nav > i {
+  flex: none;
+  white-space: nowrap;
+}
+
 .tm-builder-title nav strong {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-muted);
   font-weight: 500;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tm-builder-title h1 {
   margin-top: 2px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  overflow: hidden;
   font-size: 15px;
   font-weight: 650;
-}
-
-.tm-builder-title h1 span {
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-builder-actions {
@@ -148,81 +155,17 @@
   box-shadow: none;
 }
 
-.tm-builder-body {
-  flex: 1;
-  min-height: 0;
-  padding: var(--space-lg) var(--page-gutter) 48px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  overflow-y: auto;
-}
-
-/* 单个 UForm 包住整个 body，让 :validate 的错误能落到各 UFormField 下方。 */
-.tm-builder-form {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.tm-section {
-  max-width: 1100px;
-  width: 100%;
+/* BuilderSteps 里的单步表单：居中、最宽 980px，与步骤条同宽。 */
+.tm-step {
+  width: min(980px, calc(100% - 24px));
+  min-height: 100%;
   margin: 0 auto;
-  padding: var(--space-md);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
+  padding: var(--space-md) 0 48px;
 }
 
-.tm-section-head {
-  margin-bottom: var(--space-md);
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.tm-section-icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-elevated);
-  color: var(--accent-agent);
-  font-size: 15px;
-}
-
-.tm-section-head > div {
-  min-width: 0;
-  flex: 1;
-}
-
-.tm-section-head > div > span {
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  font-weight: 650;
-}
-
-.tm-section-head h2 {
-  margin-top: 1px;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.tm-section-head p {
-  margin-top: 3px;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.55;
-}
-
+/* 成员数「n / 8」放在「选择 Agent」标签右侧的 hint 槽。 */
 .tm-member-count {
-  padding: 3px 8px;
+  padding: 1px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   color: var(--text-muted);
@@ -318,19 +261,10 @@
   color: var(--accent-agent);
 }
 
-.tm-mode-main {
+.tm-mode-label {
   min-width: 0;
-}
-
-.tm-mode-main strong {
-  display: block;
   font-size: 12px;
   font-weight: 650;
-}
-
-.tm-mode-main small {
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
 }
 
 .tm-mode-hint {
@@ -382,6 +316,19 @@
   background: var(--accent-agent-dim);
 }
 
+/* UCheckbox 的根节点 / 方框也是 [data-slot='root'] / [data-slot='base']，会被上面 .tm-field 的撑满规则命中：
+   根节点拉到整行宽，把 Agent 名称 / 描述挤成 0 宽；方框 width:100% 落在内容宽的容器里，未勾选时塌成 0 宽。
+   行内复选框按内容排布，方框尺寸退回 Nuxt UI 主题（cascade layer 里的 size-3.5）。 */
+.tm-agent-row > :global([data-slot='root']) {
+  width: auto;
+  flex: none;
+}
+
+.tm-agent-row :global([data-slot='base'][role='checkbox']) {
+  width: revert-layer;
+  min-width: revert-layer;
+}
+
 .tm-agent-row.disabled {
   opacity: .5;
   cursor: not-allowed;
@@ -428,18 +375,8 @@
   font-size: var(--fs-sm);
 }
 
-.tm-agent-meta {
+.tm-agent-state {
   flex: 0 0 auto;
-  text-align: right;
-}
-
-.tm-agent-meta strong {
-  display: block;
-  color: var(--accent-agent);
-  font-size: var(--fs-xs);
-}
-
-.tm-agent-meta small {
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
@@ -478,23 +415,14 @@
   font-size: var(--fs-micro);
 }
 
-.tm-member-main {
+.tm-member-name {
   min-width: 0;
   flex: 0 0 170px;
-}
-
-.tm-member-main strong {
-  display: block;
   overflow: hidden;
   font-size: 12px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tm-member-main small {
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
 }
 
 .tm-member-duty {
@@ -532,72 +460,6 @@
   gap: 2px;
 }
 
-/* 底部检查清单：校验问题按编辑器区块分组展示。 */
-.tm-issue-groups {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.tm-issue-group {
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--status-warning) 30%, transparent);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--status-warning) 6%, transparent);
-}
-
-.tm-issue-group > strong {
-  color: var(--text-secondary);
-  font-size: var(--fs-sm);
-  font-weight: 650;
-}
-
-.tm-issue-group ul {
-  margin-top: 6px;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.tm-issue-group li {
-  color: var(--status-warning);
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-}
-
-.tm-issue-group li i {
-  margin-top: 1px;
-  font-size: 11px;
-}
-
-/* 校验通过时的绿色确认条。 */
-.tm-issue-clear {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--status-success) 28%, transparent);
-  border-radius: var(--radius-control);
-  color: var(--status-success);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--fs-sm);
-}
-
-.tm-builder-footer {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-}
-
 @media (max-width: 900px) {
   .tm-form-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -607,7 +469,7 @@
     grid-column: auto;
   }
 
-  .tm-member-main,
+  .tm-member-name,
   .tm-member-duty {
     flex: 1 1 100%;
   }

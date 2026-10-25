@@ -6,6 +6,8 @@ import type { PlanFormModel } from '@/interfaces/orchestration-plan/model'
 import { useOrchestrationPlansStore } from '@/stores/orchestrationPlans'
 import {
   PLAN_MODE_LABEL,
+  planIssueFieldName,
+  planIssueStep,
   useOrchestrationPlanManager,
   validatePlan,
 } from './useOrchestrationPlanManager'
@@ -157,5 +159,90 @@ describe('useOrchestrationPlanManager', () => {
       updatedAt: '2026-08-01T00:00:00Z',
     }
     expect(validatePlan(form)).toEqual([])
+  })
+})
+
+describe('validatePlan 的 issue → Builder 步骤 / 字段', () => {
+  function form(overrides: Partial<PlanFormModel> = {}): PlanFormModel {
+    return {
+      id: null,
+      workspaceId: null,
+      createdByUserId: null,
+      name: '故障诊断',
+      description: '',
+      mode: 'sequential',
+      maxIterations: 3,
+      fallback: '',
+      isEnabled: true,
+      members: [
+        { agentId: 7, agentName: '设备诊断', routeKey: 'device', when: '设备问题', isAvailable: true },
+        { agentId: 8, agentName: '日志分析', routeKey: 'logs', when: '日志问题', isAvailable: true },
+      ],
+      createdAt: '',
+      updatedAt: '',
+      ...overrides,
+    }
+  }
+
+  /** [步骤, UFormField name, 消息] 三元组，便于整体断言。 */
+  function mapped(plan: PlanFormModel) {
+    return validatePlan(plan).map((issue) => [planIssueStep(issue), planIssueFieldName(issue), issue.message])
+  }
+
+  it('名称 → basic；成员数量 → members', () => {
+    expect(mapped(form({ name: '  ', members: [] }))).toEqual([
+      ['basic', 'name', '名称不能为空。'],
+      ['members', 'members', '成员数量需在 2-5 个之间，当前 0 个。'],
+    ])
+  })
+
+  it('成员重复、成员已停用 → members', () => {
+    const plan = form()
+    plan.members.push({ ...plan.members[0]! })
+    plan.members[1]!.isAvailable = false
+    expect(mapped(plan)).toEqual([
+      ['members', 'members', '设备诊断 重复加入，同一 Agent 只能加入一次。'],
+      ['members', 'members', '日志分析 已停用，方案将无法运行。'],
+    ])
+  })
+
+  it('loop：循环轮数 → config', () => {
+    expect(mapped(form({ mode: 'loop', maxIterations: 0 }))).toEqual([
+      ['config', 'maxIterations', '循环轮数必须是 1-10 的整数。'],
+    ])
+  })
+
+  it('routing：路由标识 / 触发条件 → order（落到对应行），兜底路由 → config', () => {
+    const plan = form({ mode: 'routing', fallback: 'ghost' })
+    plan.members = [
+      { agentId: 7, agentName: '设备诊断', routeKey: '', when: '', isAvailable: true },
+      { agentId: 8, agentName: '日志分析', routeKey: 'billing', when: '账单问题', isAvailable: true },
+      { agentId: 9, agentName: '工单', routeKey: ' billing ', when: '工单问题', isAvailable: true },
+    ]
+    expect(mapped(plan)).toEqual([
+      ['order', 'routeKey-0', '成员 设备诊断 缺少路由标识。'],
+      ['order', 'when-0', '成员 设备诊断 缺少触发条件描述。'],
+      // 重复的路由标识标在第二次出现的那一行。
+      ['order', 'routeKey-2', '路由标识 billing 重复，方案内必须唯一。'],
+      // 回归：旧实现按消息里的「路由标识」字样匹配，兜底路由被错归到 routeKey--1。
+      ['config', 'fallback', '兜底路由 ghost 未命中任何成员的路由标识。'],
+    ])
+  })
+
+  it('字段定位不依赖消息文本：成员名互相包含时仍落到各自的行', () => {
+    const plan = form({ mode: 'routing' })
+    plan.members[0]!.agentName = '分析'
+    plan.members[0]!.when = ''
+    plan.members[1]!.when = ''
+    expect(validatePlan(plan).map(planIssueFieldName)).toEqual(['when-0', 'when-1'])
+  })
+
+  it('sequential / parallel 不产生 config 问题：loop 切回 sequential 后没有指向已消失步骤的 issue', () => {
+    const plan = form({ mode: 'loop', maxIterations: 0, fallback: 'ghost' })
+    expect(validatePlan(plan).map(planIssueStep)).toEqual(['config'])
+    for (const mode of ['sequential', 'parallel'] as const) {
+      plan.mode = mode
+      expect(validatePlan(plan)).toEqual([])
+    }
   })
 })

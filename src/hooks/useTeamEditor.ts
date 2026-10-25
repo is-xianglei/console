@@ -1,14 +1,26 @@
 import { computed, ref, watch } from 'vue'
 import type { ResourceStatus } from '@/interfaces/platform/model'
-import { useTeamsStore, validateTeam } from '@/stores/teams'
-import type { TeamFormModel, TeamValidationIssue } from '@/interfaces/platform-team/model'
+import { useTeamsStore, validateTeam, type TeamIssue } from '@/stores/teams'
+import type { TeamFormModel } from '@/interfaces/platform-team/model'
+import { useSaveFeedback } from './useSaveFeedback'
 
 const DEFAULT_PAGE_SIZE = 20
 const STATUS_ORDER: Record<ResourceStatus, number> = { error: 0, warning: 1, nominal: 2, idle: 3 }
+/** 「保存并启用」写入的状态：store 里 nominal 即启用（列表 / 详情显示为正常）。 */
+const ENABLED_STATUS: TeamFormModel['status'] = 'nominal'
+
+export interface TeamSaveOptions {
+  /** 保存成功、跳转之前调用；页面用它重置脏检查快照，避免离开守卫拦下保存后的跳转。 */
+  onSaved?: () => void
+}
 
 /** 编辑页草稿的加载状态，供页面区分「加载中」与「未找到」。 */
 export function useTeamEditor() {
   const store = useTeamsStore()
+  const feedback = useSaveFeedback({
+    listRoute: { name: 'platform-resource', params: { module: 'build', resource: 'teams' } },
+    detailRoute: { name: 'team-detail' },
+  })
   const route = { module: 'build', resource: 'teams' } as const
   const draft = ref<TeamFormModel>(store.createDraft())
   const baseline = ref<TeamFormModel | null>(null)
@@ -16,36 +28,23 @@ export function useTeamEditor() {
   const notFound = ref(false)
   const saving = ref(false)
   const error = ref('')
-  const issues = ref<TeamValidationIssue[]>([])
+  /** 随草稿实时校验：改好问题后立即清空，保存流程不会被上一次的结果卡住。 */
+  const issues = computed<TeamIssue[]>(() => validateTeam(draft.value))
 
   const isEdit = computed(() => Boolean(baseline.value))
 
-  const sectionLabels: Record<TeamValidationIssue['section'], string> = {
-    basic: '基本信息',
-    members: '成员 Agent',
-    runtime: '运行策略',
-  }
-  const groupedIssues = computed(() =>
-    (['basic', 'members', 'runtime'] as const)
-      .map((section) => ({
-        section,
-        label: sectionLabels[section],
-        messages: issues.value.filter((issue) => issue.section === section).map((issue) => issue.message),
-      }))
-      .filter((group) => group.messages.length > 0),
-  )
-
   function reset(to: TeamFormModel) {
     draft.value = to
-    issues.value = []
     error.value = ''
   }
 
-  function openCreate(duplicateId?: string) {
+  /** 返回草稿是否从已有 Team 复制而来（复制源不存在时回落为空草稿，返回 false）。 */
+  function openCreate(duplicateId?: string): boolean {
     notFound.value = false
     const source = duplicateId ? store.findTeam(duplicateId) : null
     reset(source ? store.duplicateDraft(source) : store.createDraft())
     baseline.value = null
+    return Boolean(source)
   }
 
   async function openEdit(id: string) {
@@ -64,28 +63,44 @@ export function useTeamEditor() {
     }
   }
 
-  /** 保存前跑一遍校验，把问题写进 issues 供 Builder 定位。 */
-  async function saveDraft(): Promise<boolean> {
-    const found = validateTeam(draft.value)
-    issues.value = found
-    if (found.length) {
-      error.value = `还有 ${found.length} 项需要修正`
-      return false
-    }
+  /**
+   * 写入 store 后：先回调 onSaved（页面在此重置脏检查快照），再 toast + 跳转。
+   * 顺序不能反：「保存并启用」改了 draft.status，若先跳转，onBeforeRouteLeave 会用旧快照判脏，
+   * 把这次跳转拦成「放弃未保存的修改？」。校验不通过时不写入、不回调，离开守卫照常生效。
+   * 去向：新建回列表并高亮，编辑去详情页。
+   */
+  async function commit(enable: boolean, verb: string, options?: TeamSaveOptions): Promise<boolean> {
+    if (saving.value || issues.value.length) return false
     saving.value = true
     try {
+      const fromEdit = isEdit.value
+      if (enable) draft.value.status = ENABLED_STATUS
       store.upsert(draft.value)
       baseline.value = store.findTeam(draft.value.id)
       error.value = ''
+      options?.onSaved?.()
+      const payload = { id: draft.value.id, message: `Team「${draft.value.name}」已${verb}` }
+      if (fromEdit) await feedback.afterSaveToDetail(payload)
+      else await feedback.afterSave(payload)
       return true
     } finally {
       saving.value = false
     }
   }
 
+  /** 「保存草稿」：按表单当前状态保存。 */
+  function saveDraft(options?: TeamSaveOptions): Promise<boolean> {
+    return commit(false, '保存', options)
+  }
+
+  /** 「保存并启用」：保存前把状态置为启用（nominal）。 */
+  function publish(options?: TeamSaveOptions): Promise<boolean> {
+    return commit(true, '保存并启用', options)
+  }
+
   return {
-    route, draft, baseline, isEdit, loadingDetail, notFound, saving, error, issues, groupedIssues,
-    openCreate, openEdit, saveDraft, reset,
+    route, draft, baseline, isEdit, loadingDetail, notFound, saving, error, issues,
+    openCreate, openEdit, saveDraft, publish, reset,
   }
 }
 
