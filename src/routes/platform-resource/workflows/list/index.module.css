@@ -37,18 +37,6 @@
   font-size: var(--fs-xs);
 }
 
-.workspaceName {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .alert { margin: 10px 10px 0; }
 
 /* 表格区（ListCard 承载滚动，这里只保留表格自身样式）。 */

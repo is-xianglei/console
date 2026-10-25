@@ -109,41 +109,8 @@
   gap: 16px;
 }
 
-.filterForms {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 24px;
-  align-items: center;
-}
-
-.filterForms :global([data-slot='label']) {
-  width: 72px;
-  flex: 0 0 72px;
-}
-
-.filterTabsRow {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.filterTabs { flex: 0 0 auto; }
 .statusBadge { text-transform: none; }
 .emailText { text-transform: none; }
-.workspaceName {
-  margin-left: auto;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .mineBadge { margin-left: 6px; text-transform: none; }
 
 .limitAlert { margin: 10px 10px 0; }
@@ -162,9 +129,6 @@
 @media (max-width: 720px) {
   .page { padding: 12px; }
   .layout { gap: 12px; }
-  .filterForms { grid-template-columns: minmax(0, 1fr); }
-  .filterTabsRow { flex-wrap: wrap; }
-  .workspaceName { margin-left: 0; flex: 1; }
   .table :global([data-slot='th']:nth-child(n + 4):not(:last-child)),
   .table :global([data-slot='td']:nth-child(n + 4):not(:last-child)) { display: none; }
 }

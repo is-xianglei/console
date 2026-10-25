@@ -103,11 +103,11 @@ watch(
     <FilterPanel
       title="筛选条件"
       :collapsible="true"
-      :columns="4"
+      storage-key="agents"
       @search="onApplyFilters"
       @reset="onResetFilters"
     >
-      <UFormField label="关键字"><UInput v-model="manager.state.keyword" icon="i-lucide-search" placeholder="搜索名称、ID、描述或模型" aria-label="搜索 Agent" @keydown.enter="onApplyFilters" /></UFormField>
+      <UFormField label="关键字"><UInput v-model="manager.state.keyword" icon="i-lucide-search" placeholder="搜索名称、ID、描述或模型" aria-label="搜索 Agent" /></UFormField>
       <UFormField label="启用状态"><USelect :model-value="manager.state.enabled" :items="enabledOptions" aria-label="启用状态筛选" @update:model-value="(value: unknown) => { manager.state.enabled = String(value ?? 'all') as AgentEnabledFilter }" /></UFormField>
       <UFormField label="模型"><USelect :model-value="manager.state.model" :items="modelOptions" aria-label="模型筛选" @update:model-value="(value: unknown) => { manager.state.model = String(value ?? 'all') }" /></UFormField>
       <UFormField label="创建时间">
@@ -119,7 +119,7 @@ watch(
       </UFormField>
     </FilterPanel>
 
-    <ListCard title="Agents" :description="`管理当前工作区的系统提示词、模型与能力绑定；已启用 ${manager.stats.value.enabled}，未绑定能力 ${manager.stats.value.unbound}。`" :total="manager.total.value">
+    <ListCard title="Agents" description="管理当前工作区的系统提示词、模型与能力绑定。">
       <template #toolbar>
         <UButton label="新建 Agent" icon="i-lucide-plus" color="primary" @click="goToCreate" />
         <UTooltip :text="manager.selectedCount.value ? '批量启用' : '请先勾选至少一行'">
@@ -136,9 +136,6 @@ watch(
         ]]">
           <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square :aria-label="'更多操作'" />
         </UDropdownMenu>
-      </template>
-      <template #tools>
-        <span :class="styles.workspaceName"><UIcon name="i-lucide-panels-top-left" />{{ authStore.currentWorkspace?.display_name || authStore.currentWorkspace?.name || '未选择工作区' }}</span>
       </template>
 
       <UAlert v-if="manager.loadingError.value" :class="styles.alert" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="manager.loadingError.value" :actions="[{ label: '重试', color: 'neutral', variant: 'outline', onClick: onRefresh }]" />

@@ -11,13 +11,11 @@ import {
   TEAM_MODE_LABEL,
   type TeamFormModel,
 } from '@/interfaces/platform-team/model'
-import { useAuthStore } from '@/stores/auth'
 
 defineOptions({ name: 'TeamResourceList' })
 
 const styles = useCssModule()
 const manager = useTeamList()
-const authStore = useAuthStore()
 const router = useRouter()
 const highlight = useHighlightFromQuery()
 
@@ -105,14 +103,14 @@ function onPageSize(size: number) {
 
 <template>
   <main :class="styles.page">
-    <FilterPanel title="筛选条件" :collapsible="true" :columns="4" @search="onSearch" @reset="manager.resetView">
-      <UFormField label="关键字"><UInput v-model="manager.search.value" icon="i-lucide-search" placeholder="搜索名称、ID、负责人或标签" aria-label="搜索 Team" @keydown.enter="onSearch" /></UFormField>
+    <FilterPanel title="筛选条件" :collapsible="true" storage-key="teams" @search="onSearch" @reset="manager.resetView">
+      <UFormField label="关键字"><UInput v-model="manager.search.value" icon="i-lucide-search" placeholder="搜索名称、ID、负责人或标签" aria-label="搜索 Team" /></UFormField>
       <UFormField label="状态"><USelect v-model="manager.statusFilter.value" :items="statusOptions" aria-label="Team 状态筛选" /></UFormField>
       <UFormField label="负责人"><USelect v-model="manager.ownerFilter.value" :items="ownerOptions" aria-label="Team 负责人筛选" /></UFormField>
       <UFormField label="排序"><USelect v-model="manager.sortBy.value" :items="sortOptions" aria-label="Team 排序方式" /></UFormField>
     </FilterPanel>
 
-    <ListCard title="Teams" description="编排多个 Agent 的职责、交接关系、共享上下文与审批节点。" :total="manager.filteredRows.value.length">
+    <ListCard title="Teams" description="编排多个 Agent 的职责、交接关系、共享上下文与审批节点。">
       <template #toolbar>
         <UButton label="创建 Team" icon="i-lucide-plus" color="primary" @click="goToCreate" />
         <UTooltip text="刷新"><UButton icon="i-lucide-refresh-cw" color="neutral" variant="outline" square aria-label="刷新 Teams" @click="manager.resetView" /></UTooltip>
@@ -122,9 +120,6 @@ function onPageSize(size: number) {
         ]]">
           <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square aria-label="更多操作" />
         </UDropdownMenu>
-      </template>
-      <template #tools>
-        <span :class="styles.workspaceName"><UIcon name="i-lucide-panels-top-left" />{{ authStore.currentWorkspace?.display_name || authStore.currentWorkspace?.name || '未选择工作区' }}</span>
       </template>
 
       <ResourceTable

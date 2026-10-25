@@ -7,7 +7,6 @@
    列宽与行高再次分叉，故此处只保留页面独有的 .rowActions 与 .joinModeText。 */
 
 /* groups 列表页专用补充。 */
-.filterTabs { flex: 0 0 auto; }
 .statusBadge { text-transform: none; }
 
 /* ===== p0 骨架：筛选卡 + 列表卡，整页固定高、不滚动 ===== */
@@ -27,51 +26,23 @@
   overflow: hidden;
 }
 
-.filterForms {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 24px;
-  align-items: center;
-}
-
-.filterForms :global([data-slot='label']) {
-  width: 72px;
-  flex: 0 0 72px;
-}
-
-.filterTabsRow {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
+/* 日期范围：两个输入等分字段格子宽度。 */
 .dateRange {
+  width: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.dateRange > :global([data-slot='root']) {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .dateRange span {
   color: var(--text-dim);
   font-size: var(--fs-micro);
-}
-
-.search { width: min(390px, 100%); }
-
-.workspaceName {
-  margin-left: auto;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* 表格样式由基线提供；本页只保留行操作按钮组与加入方式文本的覆写。 */
@@ -84,12 +55,6 @@
 .blockerBusy { padding: 12px 0; color: var(--text-muted); font-size: var(--fs-sm); display: flex; align-items: center; gap: 8px; }
 .blockerList { margin: 2px 0 6px; padding-left: 16px; color: var(--text-secondary); font-size: var(--fs-sm); line-height: 1.8; list-style: disc; }
 
-@media (max-width: 1024px) {
-  .filterForms { grid-template-columns: minmax(0, 1fr); }
-}
-
 @media (max-width: 720px) {
   .page { padding: 12px; gap: 12px; }
-  .filterTabsRow { flex-wrap: wrap; }
-  .workspaceName { margin-left: 0; flex: 1; }
 }

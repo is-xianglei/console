@@ -20,18 +20,6 @@
   overflow: hidden;
 }
 
-.workspaceName {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .alert { margin: 10px 10px 0; }
 
 /* 表格本体与行高、字色字号、行悬停均已在基线里，这里只剩行高覆写：

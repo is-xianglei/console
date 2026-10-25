@@ -37,18 +37,6 @@
   font-size: var(--fs-xs);
 }
 
-.workspaceName {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .alert { margin: 10px 10px 0; }
 
 /* 行高走双行档：名称列是「主标题 + 副标题」。 */

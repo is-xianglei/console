@@ -152,20 +152,23 @@ async function onDeleteConfirm() {
       <UAlert v-if="uploadError" :class="styles.uploadError" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="uploadError" />
     </div>
 
-    <FilterPanel title="筛选条件" :collapsible="false">
-      <template #default>
-        <UInput :model-value="manager.state.keyword" :class="styles.search" icon="i-lucide-search" placeholder="搜索名称或描述" aria-label="搜索技能" @update:model-value="(v: unknown) => { manager.state.keyword = String(v ?? '') }" />
-        <UFormField label="作用域">
-          <USelect :model-value="manager.state.scope" :class="styles.scopeFilter" :items="manager.scopeOptions.value" aria-label="技能作用域" @update:model-value="(v: unknown) => { manager.state.scope = String(v ?? 'all') }" />
-        </UFormField>
-      </template>
-      <template #actions>
-        <UButton label="搜索" icon="i-lucide-search" color="primary" @click="manager.onRetry" />
-        <UButton v-if="manager.hasActiveFilter.value" label="重置" icon="i-lucide-rotate-ccw" color="neutral" variant="outline" @click="manager.resetFilters" />
-      </template>
+    <!-- 回车与「查询」都走 @search（重拉列表）；「重置」常显，无筛选条件时禁用。 -->
+    <FilterPanel
+      title="筛选条件"
+      :collapsible="false"
+      :reset-disabled="!manager.hasActiveFilter.value"
+      @search="manager.onRetry"
+      @reset="manager.resetFilters"
+    >
+      <UFormField label="关键字">
+        <UInput :model-value="manager.state.keyword" icon="i-lucide-search" placeholder="搜索名称或描述" aria-label="搜索技能" @update:model-value="(v: unknown) => { manager.state.keyword = String(v ?? '') }" />
+      </UFormField>
+      <UFormField label="作用域">
+        <USelect :model-value="manager.state.scope" :items="manager.scopeOptions.value" aria-label="技能作用域" @update:model-value="(v: unknown) => { manager.state.scope = String(v ?? 'all') }" />
+      </UFormField>
     </FilterPanel>
 
-    <ListCard title="技能列表" description="上传、筛选与管理当前工作区的技能包。点击名称进入详情。" :total="manager.total.value">
+    <ListCard title="技能列表">
       <template #toolbar>
         <UButton icon="i-lucide-upload" label="上传技能包" color="primary" :loading="state.skillUploading" @click="onUploadTrigger" />
         <UTooltip text="刷新列表">

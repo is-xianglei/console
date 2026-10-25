@@ -11,7 +11,7 @@ withDefaults(
     title: string
     /** 说明文案。 */
     description?: string
-    /** 总数；有则在说明后渲染「共 N 条」。 */
+    /** 总数；有则在说明后渲染「共 N 条」。仅无分页栏的页面传，有分页栏时总数只由分页栏显示。 */
     total?: number
   }>(),
   { description: '', total: undefined },

@@ -1,39 +1,40 @@
+/* 筛选卡：标题栏 + 「字段区 | 按钮列」（参照 Arco Pro 查询表格）。
+   圆角、标题栏高度、标题字号与下方 ListCard 一致（取自 list-card/index.module.css）。
+   列数按面板自身宽度走容器查询，不看视口：≥960px 3 列，600~959px 2 列，<600px 1 列。 */
 .filterPanel {
+  /* 标签列宽：按最长 4 个汉字设定（em 随 FormField 自身字号解析，sm 档 12px → 48px）。 */
+  --filter-label-width: 4em;
+
   flex: 0 0 auto;
+  container: filter-panel / inline-size;
   border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   background: var(--bg-panel);
   overflow: hidden;
 }
 
 .head {
-  min-height: 40px;
-  padding: 0 12px;
+  min-height: 48px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  border-bottom: 1px solid var(--border);
+  gap: 12px;
 }
 
 .title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  flex: 0 0 auto;
   color: var(--text-primary);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   font-weight: 650;
 }
 
-.title i {
-  color: var(--accent-agent);
-  font-size: 13px;
-}
-
-/* 唯一收起/恢复筛选的按钮。内容是 10px 文字 + 12px 图标，
+/* 唯一收起/展开筛选的按钮。内容是 11px 文字 + 12px 图标，
    内容盒仅约 16×14（见审计 4.4）。用 ::before 把命中区撑到 24px 高、
    横向各外扩 4px，保持收起态下不挤占相邻元素。 */
 .toggle {
   position: relative;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -41,6 +42,7 @@
   background: transparent;
   color: var(--text-dim);
   font-size: var(--fs-xs);
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -56,45 +58,125 @@
   color: var(--text-primary);
 }
 
-.toggle i {
-  font-size: 12px;
+.toggle svg {
+  width: 12px;
+  height: 12px;
 }
 
+/* 分隔线放在 body 顶部：收起后 body 隐藏，标题栏下方不会多出一条线与卡片边框叠成双线。 */
 .body {
-  padding: 14px 12px 12px;
+  padding: 12px;
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--border);
 }
 
-/* 标签右对齐 ~80px，控件等宽。 */
+/* ===== 字段区 ===== */
 
-.grid {
+.fields {
+  --filter-cols: 3;
+
+  flex: 1 1 0;
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(var(--filter-cols, 3), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--filter-cols), minmax(0, 1fr));
   gap: 12px 24px;
+  /* start：同一行字段的 offsetTop 一致，按钮列据此数行数。 */
+  align-items: start;
+}
+
+.fields > * {
+  min-width: 0;
+}
+
+/* UFormField 横排。实际 DOM（@nuxt/ui 4.10）：
+   root[data-slot=root][data-orientation]
+     > div[data-slot=wrapper]（标签）
+     > div（无 data-slot，控件容器；纵向时带 mt-1）> 控件
+   控件撑满之前失效，是因为旧规则按 root > root 匹配，中间这层无 data-slot 的 div 截断了它。
+   FormField 自带的 orientation="horizontal" 只给 root 加 flex + justify-between，
+   不定标签宽、不让控件撑满，且要每个使用方都传，所以这里直接用两列 grid 排。 */
+.fields > :global([data-slot='root'][data-orientation]) {
+  display: grid;
+  grid-template-columns: var(--filter-label-width) minmax(0, 1fr);
   align-items: center;
+  column-gap: 8px;
 }
 
-/* UFormField 与 UInput/USelect 默认是 inline-flex，若不撑满栅格会留下大片空白。 */
-.grid > :global([data-slot='root']) {
+.fields > :global([data-slot='root'][data-orientation]) > :global([data-slot='wrapper']) {
+  min-width: 0;
+}
+
+.fields > :global([data-slot='root'][data-orientation]) :global([data-slot='label']) {
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* 控件容器：去掉纵向布局的 mt-1，撑满第二列。 */
+.fields > :global([data-slot='root'][data-orientation]) > div:not([data-slot]) {
+  min-width: 0;
+  margin-top: 0;
+}
+
+/* 控件本身（UInput 的 root、USelect 的 trigger、日期范围等自定义容器）撑满格子。
+   UInput / USelect 默认 inline-flex，不写 width 会按内容收缩。 */
+.fields > :global([data-slot='root'][data-orientation]) > div:not([data-slot]) > *,
+.fields > :global(:not([data-orientation])) {
   width: 100%;
   min-width: 0;
 }
 
-.grid > :global([data-slot='root']) > :global([data-slot='root']) {
-  width: 100%;
-  min-width: 0;
+/* ===== 按钮列 ===== */
+
+/* 位于字段区右侧，中间 1px 竖线。缺省（只有 1 行字段）两个按钮并排、垂直居中。 */
+.actions {
+  flex: 0 0 auto;
+  margin-left: 24px;
+  padding-left: 24px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  border-left: 1px solid var(--border);
 }
 
-/* 窄屏降为 1 列。 */
+/* 字段 ≥2 行：竖叠、等宽，查询在上（DOM 顺序）；整列顶对齐。 */
+.actions.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
 
-@media (max-width: 1024px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr) !important;
+.actions.stacked > * {
+  justify-content: center;
+}
+
+/* ===== 容器查询：按面板宽度切列数 ===== */
+
+@container filter-panel (width < 960px) {
+  .fields {
+    --filter-cols: 2;
   }
 }
 
-.actions {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+/* 最窄：1 列；按钮移到字段下方横排、靠右，不显示竖线。 */
+@container filter-panel (width < 600px) {
+  .fields {
+    --filter-cols: 1;
+  }
+
+  .body {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .actions,
+  .actions.stacked {
+    margin-left: 0;
+    padding-left: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    border-left: 0;
+  }
 }

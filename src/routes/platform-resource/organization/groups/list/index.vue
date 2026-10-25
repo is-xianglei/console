@@ -48,7 +48,6 @@ const columns: TableColumn<GroupResponse>[] = [
 ]
 
 const workspaceId = computed(() => authStore.currentWorkspaceId ?? authStore.currentWorkspace?.id ?? null)
-const workspaceName = computed(() => authStore.currentWorkspace?.display_name || authStore.currentWorkspace?.name || '未选择工作区')
 const deleteTitle = computed(() => manager.pendingDelete.value ? `删除群组「${manager.pendingDelete.value.name}」？` : '删除群组？')
 const deleteConfirmDisabled = computed(() => Boolean(manager.deleteBlockers.value && manager.deleteBlockers.value.memberCount > 0))
 
@@ -113,31 +112,29 @@ watch(
     <FilterPanel
       title="筛选条件"
       :collapsible="true"
+      storage-key="groups"
       @search="onApplyFilters"
       @reset="onResetFilters"
     >
-      <template #default>
-        <div :class="styles.filterForms">
-          <UFormField label="群组名称"><UInput v-model="manager.state.keyword" icon="i-lucide-search" placeholder="搜索群组名称、标识或描述（服务端搜索）" aria-label="搜索群组" @keydown.enter="onApplyFilters" /></UFormField>
-          <UFormField label="类型">
-            <USelect :model-value="manager.state.groupType" :items="typeOptions" aria-label="类型" @update:model-value="(value: unknown) => { manager.state.groupType = String(value ?? 'all') }" />
-          </UFormField>
-          <UFormField label="创建时间">
-            <div :class="styles.dateRange">
-              <UInput :model-value="manager.state.dateRange[0]" type="date" aria-label="开始日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [String(value ?? ''), manager.state.dateRange[1]] }" />
-              <span>~</span>
-              <UInput :model-value="manager.state.dateRange[1]" type="date" aria-label="结束日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [manager.state.dateRange[0], String(value ?? '')] }" />
-            </div>
-          </UFormField>
+      <UFormField label="群组名称"><UInput v-model="manager.state.keyword" icon="i-lucide-search" placeholder="搜索群组名称、标识或描述" aria-label="搜索群组" /></UFormField>
+      <UFormField label="类型">
+        <USelect :model-value="manager.state.groupType" :items="typeOptions" aria-label="类型" @update:model-value="(value: unknown) => { manager.state.groupType = String(value ?? 'all') }" />
+      </UFormField>
+      <UFormField label="创建时间">
+        <div :class="styles.dateRange">
+          <UInput :model-value="manager.state.dateRange[0]" type="date" aria-label="开始日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [String(value ?? ''), manager.state.dateRange[1]] }" />
+          <span>~</span>
+          <UInput :model-value="manager.state.dateRange[1]" type="date" aria-label="结束日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [manager.state.dateRange[0], String(value ?? '')] }" />
         </div>
-        <div :class="styles.filterTabsRow">
-          <UTabs v-model="manager.state.enabledFilter" :class="styles.filterTabs" :items="enabledOptions" :content="false" size="sm" aria-label="启用状态筛选" />
-          <span :class="styles.workspaceName"><UIcon name="i-lucide-panels-top-left" />{{ workspaceName }}</span>
-        </div>
-      </template>
+      </UFormField>
+      <!-- 原为状态 Tabs：v-model 与选项值不变。与同页「类型」下拉一致，改动即写 state，
+           由 manager 的 state 深度监听（300ms 防抖）触发重拉。 -->
+      <UFormField label="状态">
+        <USelect :model-value="manager.state.enabledFilter" :items="enabledOptions" aria-label="启用状态筛选" @update:model-value="(value: unknown) => { manager.state.enabledFilter = String(value ?? 'all') as GroupEnabledFilter }" />
+      </UFormField>
     </FilterPanel>
 
-    <ListCard title="群组列表" description="组织跨部门协作：维护群组类型、可见性、加入方式与成员审批。点击行进入群组详情页。" :total="manager.total.value">
+    <ListCard title="群组列表" description="组织跨部门协作：维护群组类型、可见性、加入方式与成员审批。">
       <template #toolbar>
         <UButton label="新建群组" icon="i-lucide-plus" color="primary" @click="goToCreate" />
         <UTooltip text="刷新目录">

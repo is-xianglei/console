@@ -22,29 +22,7 @@
   overflow: hidden;
 }
 
-.filterRow {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.filterTabs { flex: 0 0 auto; }
 .statusBadge { text-transform: none; }
-.search { width: min(390px, 100%); }
-
-.workspaceName {
-  margin-left: auto;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .alert { margin: 10px 10px 0; }
 
@@ -58,7 +36,7 @@
 /* 停用节点及其子树整体弱化（B4）。subtreeInactive 由 manager 自上而下传播。 */
 .subtreeInactive { opacity: 0.45; }
 
-/* 底部计数条：不分页，仅显示部门总数。 */
+/* 底部计数条：不分页；总数在 ListCard 标题下，这里只在关键字搜索时显示命中数。 */
 .countBar {
   display: flex;
   justify-content: flex-end;
@@ -72,7 +50,4 @@
 
 @media (max-width: 720px) {
   .page { padding: 12px; gap: 12px; }
-  .filterRow { flex-wrap: wrap; }
-  .search { width: 100%; }
-  .workspaceName { margin-left: 0; flex: 1; }
 }

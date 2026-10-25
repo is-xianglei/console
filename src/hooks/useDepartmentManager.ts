@@ -134,12 +134,6 @@ export function useDepartmentManager() {
    * 缩进（row.depth > 0）也只有走真树才有非 0 深度。 */
   const rows = computed<DepartmentTreeRow[]>(() => filteredTree.value)
   const allCount = computed(() => departments.value.length)
-  const stats = computed(() => ({
-    all: departments.value.length,
-    topLevel: departments.value.filter((item) => item.parent_id == null).length,
-    enabled: departments.value.filter((item) => item.is_active).length,
-    roots: tree.value.length,
-  }))
 
   function showToast(message: string) {
     toast.value = message
@@ -244,7 +238,6 @@ export function useDepartmentManager() {
     flatRows,
     filteredTree,
     allCount,
-    stats,
     showToast,
     toggleCollapsed,
     loadAll,

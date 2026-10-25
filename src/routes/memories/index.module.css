@@ -78,7 +78,9 @@
   border-radius: var(--radius-control);
 }
 
-/* 列表容器：详情/编辑/新建已路由化为独立页面，此处只承载列表面板。 */
+/* 列表容器：详情/编辑/新建已路由化为独立页面，此处只承载列表面板。
+   只做尺寸约束，不画边框/底色：里面的筛选卡、列表卡各自带边框，
+   外层再包一层会形成双层边框（与 skills 的 panelWrap 一致）。 */
 .panelWrap {
   width: 100%;
   max-width: var(--page-content-max);
@@ -88,9 +90,6 @@
   flex-direction: column;
   margin: 0 auto;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
 }
 
 .modalForm {

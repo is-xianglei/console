@@ -101,13 +101,6 @@ export function useGroupManager() {
     return filteredGroups.value.slice(start, start + state.pageSize)
   })
 
-  const stats = computed(() => ({
-    all: groups.value.length,
-    mine: groupsStore.state.myGroups.length,
-    open: groups.value.filter((item) => item.join_mode === 'open').length,
-    enabled: groups.value.filter((item) => item.is_active).length,
-  }))
-
   function isMine(groupId: number) {
     return myGroupIds.value.has(groupId)
   }
@@ -281,7 +274,6 @@ export function useGroupManager() {
     membershipBusyId,
     myGroupIds,
     filteredGroups,
-    stats,
     isMine,
     showToast,
     loadAll,

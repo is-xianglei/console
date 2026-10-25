@@ -179,13 +179,6 @@ export function usePeopleManager() {
       node.name.toLowerCase().includes(query))
   })
 
-  const stats = computed(() => ({
-    all: users.value.length,
-    members: workspaceMembers.value.length,
-    assigned: workspaceMembers.value.filter((item) => item.department_id != null).length,
-    admins: workspaceMembers.value.filter((item) => item.role === 'admin').length,
-  }))
-
   function isSelf(userId: number) {
     return currentUserId.value != null && currentUserId.value === userId
   }
@@ -420,7 +413,6 @@ export function usePeopleManager() {
     departmentTree,
     treeSearch,
     treeCollapsed,
-    stats,
     departmentOptions: support.departmentOptions,
     departmentName: support.departmentName,
     membershipOf: support.membershipOf,

@@ -159,29 +159,28 @@ async function onDelete() {
 
 <template>
   <section :class="styles.panel" aria-label="Memory 列表" @keydown="onKeydown">
-    <FilterPanel title="筛选条件" :collapsible="false" :columns="3" @search="onApplyFilters" @reset="onResetFilters">
-      <template #default>
-        <UFormField label="关键字">
-          <UInput :model-value="manager.search.value" :class="styles.search" icon="i-lucide-search" placeholder="搜索名称、标识或正文" aria-label="搜索 Memory" @update:model-value="(v: unknown) => { manager.search.value = String(v ?? '') }" @keydown.enter="onApplyFilters">
-            <template v-if="manager.search.value" #trailing>
-              <UButton color="neutral" variant="ghost" square size="xs" icon="i-lucide-x" aria-label="清空搜索" @click="manager.search.value = ''; onApplyFilters()" />
-            </template>
-          </UInput>
-        </UFormField>
-        <UFormField label="类型">
-          <USelect :model-value="manager.memoryType.value" :class="styles.typeFilter" :items="typeItems" aria-label="Memory 类型" @update:model-value="(v: unknown) => { manager.memoryType.value = String(v ?? 'all') as MemoryType | 'all'; onApplyFilters() }" />
-        </UFormField>
-      </template>
+    <FilterPanel title="筛选条件" :collapsible="false" @search="onApplyFilters" @reset="onResetFilters">
+      <UFormField label="关键字">
+        <UInput :model-value="manager.search.value" icon="i-lucide-search" placeholder="搜索名称、标识或正文" aria-label="搜索 Memory" @update:model-value="(v: unknown) => { manager.search.value = String(v ?? '') }">
+          <template v-if="manager.search.value" #trailing>
+            <UButton color="neutral" variant="ghost" square size="xs" icon="i-lucide-x" aria-label="清空搜索" @click="manager.search.value = ''; onApplyFilters()" />
+          </template>
+        </UInput>
+      </UFormField>
+      <UFormField label="类型">
+        <USelect :model-value="manager.memoryType.value" :items="typeItems" aria-label="Memory 类型" @update:model-value="(v: unknown) => { manager.memoryType.value = String(v ?? 'all') as MemoryType | 'all'; onApplyFilters() }" />
+      </UFormField>
+      <!-- 自定义按钮组：比缺省多一个刷新。「重置」常显，无筛选条件时禁用。 -->
       <template #actions>
-        <UButton label="搜索" icon="i-lucide-search" color="primary" @click="onApplyFilters" />
-        <UButton v-if="manager.hasActiveFilter.value" label="重置" icon="i-lucide-rotate-ccw" color="neutral" variant="outline" @click="onResetFilters" />
+        <UButton label="查询" icon="i-lucide-search" color="primary" @click="onApplyFilters" />
+        <UButton label="重置" icon="i-lucide-rotate-ccw" color="neutral" variant="outline" :disabled="!manager.hasActiveFilter.value" @click="onResetFilters" />
         <UTooltip text="刷新列表">
           <UButton color="neutral" variant="outline" square icon="i-lucide-refresh-cw" aria-label="刷新列表" :loading="manager.loading.value" @click="onRetry" />
         </UTooltip>
       </template>
     </FilterPanel>
 
-    <ListCard title="Memory 列表" description="管理当前工作区中的长期记忆、修订历史与来源证据。" :total="manager.total.value">
+    <ListCard title="Memory 列表" description="管理当前工作区中的长期记忆、修订历史与来源证据。">
       <UAlert v-if="manager.loadError.value" color="error" variant="subtle" icon="i-lucide-circle-alert" :class="styles.alert" role="alert" :title="manager.loadError.value" />
 
       <div :class="styles.tableWrap">

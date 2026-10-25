@@ -37,18 +37,6 @@
   font-size: var(--fs-xs);
 }
 
-.workspaceName {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .alert { margin: 10px 10px 0; }
 
 /* 名称 / 状态 / 时间 / 操作四类列的宽度已由基线（见文件首行 @import）的语义列类给出，

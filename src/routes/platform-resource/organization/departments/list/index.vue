@@ -43,7 +43,6 @@ function treeChildrenKey(row: DepartmentTreeRow): DepartmentTreeRow[] | undefine
 }
 
 const workspaceId = computed(() => authStore.currentWorkspaceId ?? authStore.currentWorkspace?.id ?? null)
-const workspaceName = computed(() => authStore.currentWorkspace?.display_name || authStore.currentWorkspace?.name || '未选择工作区')
 const deleteTitle = computed(() => manager.pendingDelete.value ? `删除部门「${manager.pendingDelete.value.name}」？` : '删除部门？')
 /** 删除确认是否可点：无阻断信息时允许；有阻断信息且非「仅后端原因」时禁用。 */
 const deleteConfirmDisabled = computed(() => Boolean(manager.deleteBlockers.value && (manager.deleteBlockers.value.childrenCount > 0 || manager.deleteBlockers.value.memberCount > 0)))
@@ -108,36 +107,29 @@ watch(
     <FilterPanel
       title="筛选条件"
       :collapsible="true"
+      storage-key="departments"
       @search="onApplyFilters"
       @reset="onResetFilters"
     >
-      <template #default>
-        <div :class="styles.filterRow">
-          <UInput
-            v-model="manager.state.keyword"
-            :class="styles.search"
-            icon="i-lucide-search"
-            placeholder="搜索部门名称、编码或描述"
-            aria-label="搜索部门"
-          >
-            <template v-if="manager.state.keyword" #trailing>
-              <UButton icon="i-lucide-x" color="neutral" variant="ghost" square size="xs" aria-label="清空搜索" @click="manager.state.keyword = ''" />
-            </template>
-          </UInput>
-          <UTabs
-            v-model="manager.state.enabledFilter"
-            :class="styles.filterTabs"
-            :items="enabledOptions"
-            :content="false"
-            size="sm"
-            aria-label="启用状态筛选"
-          />
-          <span :class="styles.workspaceName"><UIcon name="i-lucide-panels-top-left" />{{ workspaceName }}</span>
-        </div>
-      </template>
+      <UFormField label="关键字">
+        <UInput
+          v-model="manager.state.keyword"
+          icon="i-lucide-search"
+          placeholder="搜索部门名称、编码或描述"
+          aria-label="搜索部门"
+        >
+          <template v-if="manager.state.keyword" #trailing>
+            <UButton icon="i-lucide-x" color="neutral" variant="ghost" square size="xs" aria-label="清空搜索" @click="manager.state.keyword = ''" />
+          </template>
+        </UInput>
+      </UFormField>
+      <!-- 原为状态 Tabs：v-model 与选项值不变，改动即时生效（本页前端过滤，与 Tabs 一致）。 -->
+      <UFormField label="状态">
+        <USelect v-model="manager.state.enabledFilter" :items="enabledOptions" aria-label="启用状态筛选" />
+      </UFormField>
     </FilterPanel>
 
-    <ListCard title="部门列表" description="支持树状层级维护、负责人指定和部门状态管理。点击行进入部门详情页。" :total="manager.allCount.value">
+    <ListCard title="部门列表" description="支持树状层级维护、负责人指定和部门状态管理。" :total="manager.allCount.value">
       <template #toolbar>
         <UButton label="新建部门" icon="i-lucide-plus" color="primary" @click="goToCreate" />
         <UButton
@@ -196,8 +188,9 @@ watch(
         </template>
       </ResourceTable>
 
-      <template #footer>
-        <div :class="styles.countBar">共 {{ manager.allCount.value }} 个部门<span v-if="manager.state.keyword"> · 匹配 {{ manager.flatRows.value.length }} 个</span></div>
+      <!-- 总数只在 ListCard 标题下显示一次；底部仅在关键字搜索时给出命中数。 -->
+      <template v-if="manager.state.keyword" #footer>
+        <div :class="styles.countBar">匹配 {{ manager.flatRows.value.length }} 个</div>
       </template>
     </ListCard>
 

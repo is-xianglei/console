@@ -64,14 +64,6 @@
   margin: 0;
 }
 
-.search {
-  width: min(390px, 100%);
-}
-
-.scopeFilter {
-  width: 150px;
-}
-
 /* 表格本体（width、行高、字色字号、行悬停）已在基线里；原先这里有一份与
    teams/plans/workflows 三个列表页逐字相同的 .table 副本，已删除。
    唯一差异是表头字号曾用 --fs-xs，基线用 --fs-sm，按基线统一。 */

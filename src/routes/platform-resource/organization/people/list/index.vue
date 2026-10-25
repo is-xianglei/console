@@ -54,7 +54,6 @@ const columns: TableColumn<PersonRow>[] = [
 ]
 
 const workspaceId = computed(() => authStore.currentWorkspaceId ?? authStore.currentWorkspace?.id ?? null)
-const workspaceName = computed(() => authStore.currentWorkspace?.display_name || authStore.currentWorkspace?.name || '未选择工作区')
 const deleteTitle = computed(() => {
   const target = manager.pendingDelete.value
   return target ? `删除用户「${target.full_name || target.username}」？` : '删除用户？'
@@ -221,30 +220,27 @@ watch(
         <FilterPanel
           title="筛选条件"
           :collapsible="true"
+          storage-key="people"
           @search="onApplyFilters"
           @reset="onResetFilters"
         >
-          <template #default>
-            <div :class="styles.filterForms">
-              <UFormField label="用户名称"><UInput v-model="manager.state.keyword" icon="i-lucide-search" placeholder="搜索用户名 / 邮箱 / 姓名 / 手机号" aria-label="搜索人员" @keydown.enter="onApplyFilters" /></UFormField>
-              <!-- 窄屏替代入口：部门级联（A7）。 -->
-              <UFormField label="部门">
-                <USelect
-                  :model-value="manager.state.departmentId || SELECT_NONE_VALUE"
-                  :items="departmentFilterOptions"
-                  aria-label="部门"
-                  @update:model-value="(value: unknown) => manager.selectDepartment(value === SELECT_NONE_VALUE ? '' : String(value ?? ''))"
-                />
-              </UFormField>
-            </div>
-            <div :class="styles.filterTabsRow">
-              <UTabs v-model="manager.state.membership" :class="styles.filterTabs" :items="membershipOptions" :content="false" size="sm" aria-label="工作区归属筛选" />
-              <span :class="styles.workspaceName"><UIcon name="i-lucide-panels-top-left" />{{ workspaceName }}</span>
-            </div>
-          </template>
+          <UFormField label="用户名称"><UInput v-model="manager.state.keyword" icon="i-lucide-search" placeholder="搜索用户名 / 邮箱 / 姓名 / 手机号" aria-label="搜索人员" /></UFormField>
+          <!-- 窄屏替代入口：部门级联（A7）。 -->
+          <UFormField label="部门">
+            <USelect
+              :model-value="manager.state.departmentId || SELECT_NONE_VALUE"
+              :items="departmentFilterOptions"
+              aria-label="部门"
+              @update:model-value="(value: unknown) => manager.selectDepartment(value === SELECT_NONE_VALUE ? '' : String(value ?? ''))"
+            />
+          </UFormField>
+          <!-- 原为状态 Tabs：v-model 与选项值不变。与同页「部门」下拉一致，改动即写 state（前端过滤即时生效）。 -->
+          <UFormField label="状态">
+            <USelect v-model="manager.state.membership" :items="membershipOptions" aria-label="工作区归属筛选" />
+          </UFormField>
         </FilterPanel>
 
-        <ListCard title="人员" description="查看用户目录与其在当前工作区的部门、角色、岗位归属；点击行进入人员详情页。" :total="manager.total.value">
+        <ListCard title="人员" description="查看用户目录与其在当前工作区的部门、角色、岗位归属。">
           <template #toolbar>
             <UButton label="邀请人员" icon="i-lucide-user-plus" color="primary" @click="goToCreate" />
             <UButton label="部门" icon="i-lucide-folder-tree" color="neutral" variant="outline" :class="styles.mobileTreeBtn" @click="mobileTreeOpen = true" />
