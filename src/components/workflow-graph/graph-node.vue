@@ -6,9 +6,18 @@ import type { WfNodeData } from './types'
 
 defineOptions({ name: 'WorkflowGraphNode', inheritAttrs: false })
 
-const props = defineProps<NodeProps<WfNodeData>>()
+const props = defineProps<NodeProps<WfNodeData> & {
+  /** Builder 模式预览：名字常驻节点下方（画布不可交互，悬停浮标出不来），
+   *  路由/汇总节点也跟随状态着色，用来演示流转。聊天页不传，行为不变。 */
+  preview?: boolean
+}>()
 
 const emit = defineEmits<{ focusNode: [runId: string] }>()
+
+/** 主流程连接点跟随节点的 source/targetPosition：聊天页不设，回落到上进下出；
+ *  模式预览是横向图，设成左进右出。 */
+const targetSide = computed(() => props.targetPosition ?? Position.Top)
+const sourceSide = computed(() => props.sourcePosition ?? Position.Bottom)
 
 /** 起点/终点画成"空心圆 + 内实心点"，其余三种画图标。 */
 const isAnchor = computed(
@@ -29,10 +38,12 @@ const iconClass = computed(() => {
   }
 })
 
-/** 结构节点没有运行时状态，配色恒定，不参与状态类切换。 */
-const statusClass = computed(() =>
-  props.data.kind === 'member' ? `node-${props.data.status}` : null,
-)
+/** 结构节点没有运行时状态，配色恒定，不参与状态类切换；预览图里路由/汇总节点例外。 */
+const statusClass = computed(() => {
+  if (props.data.kind === 'member') return `node-${props.data.status}`
+  if (props.preview && !isAnchor.value) return `node-${props.data.status}`
+  return null
+})
 
 const stateText = computed(() =>
   props.data.disabled ? '成员已停用' : STATUS_LABEL[props.data.status],
@@ -71,8 +82,8 @@ function onActivate() {
     @keydown.space.prevent="onActivate"
   >
     <!-- 连接点不可见，只作为边的锚。上下走主流程，右侧留给 loop 回环 -->
-    <Handle type="target" :position="Position.Top" :class="$style.handle" />
-    <Handle type="source" :position="Position.Bottom" :class="$style.handle" />
+    <Handle type="target" :position="targetSide" :class="$style.handle" />
+    <Handle type="source" :position="sourceSide" :class="$style.handle" />
     <Handle
       v-if="data.kind === 'member'"
       id="loop-in"
@@ -91,8 +102,10 @@ function onActivate() {
     <span v-if="isAnchor" :class="$style['node-dot']"></span>
     <span v-else :class="[$style['node-icon'], iconClass]"></span>
 
+    <!-- 预览图：名字常驻节点下方 -->
+    <span v-if="preview" :class="$style.caption">{{ data.label }}</span>
     <!-- 名字不常驻画布，只在悬停/聚焦时浮出。宽度由浏览器排版，不再估算像素 -->
-    <span :class="$style.tip">{{ tipText }}</span>
+    <span v-else :class="$style.tip">{{ tipText }}</span>
   </div>
 </template>
 

@@ -197,23 +197,24 @@
   min-width: 0;
 }
 
-.wf-mode-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+/* 三个模式上下排，每个占一整行：上半是标题与说明，下半是该模式的运行图。 */
+.wf-mode-list {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-sm);
 }
 
+/* 整行可点：单选语义在行内的 button[role=radio] 上，运行图不放进 button。 */
 .wf-mode-card {
+  min-width: 0;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   color: inherit;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 6px 10px;
-  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   cursor: pointer;
   transition: border-color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-fast);
 }
@@ -226,6 +227,34 @@
   border-color: var(--accent-agent);
   background: var(--accent-agent-dim);
   box-shadow: 0 0 0 1px var(--accent-agent-glow);
+}
+
+/* 键盘焦点环画在整行上，与全局 :focus-visible 同款光晕。 */
+.wf-mode-card:has(.wf-mode-option:focus-visible) {
+  box-shadow: 0 0 0 2px var(--accent-agent-dim), 0 0 12px var(--accent-agent-glow);
+}
+
+.wf-mode-card.selected:has(.wf-mode-option:focus-visible) {
+  box-shadow: 0 0 0 1px var(--accent-agent-glow), 0 0 12px var(--accent-agent-glow);
+}
+
+.wf-mode-option {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wf-mode-option:focus-visible {
+  box-shadow: none;
 }
 
 .wf-mode-icon {

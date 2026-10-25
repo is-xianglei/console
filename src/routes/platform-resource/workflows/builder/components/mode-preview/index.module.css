@@ -1,0 +1,17 @@
+/* 预览图只展示：整块不吃指针事件，点击落到所在的模式行上，滚轮交给页面滚动。
+   Vue Flow 给节点、边、画布各自写了 pointer-events，必须逐层压掉。 */
+.mode-preview {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.mode-preview :global(*) {
+  pointer-events: none !important;
+}
+
+.mode-preview-flow {
+  position: absolute;
+  inset: 0;
+}

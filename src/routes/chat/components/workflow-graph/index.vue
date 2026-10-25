@@ -9,11 +9,11 @@ import type { PlanResponse } from '@/interfaces/orchestration-plan/api'
 import type { WorkflowResponse } from '@/interfaces/workflow/api'
 import { useConsoleStore } from '@/stores/console'
 import { useWorkflowsStore } from '@/stores/workflows'
-import GraphEdge from './graph-edge.vue'
-import GraphNode from './graph-node.vue'
-import { buildTopology, buildWorkflowTopology } from './topology'
-import { layoutTopology } from './layout'
-import { MIN_ZOOM, fitViewport } from './viewport'
+import GraphEdge from '@/components/workflow-graph/graph-edge.vue'
+import GraphNode from '@/components/workflow-graph/graph-node.vue'
+import { buildTopology, buildWorkflowTopology } from '@/components/workflow-graph/topology'
+import { layoutTopology } from '@/components/workflow-graph/layout'
+import { MIN_ZOOM, fitViewport } from '@/components/workflow-graph/viewport'
 import {
   deriveEdgeActive,
   deriveHitRoute,
@@ -25,8 +25,8 @@ import {
   findRootState,
   resolveMemberRuntime,
   resolveWorkflowRuntime,
-} from './runtime'
-import type { WfEdgeData, WfNodeData } from './types'
+} from '@/components/workflow-graph/runtime'
+import type { WfEdgeData, WfNodeData } from '@/components/workflow-graph/types'
 
 defineOptions({ name: 'WorkflowGraph' })
 

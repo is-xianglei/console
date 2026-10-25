@@ -7,8 +7,10 @@ import type {
   WorkflowFormModel,
   WorkflowValidationIssue,
 } from '@/interfaces/workflow/model'
+import type { WorkflowMode } from '@/interfaces/workflow/api'
 import BuilderSteps from '@/components/resource/builder-steps/index.vue'
 import { groupIssuesByStep, useBuilderSteps, type BuilderStepDef } from '@/hooks/useBuilderSteps'
+import WorkflowModePreview from './components/mode-preview/index.vue'
 
 defineOptions({ name: 'WorkflowBuilder' })
 
@@ -75,6 +77,36 @@ const filteredAgents = computed(() => {
 /** 顺序模式展示执行顺序（序号 + 排序）；并行与智能路由只看成员集合。 */
 const orderSensitive = computed(() => props.workflow.mode === 'sequential')
 const minimumMembers = computed(() => minWorkflowMembers(props.workflow.mode))
+
+// ===== 编排模式：每行下方的运行图预览 =====
+/** 预览图用的成员名，顺序即表单里的排列顺序；为空时预览用占位成员。 */
+const memberNames = computed(() => props.workflow.members.map((member) => member.agentName))
+/** 选中行持续播放；鼠标悬停、键盘聚焦到的行也播放。 */
+const hoveredMode = ref<WorkflowMode | null>(null)
+const focusedMode = ref<WorkflowMode | null>(null)
+
+/** 只认键盘聚焦（:focus-visible）：鼠标点中的那行本来就是选中行。 */
+function onModeFocusIn(mode: WorkflowMode, event: FocusEvent) {
+  const target = event.target as HTMLElement | null
+  focusedMode.value = target?.matches(':focus-visible') ? mode : null
+}
+
+function onModeFocusOut(mode: WorkflowMode) {
+  if (focusedMode.value === mode) focusedMode.value = null
+}
+
+/** 方向键在模式间移动并选中，与原生单选组一致；首尾循环。 */
+function onModeKeydown(event: KeyboardEvent) {
+  const steps: Record<string, number> = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }
+  const step = steps[event.key]
+  if (!step) return
+  event.preventDefault()
+  const index = WORKFLOW_MODE_OPTIONS.findIndex((option) => option.value === props.workflow.mode)
+  const next = WORKFLOW_MODE_OPTIONS[(index + step + WORKFLOW_MODE_OPTIONS.length) % WORKFLOW_MODE_OPTIONS.length]!
+  props.workflow.mode = next.value
+  const group = event.currentTarget as HTMLElement
+  group.querySelector<HTMLElement>(`[data-mode="${next.value}"]`)?.focus()
+}
 
 function memberIndex(agentId: number) {
   return props.workflow.members.findIndex((member) => member.agentId === agentId)
@@ -201,20 +233,34 @@ onBeforeUnmount(() => {
       </section>
 
       <section v-else-if="activeStep === 'mode'" :class="$style['wf-step']" aria-label="编排模式">
-        <div :class="$style['wf-mode-grid']" role="radiogroup" aria-label="编排模式">
-          <button
+        <div :class="$style['wf-mode-list']" role="radiogroup" aria-label="编排模式" @keydown="onModeKeydown">
+          <div
             v-for="option in WORKFLOW_MODE_OPTIONS"
             :key="option.value"
-            type="button"
-            role="radio"
-            :aria-checked="workflow.mode === option.value"
             :class="[$style['wf-mode-card'], { [$style.selected]: workflow.mode === option.value }]"
             @click="workflow.mode = option.value"
+            @mouseenter="hoveredMode = option.value"
+            @mouseleave="hoveredMode = null"
+            @focusin="onModeFocusIn(option.value, $event)"
+            @focusout="onModeFocusOut(option.value)"
           >
-            <span :class="$style['wf-mode-icon']"><i :class="`icon icon-${option.icon}`"></i></span>
-            <span :class="$style['wf-mode-main']"><strong>{{ option.label }}</strong></span>
-            <small :class="$style['wf-mode-hint']">{{ option.hint }}</small>
-          </button>
+            <button
+              type="button"
+              role="radio"
+              :data-mode="option.value"
+              :aria-checked="workflow.mode === option.value"
+              :class="$style['wf-mode-option']"
+            >
+              <span :class="$style['wf-mode-icon']"><i :class="`icon icon-${option.icon}`"></i></span>
+              <span :class="$style['wf-mode-main']"><strong>{{ option.label }}</strong></span>
+              <small :class="$style['wf-mode-hint']">{{ option.hint }}</small>
+            </button>
+            <WorkflowModePreview
+              :mode="option.value"
+              :member-names="memberNames"
+              :playing="workflow.mode === option.value || hoveredMode === option.value || focusedMode === option.value"
+            />
+          </div>
         </div>
       </section>
 

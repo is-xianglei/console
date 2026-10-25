@@ -1,5 +1,5 @@
 import type { PlanMemberResponse, PlanResponse } from '@/interfaces/orchestration-plan/api'
-import type { WorkflowAgentResponse, WorkflowResponse } from '@/interfaces/workflow/api'
+import type { WorkflowAgentResponse, WorkflowMode, WorkflowResponse } from '@/interfaces/workflow/api'
 import type { TopoEdge, TopoNode, Topology, WfNodeKind } from './types'
 
 /** 成员节点键用 position 而非数组下标：position 是后端定的稳定序号，
@@ -141,23 +141,31 @@ export function buildWorkflowTopology(workflow: WorkflowResponse): Topology {
   const members = [...workflow.agents].sort(
     (left, right) => left.sort_order - right.sort_order || left.agent_id - right.agent_id,
   )
+  return buildWorkflowModeTopology(workflow.mode, members.map(workflowMemberNode))
+}
+
+/**
+ * 按模式把已排好序的成员节点接成 Workflow 图。聊天页的 Workflow 图与 Builder 的模式预览
+ * 共用这一份结构：前者传真实成员（id 为 m{agent_id}），后者传预览成员，连线规则只认节点 id。
+ */
+export function buildWorkflowModeTopology(mode: WorkflowMode, members: TopoNode[]): Topology {
   if (!members.length) return { nodes: [], edges: [], loopbacks: [] }
 
-  const hasRouterNode = workflow.mode === 'llm_routing'
-  const hasJoinNode = workflow.mode === 'parallel'
+  const hasRouterNode = mode === 'llm_routing'
+  const hasJoinNode = mode === 'parallel'
 
   const nodes: TopoNode[] = [structNode('start', 'anchor-start', '开始')]
   if (hasRouterNode) nodes.push(structNode('router', 'router', '智能路由'))
-  nodes.push(...members.map(workflowMemberNode))
+  nodes.push(...members)
   if (hasJoinNode) nodes.push(structNode('join', 'join', '汇总结果'))
   nodes.push(structNode('end', 'anchor-end', '结束'))
 
   const edges: TopoEdge[] = []
-  if (workflow.mode === 'sequential') {
+  if (mode === 'sequential') {
     let prev = 'start'
     for (const member of members) {
-      edges.push(flowEdge(prev, workflowMemberId(member)))
-      prev = workflowMemberId(member)
+      edges.push(flowEdge(prev, member.id))
+      prev = member.id
     }
     edges.push(flowEdge(prev, 'end'))
   } else {
@@ -165,8 +173,8 @@ export function buildWorkflowTopology(workflow: WorkflowResponse): Topology {
     const sink = hasJoinNode ? 'join' : 'end'
     if (hasRouterNode) edges.push(flowEdge('start', 'router'))
     for (const member of members) {
-      edges.push(flowEdge(fan, workflowMemberId(member)))
-      edges.push(flowEdge(workflowMemberId(member), sink))
+      edges.push(flowEdge(fan, member.id))
+      edges.push(flowEdge(member.id, sink))
     }
     if (hasJoinNode) edges.push(flowEdge('join', 'end'))
   }

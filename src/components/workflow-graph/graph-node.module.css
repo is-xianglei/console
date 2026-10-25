@@ -119,6 +119,23 @@
   opacity: 1;
 }
 
+/* ===== 预览图常驻名字：宽度上限与模式预览的 rank 间距配套，超出省略 ===== */
+.caption {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  line-height: 16px;
+  pointer-events: none;
+}
+
 /* 连接点只作为边的锚，不可见也不可交互 */
 .handle {
   opacity: 0;
