@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import ui from '@nuxt/ui/vite'
+import { codeInspectorPlugin } from 'code-inspector-plugin'
 import { fileURLToPath, URL } from 'node:url'
 
 function lucideWoff2Only(): Plugin {
@@ -31,6 +32,12 @@ export default defineConfig({
     },
   },
   plugins: [
+    // 仅 dev（vite serve）生效，build 时插件 apply 返回 false 不参与构建；
+    // 官方要求放在框架插件之前。编辑器靠扫描运行中的进程自动识别（多个 IDE 同时运行时按内置顺序挑），
+    // 要固定用某个编辑器，在本地 .env.local 写 CODE_EDITOR=<可执行文件绝对路径>；写编码名只在该 IDE 运行时优先
+    codeInspectorPlugin({
+      bundler: 'vite',
+    }),
     lucideWoff2Only(),
     vue(),
     ui({
