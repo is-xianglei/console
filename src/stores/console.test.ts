@@ -609,4 +609,40 @@ describe('console store 推理块收尾兜底', () => {
     handlers.onError?.(new Error('网络断开'))
     expect(answer()).toMatchObject({ kind: 'answer', text: '半截回答', streaming: false })
   })
+
+  /** 再灌入一个子代理：推理块和回答块都只开了头，没有 block_stop / turn_end */
+  function startSubAgentStream(handlers: ReturnType<typeof startThinkingStream>['handlers']) {
+    const actor = { role: 'subagent' as const, name: 'research', run_id: 'run-9' }
+    handlers.onEvent({ type: 'turn_start', sequence: 80, session_id: 12, actor })
+    handlers.onEvent({ type: 'block_start', sequence: 81, session_id: 12, actor, block: { index: 0, block_type: 'thinking' } })
+    handlers.onEvent({ type: 'thinking_delta', sequence: 82, session_id: 12, actor, block: { index: 0 }, text: '查历史' })
+    handlers.onEvent({ type: 'block_start', sequence: 83, session_id: 12, actor, block: { index: 1, block_type: 'text' } })
+    handlers.onEvent({ type: 'text_delta', sequence: 84, session_id: 12, actor, block: { index: 1 }, text: '半截' })
+    const stream = () => useConsoleStore().state.agents.find((a) => a.id === 'run-9')?.stream
+    expect(stream()).toEqual([
+      { kind: 'think', text: '查历史', done: false },
+      { kind: 'answer', text: '半截', streaming: true },
+    ])
+    return stream
+  }
+
+  it('流正常关闭时,子代理面板里没结束的推理块和回答块一并收尾', () => {
+    const { handlers } = startThinkingStream()
+    const stream = startSubAgentStream(handlers)
+    handlers.onDone?.()
+    expect(stream()).toEqual([
+      { kind: 'think', text: '查历史', done: true, seconds: 1 },
+      { kind: 'answer', text: '半截', streaming: false },
+    ])
+  })
+
+  it('连接出错时,子代理面板同样收尾', () => {
+    const { handlers } = startThinkingStream()
+    const stream = startSubAgentStream(handlers)
+    handlers.onError?.(new Error('网络断开'))
+    expect(stream()).toEqual([
+      { kind: 'think', text: '查历史', done: true, seconds: 1 },
+      { kind: 'answer', text: '半截', streaming: false },
+    ])
+  })
 })

@@ -884,11 +884,8 @@ export const useConsoleStore = defineStore('console', () => {
       },
       onError: (err) => {
         if (generation !== dataGeneration) return
-        // 出错同样收尾:回答块停止流式光标,否则光标会一直闪
-        for (const b of ai.blocks!) {
-          if (b.kind === 'answer') b.streaming = false
-        }
-        reducer.settleThinking()
+        // 出错同样收尾:对话区和子代理面板的推理块标为已结束、回答停止流式光标,否则会一直闪
+        reducer.settleStreams()
         ai.blocks!.push({
           kind: 'tool',
           tag: 'ERROR',
@@ -901,11 +898,8 @@ export const useConsoleStore = defineStore('console', () => {
       },
       onDone: () => {
         if (generation !== dataGeneration) return
-        // 收尾:未结束的回答块停止流式光标,未收到 block_stop 的推理块标为已结束
-        for (const b of ai.blocks!) {
-          if (b.kind === 'answer') b.streaming = false
-        }
-        reducer.settleThinking()
+        // 收尾:对话区和子代理面板里未收到 block_stop 的推理块标为已结束、回答块停止流式光标
+        reducer.settleStreams()
         state.busy = false
         activeStreamAbort = null
       },

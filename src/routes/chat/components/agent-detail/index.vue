@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { StreamingText, ThinkingReasoning } from '@/components'
 import { useStickToBottom } from '@/hooks'
 import type { SubAgent } from '@/interfaces'
 import ToolCallCard from '../tool-call-card/index.vue'
@@ -66,7 +67,8 @@ const statusLabel: Record<string, string> = {
       </div>
 
       <div ref="stream" :class="$style['detail-stream']">
-        <div v-for="(s, i) in agent.stream" :key="i" :class="$style['stream-item']">
+        <!-- key 带上子代理 id：切换查看的子代理时整条流重新挂载，避免复用上一个子代理的揭示进度和展开状态 -->
+        <div v-for="(s, i) in agent.stream" :key="`${agent.id}:${i}`" :class="$style['stream-item']">
           <template v-if="s.kind === 'tool'">
             <div :class="[$style['stream-lbl'], $style['tool']]"><i class="icon icon-terminal"></i>工具调用</div>
             <div :class="$style['stream-cli']">
@@ -78,13 +80,17 @@ const statusLabel: Record<string, string> = {
               />
             </div>
           </template>
-          <template v-else-if="s.kind === 'think'">
-            <div :class="[$style['stream-lbl'], $style['think']]"><i class="icon icon-brain"></i>推理</div>
-            <div :class="[$style['stream-txt'], $style['think']]">{{ s.text }}</div>
-          </template>
+          <!-- 推理块自带「思考中… / 已思考 N 秒」标题，不再另加标签 -->
+          <ThinkingReasoning
+            v-else-if="s.kind === 'think'"
+            :class="$style['stream-body']"
+            :text="s.text"
+            :done="s.done"
+            :seconds="s.seconds"
+          />
           <template v-else>
             <div :class="[$style['stream-lbl'], $style['answer']]"><i class="icon icon-message-circle"></i>回答</div>
-            <div :class="$style['stream-txt']">{{ s.text }}</div>
+            <StreamingText :class="[$style['stream-body'], $style['stream-answer']]" :text="s.text" :streaming="s.streaming" />
           </template>
         </div>
       </div>

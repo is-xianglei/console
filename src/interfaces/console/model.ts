@@ -312,10 +312,10 @@ export type CliTag =
   | 'WARN'
   | 'DONE'
 
-/** 子代理事件流中的单条记录。 */
+/** 子代理事件流中的单条记录。think/answer 的结束语义与中间对话区的 ChatBlock 一致 */
 export type StreamEvent =
-  | { kind: 'think'; text: string }
-  | { kind: 'answer'; text: string }
+  | { kind: 'think'; text: string; done: boolean; seconds?: number }
+  | { kind: 'answer'; text: string; streaming: boolean }
   | { kind: 'tool'; fn: string; body: string; done: boolean }
 
 /** 控制台右栏中的子代理。 */

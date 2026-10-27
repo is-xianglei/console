@@ -3,9 +3,14 @@ import type {
   ChatMessage,
   SseEvent,
   SseWorkflowProgress,
+  StreamEvent,
   SubAgent,
   TaskResponse,
 } from '../interfaces/console/model'
+
+/** 中间对话区与子代理面板共用的推理块、回答块形状 */
+type ThinkItem = Extract<ChatBlock | StreamEvent, { kind: 'think' }>
+type AnswerItem = Extract<ChatBlock | StreamEvent, { kind: 'answer' }>
 
 /** reducer 操作的可变状态切片(由 store 传入其响应式对象引用) */
 export interface SseTarget {
@@ -96,28 +101,39 @@ export function fmtToolCall(name: string, input?: Record<string, unknown>): stri
 export function createSseReducer(target: SseTarget) {
   // orchestrator 当前轮的块映射:block.index → ChatBlock 引用
   const oBlocks = new Map<number, ChatBlock>()
-  // 子代理当前块映射:agentKey → (index → 'think'|'answer' 累加目标)
-  const aBlocks = new Map<string, Map<number, { kind: 'think' | 'answer' }>>()
+  // 子代理当前块映射:agentKey → (index → 面板 stream 里的累加目标,存 reactive 代理)
+  const aBlocks = new Map<string, Map<number, ThinkItem | AnswerItem>>()
   // 推理块开始时间:只用于算思考秒数,不放进块对象,免得触发响应式更新。
   // 后端信封不带事件时间戳,按前端收到 block_start 的时刻计。
-  const thinkStartedAt = new WeakMap<ChatBlock, number>()
+  const thinkStartedAt = new WeakMap<ThinkItem, number>()
 
   /** 结束推理块并记下思考秒数;已结束的不重复处理(block_stop 与收尾兜底可能先后到达) */
-  function settleThink(b: Extract<ChatBlock, { kind: 'think' }>) {
+  function settleThink(b: ThinkItem) {
     if (b.done) return
     b.done = true
     const startedAt = thinkStartedAt.get(b)
     if (startedAt != null) b.seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
   }
 
+  /** 结束单个推理块或回答块:推理记秒数,回答停掉流式光标 */
+  function settleItem(b: ChatBlock | StreamEvent) {
+    if (b.kind === 'think') settleThink(b)
+    else if (b.kind === 'answer') b.streaming = false
+  }
+
+  /** 子代理本轮结束或出错:收尾它还没结束的推理块和回答块 */
+  function settleAgent(a: SubAgent) {
+    for (const it of a.stream) settleItem(it)
+  }
+
   /**
-   * 收尾兜底:把仍未结束的推理块标为已结束。
-   * 流被中止、连接出错或流结束却没收到 block_stop 时,推理块会一直停在「思考中…」且无法展开。
+   * 收尾兜底:把中间对话区和所有子代理面板里仍未结束的推理块、回答块都结束掉。
+   * 流被中止、连接出错或流结束却没收到 block_stop / turn_end 时,
+   * 推理块会一直停在「思考中…」且无法展开,回答的光标会一直闪。
    */
-  function settleThinking() {
-    for (const b of target.ai.blocks ?? []) {
-      if (b.kind === 'think') settleThink(b)
-    }
+  function settleStreams() {
+    for (const b of target.ai.blocks ?? []) settleItem(b)
+    for (const a of target.agents) settleAgent(a)
   }
 
   function handle(ev: SseEvent) {
@@ -168,7 +184,7 @@ export function createSseReducer(target: SseTarget) {
           blocks.push({ kind: 'think', text: '', done: false })
           // 关键:存回 reactive 数组里的代理,而非 push 前的原始字面量,
           // 否则后续 b.text += delta 改的是原始对象,不触发视图更新
-          const block = blocks[blocks.length - 1]
+          const block = blocks[blocks.length - 1] as ThinkItem
           oBlocks.set(ev.block!.index, block)
           thinkStartedAt.set(block, Date.now())
         } else if (bt === 'text') {
@@ -275,14 +291,17 @@ export function createSseReducer(target: SseTarget) {
         const bt = ev.block?.block_type
         const map = aBlocks.get(key) ?? new Map()
         aBlocks.set(key, map)
+        // 同 orchestrator:存回 reactive 数组里的代理,后续增量直接累加到它上面
         if (bt === 'thinking') {
-          a.stream.push({ kind: 'think', text: '' })
-          map.set(ev.block!.index, { kind: 'think' })
+          a.stream.push({ kind: 'think', text: '', done: false })
+          const item = a.stream[a.stream.length - 1] as ThinkItem
+          map.set(ev.block!.index, item)
+          thinkStartedAt.set(item, Date.now())
           a.status = 'think'
           a.progress = Math.max(a.progress, 30)
         } else if (bt === 'text') {
-          a.stream.push({ kind: 'answer', text: '' })
-          map.set(ev.block!.index, { kind: 'answer' })
+          a.stream.push({ kind: 'answer', text: '', streaming: true })
+          map.set(ev.block!.index, a.stream[a.stream.length - 1] as AnswerItem)
           a.status = 'run'
           a.progress = Math.max(a.progress, 70)
         }
@@ -290,17 +309,15 @@ export function createSseReducer(target: SseTarget) {
       }
       case 'thinking_delta':
       case 'text_delta': {
-        const a = ensureAgent(target, ev)
+        ensureAgent(target, ev)
         const slot = aBlocks.get(key)?.get(ev.block!.index)
         if (!slot) break
-        // 取该 kind 的最后一条流项累加
-        for (let i = a.stream.length - 1; i >= 0; i--) {
-          const it = a.stream[i]
-          if (it.kind === slot.kind) {
-            it.text += ev.text ?? ''
-            break
-          }
-        }
+        slot.text += ev.text ?? ''
+        break
+      }
+      case 'block_stop': {
+        const slot = aBlocks.get(key)?.get(ev.block!.index)
+        if (slot) settleItem(slot)
         break
       }
       case 'tool_use': {
@@ -329,12 +346,14 @@ export function createSseReducer(target: SseTarget) {
       }
       case 'turn_end': {
         const a = ensureAgent(target, ev)
+        settleAgent(a)
         a.status = 'done'
         a.progress = 100
         break
       }
       case 'error': {
         const a = ensureAgent(target, ev)
+        settleAgent(a)
         a.status = 'error'
         a.stream.push({
           kind: 'tool',
@@ -347,5 +366,5 @@ export function createSseReducer(target: SseTarget) {
     }
   }
 
-  return { handle, settleThinking }
+  return { handle, settleStreams }
 }

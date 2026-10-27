@@ -159,7 +159,7 @@ describe('createSseReducer', () => {
     it('流收尾时兜底结束没收到 block_stop 的推理块', () => {
       const { ai, reducer } = startThinking()
       vi.advanceTimersByTime(3000)
-      reducer.settleThinking()
+      reducer.settleStreams()
 
       expect(ai.blocks?.[0]).toMatchObject({ done: true, seconds: 3 })
     })
@@ -169,7 +169,7 @@ describe('createSseReducer', () => {
       vi.advanceTimersByTime(2000)
       reducer.handle(createEvent('block_stop', { block: { index: 0 } }))
       vi.advanceTimersByTime(8000)
-      reducer.settleThinking()
+      reducer.settleStreams()
 
       expect(ai.blocks?.[0]).toMatchObject({ done: true, seconds: 2 })
     })
@@ -177,7 +177,7 @@ describe('createSseReducer', () => {
     it('其他归约器建的推理块（如审批后续流）兜底时只标结束、不记秒数', () => {
       const { ai } = startThinking()
       const resumed = createSseReducer({ ai, agents: [], selectAgent: vi.fn() })
-      resumed.settleThinking()
+      resumed.settleStreams()
 
       expect(ai.blocks).toEqual([{ kind: 'think', text: '拆解问题', done: true }])
     })
@@ -229,7 +229,7 @@ describe('createSseReducer', () => {
       id: 'run-1',
       status: 'done',
       progress: 100,
-      stream: [{ kind: 'answer', text: '调查完成' }],
+      stream: [{ kind: 'answer', text: '调查完成', streaming: false }],
     })])
   })
 
@@ -266,7 +266,7 @@ describe('createSseReducer', () => {
     expect(agents[0]).toMatchObject({
       id: nodeKey,
       name: '专业评审',
-      stream: [{ kind: 'answer', text: '结构清晰' }],
+      stream: [{ kind: 'answer', text: '结构清晰', streaming: true }],
     })
   })
 
@@ -304,5 +304,100 @@ describe('createSseReducer', () => {
 
     expect(agents).toHaveLength(1)
     expect(agents[0]).toMatchObject({ id: 'run-1', name: 'wf-专业写作', agentId: 1, status: 'done' })
+  })
+
+  describe('子代理面板的推理块与回答块收尾', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    const actor = { role: 'subagent' as const, name: 'research', run_id: 'run-2' }
+
+    /** 子代理开一个推理块和一个回答块，都还没收到 block_stop */
+    function startAgent() {
+      const ai: ChatMessage = { id: 'ai-10', role: 'ai', time: '10:09', blocks: [] }
+      const agents: Parameters<typeof createSseReducer>[0]['agents'] = []
+      const reducer = createSseReducer({ ai, agents, selectAgent: vi.fn() })
+      reducer.handle(createEvent('turn_start', { actor }))
+      reducer.handle(createEvent('block_start', { actor, block: { index: 0, block_type: 'thinking' } }))
+      reducer.handle(createEvent('thinking_delta', { actor, block: { index: 0 }, text: '查历史工单' }))
+      vi.advanceTimersByTime(2600)
+      reducer.handle(createEvent('block_start', { actor, block: { index: 1, block_type: 'text' } }))
+      reducer.handle(createEvent('text_delta', { actor, block: { index: 1 }, text: '找到 3 条' }))
+      return { ai, agents, reducer }
+    }
+
+    it('block_stop 结束推理块并记秒数，回答块停止流式', () => {
+      const { agents, reducer } = startAgent()
+      expect(agents[0].stream).toEqual([
+        { kind: 'think', text: '查历史工单', done: false },
+        { kind: 'answer', text: '找到 3 条', streaming: true },
+      ])
+
+      reducer.handle(createEvent('block_stop', { actor, block: { index: 0 } }))
+      reducer.handle(createEvent('block_stop', { actor, block: { index: 1 } }))
+
+      expect(agents[0].stream).toEqual([
+        { kind: 'think', text: '查历史工单', done: true, seconds: 3 },
+        { kind: 'answer', text: '找到 3 条', streaming: false },
+      ])
+    })
+
+    it('增量按块索引累加，推理和回答交替出现时各自累加到对应块', () => {
+      const { agents, reducer } = startAgent()
+      reducer.handle(createEvent('block_start', { actor, block: { index: 2, block_type: 'thinking' } }))
+      reducer.handle(createEvent('thinking_delta', { actor, block: { index: 0 }, text: '，按时间排序' }))
+      reducer.handle(createEvent('text_delta', { actor, block: { index: 1 }, text: '，均已关闭' }))
+
+      expect(agents[0].stream.map((it) => it.kind === 'tool' ? '' : it.text)).toEqual([
+        '查历史工单，按时间排序',
+        '找到 3 条，均已关闭',
+        '',
+      ])
+    })
+
+    it('turn_end 时收尾没收到 block_stop 的推理块和回答块', () => {
+      const { agents, reducer } = startAgent()
+      reducer.handle(createEvent('turn_end', { actor }))
+
+      expect(agents[0]).toMatchObject({ status: 'done', progress: 100 })
+      expect(agents[0].stream).toEqual([
+        { kind: 'think', text: '查历史工单', done: true, seconds: 3 },
+        { kind: 'answer', text: '找到 3 条', streaming: false },
+      ])
+    })
+
+    it('子代理出错时同样收尾，再追加错误卡片', () => {
+      const { agents, reducer } = startAgent()
+      reducer.handle(createEvent('error', {
+        actor,
+        error: { code: 'TOOL_FAILED', message: '检索失败', retriable: false, fatal: false },
+      }))
+
+      expect(agents[0].status).toBe('error')
+      expect(agents[0].stream).toEqual([
+        { kind: 'think', text: '查历史工单', done: true, seconds: 3 },
+        { kind: 'answer', text: '找到 3 条', streaming: false },
+        { kind: 'tool', fn: 'TOOL_FAILED', body: '检索失败', done: true },
+      ])
+    })
+
+    it('settleStreams 同时收尾中间对话区和所有子代理面板', () => {
+      const { ai, agents, reducer } = startAgent()
+      reducer.handle(createEvent('block_start', { block: { index: 0, block_type: 'text' } }))
+      reducer.handle(createEvent('text_delta', { block: { index: 0 }, text: '汇总中' }))
+
+      reducer.settleStreams()
+
+      expect(ai.blocks).toEqual([{ kind: 'answer', text: '汇总中', streaming: false }])
+      expect(agents[0].stream).toEqual([
+        { kind: 'think', text: '查历史工单', done: true, seconds: 3 },
+        { kind: 'answer', text: '找到 3 条', streaming: false },
+      ])
+    })
   })
 })
