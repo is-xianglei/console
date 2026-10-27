@@ -20,17 +20,25 @@
   background: var(--bg-hover);
 }
 
+/* 底色铺满整行；左侧竖条只画在首格，否则每一列左边都会出现一条。 */
 .resource-table :global([data-slot='tbody'] > tr).active > td,
 .resource-table :global([data-slot='tbody'] > tr[data-selected='true'] > td) {
   background: var(--accent-agent-dim);
+}
+
+.resource-table :global([data-slot='tbody'] > tr).active > td:first-child,
+.resource-table :global([data-slot='tbody'] > tr[data-selected='true'] > td:first-child) {
   box-shadow: inset 2px 0 var(--accent-agent);
 }
 
 /* highlightId 命中行：高亮后 2s 淡出（CSS transition）。 */
 .resource-table :global([data-slot='tbody'] > tr).highlighted > td {
   background: var(--accent-agent-dim);
-  box-shadow: inset 3px 0 var(--accent-agent);
   animation: highlight-fade 2s var(--ease-out) forwards;
+}
+
+.resource-table :global([data-slot='tbody'] > tr).highlighted > td:first-child {
+  box-shadow: inset 3px 0 var(--accent-agent);
 }
 
 .resource-table :global([data-slot='tbody'] > tr:focus-visible) {

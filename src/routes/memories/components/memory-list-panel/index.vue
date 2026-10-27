@@ -118,19 +118,34 @@ function rowMenuItems(item: MemorySummary): DropdownMenuItem[][] {
   ]]
 }
 
+// 上/下键的光标行只在键盘导航期间显示，焦点离开面板即隐藏。
+// store 的 selectedId 在查看、编辑、新建后都会留着，直接拿来高亮会让某一行一直亮着。
+const keyboardNavigating = ref(false)
+const cursorId = computed(() =>
+  keyboardNavigating.value && manager.selectedId.value != null ? String(manager.selectedId.value) : null,
+)
+
+function onFocusout(event: FocusEvent) {
+  const panel = event.currentTarget as HTMLElement
+  if (!panel.contains(event.relatedTarget as Node | null)) keyboardNavigating.value = false
+}
+
 /** ResourceTable 不透传 @keydown，在面板外层保留上/下/回车键盘导航。 */
 function onKeydown(event: KeyboardEvent) {
   if (!manager.items.value.length) return
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     const delta = event.key === 'ArrowDown' ? 1 : -1
-    const current = manager.items.value.findIndex((item) => item.id === manager.selectedId.value)
+    const current = keyboardNavigating.value
+      ? manager.items.value.findIndex((item) => item.id === manager.selectedId.value)
+      : -1
     const next = current < 0 ? (delta > 0 ? 0 : manager.items.value.length - 1) : current + delta
     const clamped = Math.max(0, Math.min(manager.items.value.length - 1, next))
     event.preventDefault()
+    keyboardNavigating.value = true
     manager.selectedId.value = manager.items.value[clamped].id
     return
   }
-  if (event.key === 'Enter' && manager.selectedId.value != null) {
+  if (event.key === 'Enter' && keyboardNavigating.value && manager.selectedId.value != null) {
     event.preventDefault()
     goToDetail(manager.selectedId.value)
   }
@@ -158,7 +173,7 @@ async function onDelete() {
 </script>
 
 <template>
-  <section :class="styles.panel" aria-label="Memory 列表" @keydown="onKeydown">
+  <section :class="styles.panel" aria-label="Memory 列表" @keydown="onKeydown" @focusout="onFocusout">
     <FilterPanel title="筛选条件" :collapsible="false" @search="onApplyFilters" @reset="onResetFilters">
       <UFormField label="关键字">
         <UInput :model-value="manager.search.value" icon="i-lucide-search" placeholder="搜索名称、标识或正文" aria-label="搜索 Memory" @update:model-value="(v: unknown) => { manager.search.value = String(v ?? '') }">
@@ -190,7 +205,7 @@ async function onDelete() {
           :data="manager.items.value"
           :loading="manager.loading.value"
           :row-key="(item: MemorySummary) => String(item.id)"
-          :active-id="manager.selectedId.value != null ? String(manager.selectedId.value) : null"
+          :active-id="cursorId"
           :table-class="styles.table"
           :empty-mode="emptyMode"
           :resource-name="'Memory'"

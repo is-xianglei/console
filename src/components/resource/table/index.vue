@@ -15,7 +15,11 @@ const props = withDefaults(
     loading?: boolean
     /** 行唯一键，供 get-row-id 与选中态使用。 */
     rowKey: (row: T) => string
-    /** 当前选中行 id，用于高亮；传 null 表示不启用高亮。 */
+    /**
+     * 当前选中行 id，用于高亮；传 null 表示不启用高亮。
+     * 只传「此刻正在指向」的行（如键盘光标），不要直接传 store 里会长期保留的 selectedId，
+     * 否则查看或编辑过的那一行回到列表后会一直亮着。
+     */
     activeId?: string | null
     /** 透传给底层 UTable 的类名（如列表页的表格自身样式）。 */
     tableClass?: string | string[]
