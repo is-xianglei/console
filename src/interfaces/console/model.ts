@@ -346,7 +346,8 @@ export type InteractionStatus = 'pending' | 'resolved' | 'cancelled'
 
 /** 中间对话区的消息块。 */
 export type ChatBlock =
-  | { kind: 'think'; text: string; duration: string; collapsed: boolean }
+  /** done：推理已结束（block_stop 或流收尾）；seconds：实时流测得的思考秒数，历史消息没有 */
+  | { kind: 'think'; text: string; done: boolean; seconds?: number }
   | { kind: 'tool'; tag: CliTag; fn: string; body: string; done: boolean }
   | { kind: 'answer'; text: string; streaming: boolean }
   | {

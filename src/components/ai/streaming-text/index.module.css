@@ -1,0 +1,35 @@
+/* 流式正文：AICSS streaming-text 移植。字号、行高沿用原回答块，markdown 排版交给全局 .md */
+.streaming-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.65;
+}
+.streaming-text :global(.md) {
+  display: inline;
+}
+/* markdown 收尾多为段落：末段内联化，让光标跟在最后一行文字后，
+ * 而非因块级 </p> 换行后独占一行；列表/代码块等块级收尾时光标仍落到下一行，属自然表现。 */
+.streaming-text :global(.md) > p:last-child {
+  display: inline;
+}
+/* 块状光标：等新 token 时闪烁；caret-blink 是 index.css 里的全局 keyframes */
+.caret {
+  display: inline-block;
+  width: 8px;
+  height: 1.05em;
+  margin-left: 2px;
+  background: var(--text-primary);
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: global(caret-blink) 1s step-end infinite;
+}
+/* 正在揭示时常亮不闪 */
+.caret-steady {
+  animation: none;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}

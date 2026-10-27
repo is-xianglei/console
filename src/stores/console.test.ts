@@ -558,3 +558,55 @@ describe('console store Workflow 对话', () => {
     })
   })
 })
+
+describe('console store 推理块收尾兜底', () => {
+  let sequence = 0
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.resetAllMocks()
+    vi.mocked(sendMessage).mockReturnValue(() => {})
+    sequence = 0
+  })
+
+  /** 派发一条消息,并灌入一个只有开头、没有 block_stop 的推理块。 */
+  function startThinkingStream() {
+    const store = useConsoleStore()
+    store.resetConsole()
+    expect(store.dispatch('你好')).toBe(true)
+    const handlers = vi.mocked(sendMessage).mock.calls.at(-1)?.[1]
+    if (!handlers) throw new Error('未捕获到 SSE handlers')
+    const event = (type: SseEvent['type'], overrides: Partial<SseEvent>): SseEvent => {
+      sequence += 1
+      return { type, sequence, session_id: 12, ...overrides }
+    }
+    handlers.onEvent(event('block_start', { block: { index: 0, block_type: 'thinking' } }))
+    handlers.onEvent(event('thinking_delta', { block: { index: 0 }, text: '分析中' }))
+    const thinkBlock = () => store.state.messages.at(-1)?.blocks?.[0]
+    expect(thinkBlock()).toMatchObject({ kind: 'think', done: false })
+    return { handlers, thinkBlock }
+  }
+
+  it('流正常关闭但没收到 block_stop 时,推理块标为已结束', () => {
+    const { handlers, thinkBlock } = startThinkingStream()
+    handlers.onDone?.()
+    expect(thinkBlock()).toMatchObject({ kind: 'think', done: true, seconds: 1 })
+  })
+
+  it('连接出错时,推理块同样标为已结束', () => {
+    const { handlers, thinkBlock } = startThinkingStream()
+    handlers.onError?.(new Error('网络断开'))
+    expect(thinkBlock()).toMatchObject({ kind: 'think', done: true })
+  })
+
+  it('连接出错时,未结束的回答块停止流式光标', () => {
+    const { handlers } = startThinkingStream()
+    handlers.onEvent({ type: 'block_start', sequence: 90, session_id: 12, block: { index: 1, block_type: 'text' } })
+    handlers.onEvent({ type: 'text_delta', sequence: 91, session_id: 12, block: { index: 1 }, text: '半截回答' })
+    const store = useConsoleStore()
+    const answer = () => store.state.messages.at(-1)?.blocks?.find((b) => b.kind === 'answer')
+    expect(answer()).toMatchObject({ streaming: true })
+    handlers.onError?.(new Error('网络断开'))
+    expect(answer()).toMatchObject({ kind: 'answer', text: '半截回答', streaming: false })
+  })
+})

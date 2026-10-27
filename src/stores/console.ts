@@ -213,7 +213,7 @@ function mapMessages(list: SessionMessageResponse[]): ChatMessage[] {
     const blocks: ChatBlock[] = []
     for (const b of normalizeBlocks(m.content)) {
       if (b.type === 'thinking' && b.thinking) {
-        blocks.push({ kind: 'think', text: b.thinking, duration: '推理完成', collapsed: true })
+        blocks.push({ kind: 'think', text: b.thinking, done: true })
       } else if (b.type === 'text' && b.text) {
         blocks.push({ kind: 'answer', text: b.text, streaming: false })
       } else if (b.type === 'tool_use') {
@@ -884,6 +884,11 @@ export const useConsoleStore = defineStore('console', () => {
       },
       onError: (err) => {
         if (generation !== dataGeneration) return
+        // 出错同样收尾:回答块停止流式光标,否则光标会一直闪
+        for (const b of ai.blocks!) {
+          if (b.kind === 'answer') b.streaming = false
+        }
+        reducer.settleThinking()
         ai.blocks!.push({
           kind: 'tool',
           tag: 'ERROR',
@@ -896,10 +901,11 @@ export const useConsoleStore = defineStore('console', () => {
       },
       onDone: () => {
         if (generation !== dataGeneration) return
-        // 收尾:未结束的回答块停止流式光标
+        // 收尾:未结束的回答块停止流式光标,未收到 block_stop 的推理块标为已结束
         for (const b of ai.blocks!) {
           if (b.kind === 'answer') b.streaming = false
         }
+        reducer.settleThinking()
         state.busy = false
         activeStreamAbort = null
       },
@@ -1095,8 +1101,8 @@ export const useConsoleStore = defineStore('console', () => {
         {
           kind: 'think',
           text: '用户希望定位 pump-01 的振动告警根因。我会派发多个子代理并行采集数据、做频谱诊断、检索历史工单,最后汇总。点击右栏的子代理可查看各自的推理与工具调用。',
-          duration: '思考 0.9s',
-          collapsed: true,
+          done: true,
+          seconds: 1,
         },
         {
           kind: 'answer',

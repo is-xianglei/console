@@ -98,6 +98,27 @@ export function createSseReducer(target: SseTarget) {
   const oBlocks = new Map<number, ChatBlock>()
   // 子代理当前块映射:agentKey → (index → 'think'|'answer' 累加目标)
   const aBlocks = new Map<string, Map<number, { kind: 'think' | 'answer' }>>()
+  // 推理块开始时间:只用于算思考秒数,不放进块对象,免得触发响应式更新。
+  // 后端信封不带事件时间戳,按前端收到 block_start 的时刻计。
+  const thinkStartedAt = new WeakMap<ChatBlock, number>()
+
+  /** 结束推理块并记下思考秒数;已结束的不重复处理(block_stop 与收尾兜底可能先后到达) */
+  function settleThink(b: Extract<ChatBlock, { kind: 'think' }>) {
+    if (b.done) return
+    b.done = true
+    const startedAt = thinkStartedAt.get(b)
+    if (startedAt != null) b.seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+  }
+
+  /**
+   * 收尾兜底:把仍未结束的推理块标为已结束。
+   * 流被中止、连接出错或流结束却没收到 block_stop 时,推理块会一直停在「思考中…」且无法展开。
+   */
+  function settleThinking() {
+    for (const b of target.ai.blocks ?? []) {
+      if (b.kind === 'think') settleThink(b)
+    }
+  }
 
   function handle(ev: SseEvent) {
     const role = ev.actor?.role ?? 'orchestrator'
@@ -144,10 +165,12 @@ export function createSseReducer(target: SseTarget) {
       case 'block_start': {
         const bt = ev.block?.block_type
         if (bt === 'thinking') {
-          blocks.push({ kind: 'think', text: '', duration: '思考中…', collapsed: false })
+          blocks.push({ kind: 'think', text: '', done: false })
           // 关键:存回 reactive 数组里的代理,而非 push 前的原始字面量,
           // 否则后续 b.text += delta 改的是原始对象,不触发视图更新
-          oBlocks.set(ev.block!.index, blocks[blocks.length - 1])
+          const block = blocks[blocks.length - 1]
+          oBlocks.set(ev.block!.index, block)
+          thinkStartedAt.set(block, Date.now())
         } else if (bt === 'text') {
           blocks.push({ kind: 'answer', text: '', streaming: true })
           oBlocks.set(ev.block!.index, blocks[blocks.length - 1])
@@ -167,8 +190,7 @@ export function createSseReducer(target: SseTarget) {
       case 'block_stop': {
         const b = oBlocks.get(ev.block!.index)
         if (b?.kind === 'think') {
-          b.duration = '推理完成'
-          b.collapsed = true
+          settleThink(b)
         } else if (b?.kind === 'answer') {
           b.streaming = false
         }
@@ -325,5 +347,5 @@ export function createSseReducer(target: SseTarget) {
     }
   }
 
-  return { handle }
+  return { handle, settleThinking }
 }

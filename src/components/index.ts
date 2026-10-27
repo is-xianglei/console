@@ -1,5 +1,7 @@
 export { default as ActivityRail } from './activity-rail/index.vue'
 export { default as AiOrb } from './ai/orb/index.vue'
+export { default as StreamingText } from './ai/streaming-text/index.vue'
+export { default as ThinkingReasoning } from './ai/thinking-reasoning/index.vue'
 export { default as AppShell } from './app-shell/index.vue'
 export { default as ErrorBoundary } from './error-boundary/index.vue'
 export { default as ModuleSidebar } from './module-sidebar/index.vue'

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatMessage, SseEvent } from '@/interfaces/console/model'
 import { createSseReducer, fmtToolCall } from './sse-reducer'
 
@@ -110,7 +110,7 @@ describe('createSseReducer', () => {
     }))
 
     expect(ai.blocks).toEqual([
-      { kind: 'think', text: '正在分析', duration: '推理完成', collapsed: true },
+      { kind: 'think', text: '正在分析', done: true, seconds: 1 },
       {
         kind: 'tool',
         tag: 'RESULT',
@@ -120,6 +120,67 @@ describe('createSseReducer', () => {
       },
       { kind: 'tool', tag: 'ERROR', fn: 'MODEL_TIMEOUT', body: '模型超时', done: true },
     ])
+  })
+
+  describe('推理块的结束状态与思考秒数', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    function startThinking() {
+      const ai: ChatMessage = { id: 'ai-think', role: 'ai', time: '10:05', blocks: [] }
+      const reducer = createSseReducer({ ai, agents: [], selectAgent: vi.fn() })
+      reducer.handle(createEvent('block_start', { block: { index: 0, block_type: 'thinking' } }))
+      reducer.handle(createEvent('thinking_delta', { block: { index: 0 }, text: '拆解问题' }))
+      return { ai, reducer }
+    }
+
+    it('block_stop 前保持进行中，结束时按 block_start 到 block_stop 的时长记秒数', () => {
+      const { ai, reducer } = startThinking()
+      expect(ai.blocks).toEqual([{ kind: 'think', text: '拆解问题', done: false }])
+
+      vi.advanceTimersByTime(4600)
+      reducer.handle(createEvent('block_stop', { block: { index: 0 } }))
+
+      expect(ai.blocks).toEqual([{ kind: 'think', text: '拆解问题', done: true, seconds: 5 }])
+    })
+
+    it('不足 1 秒按 1 秒显示', () => {
+      const { ai, reducer } = startThinking()
+      vi.advanceTimersByTime(200)
+      reducer.handle(createEvent('block_stop', { block: { index: 0 } }))
+
+      expect(ai.blocks?.[0]).toMatchObject({ done: true, seconds: 1 })
+    })
+
+    it('流收尾时兜底结束没收到 block_stop 的推理块', () => {
+      const { ai, reducer } = startThinking()
+      vi.advanceTimersByTime(3000)
+      reducer.settleThinking()
+
+      expect(ai.blocks?.[0]).toMatchObject({ done: true, seconds: 3 })
+    })
+
+    it('已结束的推理块不会被兜底改写秒数', () => {
+      const { ai, reducer } = startThinking()
+      vi.advanceTimersByTime(2000)
+      reducer.handle(createEvent('block_stop', { block: { index: 0 } }))
+      vi.advanceTimersByTime(8000)
+      reducer.settleThinking()
+
+      expect(ai.blocks?.[0]).toMatchObject({ done: true, seconds: 2 })
+    })
+
+    it('其他归约器建的推理块（如审批后续流）兜底时只标结束、不记秒数', () => {
+      const { ai } = startThinking()
+      const resumed = createSseReducer({ ai, agents: [], selectAgent: vi.fn() })
+      resumed.settleThinking()
+
+      expect(ai.blocks).toEqual([{ kind: 'think', text: '拆解问题', done: true }])
+    })
   })
 
   it('透传会话任务全量快照', () => {

@@ -1,0 +1,161 @@
+/* 推理块：AICSS thinking-reasoning 视觉移植。颜色走全局文字 token，浅色主题随 token 切换 */
+.tr {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-family: var(--font-body);
+  /* 挂载软入场 */
+  animation: tr-block-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes tr-block-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.tr-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: default;
+}
+.tr-header.is-clickable {
+  cursor: pointer;
+}
+.tr-label {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  /* 比「已思考」更弱一级，秒数退到次要层级 */
+  color: var(--text-dim);
+  letter-spacing: -0.005em;
+}
+.tr-verb {
+  color: var(--text-muted);
+}
+.tr-chevron {
+  color: var(--text-dim);
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* 路径本身是向上箭头；收起时朝下 */
+  transform: rotate(180deg);
+}
+.tr-header[aria-expanded='true'] .tr-chevron {
+  transform: rotate(0deg);
+}
+.tr-header.is-clickable:hover .tr-chevron {
+  color: var(--text-muted);
+}
+/* 折叠动画：grid-template-rows 0fr→1fr 按内容真实高度过渡 */
+.tr-collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease;
+}
+.tr-collapsible.is-collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.tr-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+/* 视口：随内容增高，封顶 180px。进行中最新内容在渐隐后自动上推；
+ * 结束并被用户展开后改为原生滚动，渐隐跟随滚动位置，滚动条隐藏。 */
+.tr-viewport {
+  margin-top: 6px;
+  overflow: hidden;
+  transition: height 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tr-viewport.is-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.tr-viewport.is-scroll::-webkit-scrollbar {
+  display: none;
+}
+.tr-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.tr-sentence {
+  margin: 0;
+  line-height: 20px;
+  font-size: 13px;
+  font-weight: 425;
+  color: var(--text-dim);
+  letter-spacing: -0.005em;
+  /* 推理原文段内可能有连续空格；长 token 强制断行避免横向溢出 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  animation: tr-sentence-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes tr-sentence-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* 扫光：一道亮度低谷横扫文案 */
+.tr-shimmer {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    var(--text-muted) 30%,
+    color-mix(in srgb, var(--text-muted) 45%, transparent) 45%,
+    color-mix(in srgb, var(--text-muted) 45%, transparent) 55%,
+    var(--text-muted) 70%,
+    var(--text-muted) 100%
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: tr-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+@keyframes tr-shine {
+  0%,
+  18% {
+    background-position: 100% 0;
+  }
+  82%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tr,
+  .tr-sentence {
+    animation: none;
+  }
+  .tr-collapsible,
+  .tr-viewport,
+  .tr-stream,
+  .tr-chevron {
+    transition: none;
+  }
+  .tr-shimmer {
+    animation: none;
+    background: none;
+    color: var(--text-muted);
+    -webkit-text-fill-color: var(--text-muted);
+  }
+}

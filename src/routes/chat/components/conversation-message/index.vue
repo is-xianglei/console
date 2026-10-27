@@ -1,9 +1,8 @@
 <script setup lang="ts">
+import { StreamingText, ThinkingReasoning } from '@/components'
 import type { ChatMessage } from '@/interfaces'
-import AnswerBlock from '../answer-block/index.vue'
 import ApprovalCard from '../approval-card/index.vue'
 import InteractionCard from '../interaction-card/index.vue'
-import ThinkingBlock from '../thinking-block/index.vue'
 import ToolCallCard from '../tool-call-card/index.vue'
 
 defineOptions({ name: 'ConversationMessage' })
@@ -26,11 +25,11 @@ defineProps<{ message: ChatMessage; busy: boolean }>()
       </div>
       <div :class="$style['ai-blocks']">
         <template v-for="(block, index) in message.blocks" :key="index">
-          <ThinkingBlock
+          <ThinkingReasoning
             v-if="block.kind === 'think'"
             :text="block.text"
-            :duration="block.duration"
-            :collapsed="block.collapsed"
+            :done="block.done"
+            :seconds="block.seconds"
           />
           <ToolCallCard
             v-else-if="block.kind === 'tool'"
@@ -53,7 +52,7 @@ defineProps<{ message: ChatMessage; busy: boolean }>()
             :status="block.status"
             :response-label="block.responseLabel"
           />
-          <AnswerBlock
+          <StreamingText
             v-else-if="block.kind === 'answer'"
             :text="block.text"
             :streaming="block.streaming"
