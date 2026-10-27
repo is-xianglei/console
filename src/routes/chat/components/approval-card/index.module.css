@@ -4,7 +4,7 @@
   border: 1px solid var(--status-warning);
   background: color-mix(in srgb, var(--status-warning) 6%, transparent);
   overflow: hidden;
-  animation: entry-appear 180ms ease-out;
+  animation: global(entry-appear) 180ms ease-out;
 }
 .approval-card.resolved {
   border-color: var(--border-subtle);

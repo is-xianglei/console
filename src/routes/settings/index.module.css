@@ -108,7 +108,7 @@
 .set-spinner {
   width: 14px;
   height: 14px;
-  animation: spin 0.8s linear infinite;
+  animation: global(spin) 0.8s linear infinite;
 }
 .set-list {
   display: flex;

@@ -166,7 +166,7 @@
 }
 
 .ag-builder :global(.spinning) {
-  animation: spin .8s linear infinite;
+  animation: global(spin) .8s linear infinite;
 }
 
 @media (max-width: 760px) {

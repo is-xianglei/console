@@ -6,7 +6,7 @@
   border: 1px solid var(--border-subtle);
   background: var(--bg-panel);
   overflow: hidden;
-  animation: entry-appear 180ms ease-out;
+  animation: global(entry-appear) 180ms ease-out;
 }
 .cli-bar {
   display: flex;
@@ -73,7 +73,7 @@
   border: 1.5px solid var(--border-strong);
   border-top-color: var(--status-info);
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: global(spin) 0.7s linear infinite;
 }
 .cli-body {
   padding: 9px 12px;

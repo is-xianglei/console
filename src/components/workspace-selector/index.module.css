@@ -7,7 +7,7 @@
 .workspace-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 600; }
 .workspace-meta { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: var(--fs-xs); }
 .workspace-button > i { color: var(--text-dim); font-size: 11px; }
-.workspace-options { width: var(--reka-dropdown-menu-trigger-width); max-width: calc(100vw - 16px); max-height: min(420px, calc(100vh - 136px)); overflow: hidden; padding: 0; border: 1px solid var(--border-visible); border-radius: var(--radius-md); background: var(--bg-elevated); box-shadow: none; animation: entry-appear 180ms var(--ease-out); }
+.workspace-options { width: var(--reka-dropdown-menu-trigger-width); max-width: calc(100vw - 16px); max-height: min(420px, calc(100vh - 136px)); overflow: hidden; padding: 0; border: 1px solid var(--border-visible); border-radius: var(--radius-md); background: var(--bg-elevated); box-shadow: none; animation: global(entry-appear) 180ms var(--ease-out); }
 .workspace-viewport { max-height: min(420px, calc(100vh - 136px)); overflow-y: auto; }
 .workspace-group { padding: 4px; }
 .workspace-menu-label { min-height: 28px; padding: 4px 8px; color: var(--text-dim); font-size: var(--fs-micro); font-weight: 600; }
@@ -22,5 +22,5 @@
 .workspace-option-current .workspace-item-symbol { border-color: color-mix(in srgb, var(--accent-agent) 34%, var(--border)); background: var(--accent-agent-dim); color: var(--accent-agent); }
 .workspace-current { color: var(--accent-agent); display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); white-space: nowrap; }
 .workspace-current svg,.workspace-spinner { width: 12px; height: 12px; }
-.workspace-spinner { color: var(--accent-agent); animation: spin 1s linear infinite; }
+.workspace-spinner { color: var(--accent-agent); animation: global(spin) 1s linear infinite; }
 @media (max-width: 760px) { .workspace-options,.workspace-viewport { max-height: calc(100dvh - 166px); } }

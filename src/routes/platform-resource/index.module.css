@@ -52,7 +52,7 @@
 .row-actions button { width: 30px; height: 30px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-dim); cursor: pointer; }
 .row-actions button:hover { background: var(--bg-hover); color: var(--text-primary); }
 .table-empty { margin: 48px 0; color: var(--text-dim); font-size: var(--fs-sm); }
-.table-empty [data-slot='icon'] { color: var(--accent-agent); opacity: .24; animation: glow-breathe 3s infinite; }
+.table-empty [data-slot='icon'] { color: var(--accent-agent); opacity: .24; animation: global(glow-breathe) 3s infinite; }
 .inspector { min-width: 0; background: var(--bg-surface); }
 .inspector-head { min-height: 70px; padding: 13px 14px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--border); }
 .inspector-kicker { color: var(--text-dim); font-size: var(--fs-xs); }
