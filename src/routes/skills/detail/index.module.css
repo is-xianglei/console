@@ -44,11 +44,6 @@
   font-size: 12px;
 }
 
-.kicker {
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
-}
-
 .ver {
   font-size: var(--fs-xs);
   font-weight: 600;
@@ -65,6 +60,7 @@
 .actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
 }
@@ -79,66 +75,56 @@
   width: 100%;
   max-width: var(--page-content-max);
   margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+}
+
+.scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* 左：SKILL.md；右：文件 + 信息。窄屏右栏落到下方。 */
+.grid {
+  width: 100%;
+  max-width: var(--page-content-max);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: 14px;
+}
+
+.side {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 14px;
 }
 
-.shell {
-  width: 100%;
-  max-width: var(--page-content-max);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-.metaGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-
-.meta {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-subtle);
+/* UCard outline 变体默认用 ring 描边，这里换成项目统一的边框与面板底色。 */
+.card {
+  min-width: 0;
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-panel);
+  box-shadow: none;
 }
 
-.metaK {
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--text-dim);
+.card :global([data-slot='header']) {
+  border-bottom: 1px solid var(--border);
 }
 
-.metaV {
-  font-size: 12px;
-  color: var(--text-primary);
-}
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.sectionTitle {
+.cardTitle {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--font-ui);
+  padding: 10px 14px;
+  color: var(--text-primary);
   font-size: var(--fs-sm);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-weight: 650;
 }
 
 .count {
@@ -149,17 +135,24 @@
   padding: 1px 8px;
 }
 
+.frontmatter {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.fmToggle {
+  margin: 6px 8px;
+  color: var(--text-muted);
+}
+
 .fm {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
-  overflow: hidden;
+  margin: 0;
+  padding: 0 14px 10px;
 }
 
 .fmRow {
   display: flex;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 6px 0;
 }
 
 .fmRow:not(:last-child) {
@@ -176,9 +169,15 @@
 .fmV {
   flex: 1;
   min-width: 0;
+  margin: 0;
   font-size: var(--fs-sm);
   color: var(--text-secondary);
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.body {
+  padding: 16px;
 }
 
 .resources {
@@ -186,23 +185,15 @@
   flex-direction: column;
   gap: 2px;
   margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
+  padding: 8px 14px;
   list-style: none;
 }
 
 .resourceRow {
   display: flex;
   align-items: center;
-  gap: 7px;
-  color: var(--text-secondary);
-}
-
-.resourceIcon {
-  font-size: 12px;
-  color: var(--text-dim);
+  gap: 8px;
+  padding: 3px 0;
 }
 
 .resourcePath {
@@ -216,27 +207,42 @@
 }
 
 .resourceSize {
+  flex-shrink: 0;
   color: var(--text-dim);
   font-size: var(--fs-xs);
-  flex-shrink: 0;
 }
 
-.body {
-  padding: 16px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
-}
-
-.empty {
+.info {
+  margin: 0;
+  padding: 8px 14px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 32px 16px;
-  color: var(--text-dim);
+  gap: 6px;
   font-size: var(--fs-sm);
-  text-align: center;
+}
+
+.info > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.info dt {
+  width: 36px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.info dd {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+@media (max-width: 1080px) {
+  .grid,
+  .loading {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 760px) {
@@ -253,10 +259,6 @@
 
   .actions {
     justify-content: flex-start;
-  }
-
-  .metaGrid {
-    grid-template-columns: 1fr;
   }
 
   .fmRow {

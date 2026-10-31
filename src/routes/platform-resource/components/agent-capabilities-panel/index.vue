@@ -53,7 +53,8 @@ function onToolToggle(tool: ToolResponse, value: boolean | 'indeterminate') {
       <label v-for="skill in skills" :key="skill.id" :class="[$style['ag-select-row'], { [$style.selected]: hasSkill(skill.id) }]">
         <UCheckbox :model-value="hasSkill(skill.id)" @update:model-value="onSkillToggle(skill.id, $event)" />
         <span :class="$style['ag-select-icon']"><i class="icon icon-wrench"></i></span>
-        <span :class="$style['ag-select-main']"><strong class="mono">{{ skill.name }}</strong><small>{{ skill.description }}</small></span>
+        <!-- 已停用的 skill 仍可绑定，启用后生效。 -->
+        <span :class="$style['ag-select-main']"><strong class="mono">{{ skill.name }}<UBadge v-if="!skill.is_enabled" :class="$style['ag-disabled-badge']" color="neutral" variant="subtle" size="xs">已停用</UBadge></strong><small>{{ skill.description }}</small></span>
         <span :class="$style['ag-select-meta']"><strong class="mono">{{ skill.version ? `v${skill.version}` : '未设版本' }}</strong><small>ID {{ skill.id }}</small></span>
         <span :class="$style['ag-verify']"><i class="icon icon-building-2"></i>{{ skill.scope }}</span>
       </label>

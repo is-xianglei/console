@@ -111,6 +111,13 @@ export const targetRules: Record<string, TargetRule> = {
     }
     return { allowed: true }
   },
+  // skill：写操作（新建/编辑/启停/上传/删除）只有工作区 owner / admin 可调，member 只读。
+  // 角色未知（工作区列表未加载）按无权限处理，后端同样会返回 403。
+  skill: (_resource, _action, target) => {
+    const role = operatorRole(target)
+    if (role === 'owner' || role === 'admin') return { allowed: true }
+    return { allowed: false, reason: '仅工作区所有者或管理员可修改技能' }
+  },
   // workspace member：owner 不可移除；非 admin 不可改角色。
   workspaceMember: (_resource, _action, target) => {
     if (target?.role === 'owner') return { allowed: false, reason: '工作区所有者不可移除' }

@@ -126,6 +126,12 @@
   white-space: nowrap;
 }
 
+.ag-disabled-badge {
+  margin-left: 6px;
+  font-family: var(--font-ui);
+  vertical-align: 1px;
+}
+
 .ag-select-main small,
 .ag-select-meta small {
   margin-top: 2px;

@@ -1,80 +1,62 @@
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, useCssModule, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, useCssModule, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from '@nuxt/ui/composables'
-import { RelativeTime } from '@/components'
 import { useSkillEditor } from '@/hooks/useSkillEditor'
-import { useUnsavedGuard } from '@/hooks/useFormHelpers'
+import { useSnapshotDirty, useUnsavedGuard } from '@/hooks/useFormHelpers'
+import SkillForm from '@/routes/skills/components/skill-form/index.vue'
 
+/** 新建（skill-create）与编辑（skill-edit）共用本页，模式由路由名决定。 */
 defineOptions({ name: 'SkillEditPage' })
 
 const styles = useCssModule()
 const router = useRouter()
 const toast = useToast()
 const editor = useSkillEditor()
+const formRef = ref<InstanceType<typeof SkillForm> | null>(null)
 
-const saveFile = ref<File | null>(null)
-const saveOpen = ref(false)
-const saving = ref(false)
-
-/** 未保存离开守卫：patchNote 非空时拦截。 */
-const leaveGuard = useUnsavedGuard(editor.dirty, {
-  navigate: (target) => {
-    if (target) void router.push(target as never)
-    else goToList()
-  },
-  onConfirm: () => editor.markSaved(),
+const snapshot = useSnapshotDirty(
+  () => editor.draft.value,
+  { resetOn: () => editor.loading.value },
+)
+const leaveGuard = useUnsavedGuard(snapshot.dirty, {
+  navigate: (target) => { void router.push(target as Parameters<typeof router.push>[0]) },
+  onConfirm: () => snapshot.reset(),
 })
 
-const detail = computed(() => editor.detail.value)
-const error = computed(() => editor.error.value)
+const creating = computed(() => editor.creating.value)
+/** 编辑时详情没加载出来就不渲染表单。 */
+const ready = computed(() => creating.value || (!editor.loading.value && !editor.loadError.value))
+const backTarget = computed(() => (
+  creating.value
+    ? { name: 'skills' }
+    : { name: 'skill-detail', params: { id: String(editor.skillId.value) } }
+))
 
 async function load() {
-  await editor.openEdit()
+  if (creating.value) editor.openCreate()
+  else await editor.openEdit()
+  snapshot.reset()
 }
 
-watch(() => editor.skillName.value, () => { void load() }, { immediate: true })
-
-function goToList() {
-  void router.push({ name: 'skills' })
-}
+watch(() => [creating.value, editor.skillId.value] as const, () => { void load() }, { immediate: true })
 
 function onCancel() {
-  // 统一走守卫：若草稿非空则弹确认，未脏直接离开。
-  leaveGuard.requestLeave({ name: 'skills' })
+  leaveGuard.requestLeave(backTarget.value)
 }
 
-function onSave() {
-  saveOpen.value = true
-}
-
-async function handleOverwrite(file: File | undefined) {
-  if (!file) return
-  saving.value = true
-  const result = await editor.saveDraft(file)
-  saving.value = false
-  if (result?.error) {
-    toast.add({ title: '保存失败', description: result.error, color: 'error', icon: 'i-lucide-circle-alert' })
-    saveOpen.value = false
+async function onSave() {
+  const saved = await editor.save()
+  if (!saved) {
+    await nextTick()
+    void formRef.value?.showErrors()
     return
   }
-  editor.markSaved()
-  saveOpen.value = false
-  toast.add({ title: '技能已保存', color: 'success', icon: 'i-lucide-upload' })
-  // 覆盖上传后回列表并高亮新行。
-  const highlight = result?.highlight
-  if (highlight) {
-    void router.push({ name: 'skills', query: { highlight } })
-  } else {
-    goToList()
-  }
+  // 先重置基线，否则离开守卫会拦下这次跳转。
+  snapshot.reset()
+  toast.add({ title: creating.value ? `技能「${saved.name}」已创建` : '技能已保存', color: 'success', icon: 'i-lucide-check' })
+  void router.push({ name: 'skill-detail', params: { id: String(saved.id) } })
 }
-
-watch(saveFile, async (file) => {
-  if (!file) return
-  await handleOverwrite(file)
-  saveFile.value = null
-})
 
 onScopeDispose(() => {
   leaveGuard.cancelLeave()
@@ -85,73 +67,57 @@ onScopeDispose(() => {
   <main :class="styles.page">
     <header :class="styles.header">
       <div :class="styles.heading">
-        <div :class="[styles.kicker, 'mono']">EDIT SKILL</div>
         <nav :class="styles.breadcrumb" aria-label="面包屑">
-          <UButton color="neutral" variant="ghost" icon="i-lucide-arrow-left" label="返回列表" @click="onCancel" />
+          <UButton color="neutral" variant="ghost" icon="i-lucide-arrow-left" :label="creating ? '技能库' : '返回详情'" @click="onCancel" />
         </nav>
         <div :class="styles.titleRow">
-          <h1>编辑技能</h1>
-          <span v-if="detail" :class="[styles.ver, 'mono']">{{ detail.name }}</span>
+          <h1>{{ creating ? '新建技能' : '编辑技能' }}</h1>
+          <span v-if="!creating && editor.draft.value.name" :class="[styles.ver, 'mono']">{{ editor.draft.value.name }}</span>
         </div>
-        <p>技能内容通过 zip 包定义，编辑需重新上传技能包覆盖。</p>
+      </div>
+      <div v-if="ready" :class="styles.actions">
+        <UButton color="neutral" variant="outline" label="取消" :disabled="editor.saving.value" @click="onCancel" />
+        <UButton color="primary" icon="i-lucide-save" label="保存" :loading="editor.saving.value" @click="formRef?.submit()" />
       </div>
     </header>
 
-    <UAlert v-if="error" :class="styles.alert" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" role="alert" />
-
-    <div :class="styles.shell">
-      <div v-if="editor.loading.value" :class="styles.loading">
-        <USkeleton class="h-6 w-2/5" />
-        <USkeleton class="h-20 w-full" />
-        <USkeleton class="h-64 w-full" />
-      </div>
-      <UEmpty v-else-if="!detail" variant="naked" icon="i-lucide-package-search" title="未找到该技能" description="可能已被删除或工作区已切换。" />
-      <template v-else>
-        <div :class="styles.metaGrid">
-          <div :class="styles.meta">
-            <span :class="styles.metaK">名称</span>
-            <span class="mono" :class="styles.metaV">{{ detail.name }}</span>
-          </div>
-          <div :class="styles.meta">
-            <span :class="styles.metaK">作用域</span>
-            <span class="mono" :class="styles.metaV">{{ detail.scope }}</span>
-          </div>
-          <div :class="styles.meta">
-            <span :class="styles.metaK">版本</span>
-            <span class="mono" :class="styles.metaV">{{ detail.version ? `v${detail.version}` : '—' }}</span>
-          </div>
-          <div :class="styles.meta">
-            <span :class="styles.metaK">更新时间</span>
-            <span :class="styles.metaV"><RelativeTime :value="detail.updated_at" /></span>
-          </div>
-        </div>
-
-        <UAlert color="info" variant="subtle" icon="i-lucide-info" title="字段编辑需重新上传覆盖">
-          <template #description>后端当前未提供技能字段更新接口，修改技能内容请重新上传 zip 技能包。以下「修改说明」仅作本地备注，不影响服务端内容。</template>
-        </UAlert>
-
-        <UFormField label="修改说明">
-          <UTextarea v-model="editor.patchNote.value" :rows="4" placeholder="记录本次修改意图…" />
-        </UFormField>
-
-        <div :class="styles.actions">
-          <UButton color="neutral" variant="outline" label="取消" @click="onCancel" />
-          <UButton icon="i-lucide-upload" label="上传技能包覆盖" color="primary" @click="onSave" />
-        </div>
-      </template>
+    <div v-if="editor.loading.value" :class="styles.loading">
+      <USkeleton class="h-10 w-full" />
+      <USkeleton class="h-20 w-full" />
+      <USkeleton class="h-64 w-full" />
     </div>
 
-    <!-- 保存：选择 zip 后调 store 的覆盖上传，成功后自动回列表。 -->
-    <UModal :open="saveOpen" title="上传技能包" description="选择新的 zip 包将覆盖当前技能，完成后自动刷新列表。">
-      <template #body>
-        <UFileUpload v-model="saveFile" accept=".zip" variant="area" layout="list" :preview="false" :disabled="saving" :icon="saving ? 'i-lucide-loader-circle' : 'i-lucide-upload'" label="选择 zip 技能包" description="zip ≤ 8MB" />
+    <UEmpty v-else-if="editor.notFound.value" variant="naked" icon="i-lucide-package-search" title="技能不存在">
+      <template #actions>
+        <UButton icon="i-lucide-arrow-left" label="返回列表" color="neutral" variant="outline" @click="router.push({ name: 'skills' })" />
       </template>
-      <template #footer>
-        <UButton color="neutral" variant="outline" label="取消" :disabled="saving" @click="saveOpen = false" />
-      </template>
-    </UModal>
+    </UEmpty>
 
-    <UModal :open="leaveGuard.pending.value" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改说明尚未提交，离开后将丢失。">
+    <UAlert
+      v-else-if="editor.loadError.value"
+      :class="styles.alert"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-circle-alert"
+      :title="editor.loadError.value"
+      :actions="[
+        { label: '重试', color: 'neutral', variant: 'outline', onClick: load },
+        { label: '返回详情', color: 'neutral', variant: 'ghost', onClick: () => router.push(backTarget) },
+      ]"
+    />
+
+    <div v-else :class="styles.shell">
+      <SkillForm
+        ref="formRef"
+        :model="editor.draft.value"
+        :creating="creating"
+        :issues="editor.issues.value"
+        :form-error="editor.formError.value"
+        @save="onSave"
+      />
+    </div>
+
+    <UModal :open="leaveGuard.pending.value" class="ag-confirm-modal" title="放弃未保存的修改？" description="当前修改尚未保存，离开后将丢失。" @update:open="(open: boolean) => { if (!open) leaveGuard.cancelLeave() }">
       <template #footer>
         <UButton label="继续编辑" color="neutral" variant="outline" @click="leaveGuard.cancelLeave()" />
         <UButton label="放弃修改" color="error" @click="leaveGuard.confirmLeave()" />

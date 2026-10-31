@@ -44,10 +44,10 @@ const commandItems = [
 const agentCount = computed(() => state.agents.length)
 const rightAvailable = computed(() => route.name === 'chat' && state.workbenchMode === 'chat' && state.agents.length > 0)
 const showRight = computed(() => rightAvailable.value && (isMobile.value ? mobileRightOpen.value : !state.rightCollapsed))
-const hasContextSidebar = computed(() => route.name === 'chat' || route.name === 'skills' || route.name === 'platform-resource' || route.meta.platform === true)
+const hasContextSidebar = computed(() => route.name === 'chat' || route.path.startsWith('/skills') || route.name === 'platform-resource' || route.meta.platform === true)
 const showContextSidebar = computed(() => hasContextSidebar.value && (isMobile.value ? mobileContextOpen.value : !state.leftCollapsed))
 const moduleContext = computed<PlatformModuleKey | null>(() => {
-  if (route.name === 'skills') return 'build'
+  if (route.path.startsWith('/skills')) return 'build'
   if (route.meta.platform === true) {
     const module = String(route.meta.module ?? route.params.module ?? '')
     return module === 'build' || module === 'governance' || module === 'organization' ? module : null

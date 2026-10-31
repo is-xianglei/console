@@ -12,7 +12,6 @@ defineOptions({ name: 'SkillsPage' })
         <div :class="$style.titleRow">
           <h1>技能库</h1>
         </div>
-        <p>上传、筛选与管理当前工作区的技能包。</p>
       </div>
     </header>
 

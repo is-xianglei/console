@@ -212,10 +212,12 @@ const hasText = computed(() => value.value.trim().length > 0)
 const enhancing = computed(() => phase.value === 'enhancing')
 const sendActive = computed(() => hasText.value && !enhancing.value && !state.busy)
 const showPill = computed(() => hasText.value && !enhancing.value)
+/** 技能菜单与斜杠命令只列出已启用的 skill（停用的 agent 运行时不可用）。 */
+const enabledSkills = computed(() => skillsStore.state.skills.filter((sk) => sk.is_enabled))
 /** 斜杠命令的数据源：真实 skills store，按名称与描述做包含匹配。 */
 const slashResults = computed(() => {
   const q = slashQuery.value.toLowerCase()
-  return skillsStore.state.skills.filter(
+  return enabledSkills.value.filter(
     (sk) => sk.name.toLowerCase().includes(q) || sk.description.toLowerCase().includes(q),
   )
 })
@@ -800,7 +802,7 @@ onBeforeUnmount(() => {
                 </button>
                 <div v-if="skillsOpen" :class="$style['menu-flyout']" role="menu">
                   <button
-                    v-for="sk in skillsStore.state.skills"
+                    v-for="sk in enabledSkills"
                     :key="sk.id"
                     type="button"
                     role="menuitem"
@@ -809,8 +811,8 @@ onBeforeUnmount(() => {
                   >
                     <span :class="$style['menu-name']">{{ sk.name }}</span>
                   </button>
-                  <div v-if="!skillsStore.state.skills.length" :class="$style['slash-empty']">
-                    {{ skillsStore.state.skillsLoading ? '加载中…' : '当前工作区暂无技能' }}
+                  <div v-if="!enabledSkills.length" :class="$style['slash-empty']">
+                    {{ skillsStore.state.skillsLoading ? '加载中…' : '暂无已启用的技能' }}
                   </div>
                 </div>
               </div>

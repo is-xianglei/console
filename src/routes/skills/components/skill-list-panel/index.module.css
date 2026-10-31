@@ -1,155 +1,143 @@
-/* 表格基线（行高、内边距、字色字号、列省略、行悬停）+ 语义列类（col-name 等）
-   的单一来源。必须放在最前。 */
-@import '@/assets/styles/table-baseline.module.css';
-
 .panel {
   display: flex;
   min-width: 0;
   min-height: 0;
+  flex: 1;
   flex-direction: column;
   gap: 14px;
   background: transparent;
+  container: skill-list / inline-size;
 }
-
-.uploadArea {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.drop {
-  width: 100%;
-}
-
-.drop :global([data-slot='base']) {
-  min-height: 72px;
-  padding: 12px 14px;
-  border: 1px dashed var(--border-visible);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  text-align: center;
-  transition: border-color var(--dur-fast), background var(--dur-fast);
-}
-
-.drop :global([data-slot='base']:hover) {
-  border-color: var(--accent-agent);
-  background: var(--bg-elevated);
-}
-
-.drop :global([data-slot='icon']) {
-  width: 18px;
-  height: 18px;
-  color: var(--accent-agent);
-}
-
-.drop :global([data-slot='label']) {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.drop :global([data-slot='description']) {
-  font-size: var(--fs-xs);
-  color: var(--text-dim);
-  letter-spacing: 0;
-}
-
-.uploadError {
-  margin: 0;
-}
-
-/* 表格本体（width、行高、字色字号、行悬停）已在基线里；原先这里有一份与
-   teams/plans/workflows 三个列表页逐字相同的 .table 副本，已删除。
-   唯一差异是表头字号曾用 --fs-xs，基线用 --fs-sm，按基线统一。 */
 
 .alert {
   margin: 10px 10px 0;
 }
 
-.skeletonRow {
-  display: flex;
-  align-items: center;
+/* 卡片网格：宽屏 3 列、中屏 2 列、窄屏 1 列。按面板宽度（容器查询）切换，侧栏收起展开都准确。 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   padding: 12px;
 }
 
-.skeletonCell {
-  height: 18px;
-  flex: 1 1 0;
-  border-radius: var(--radius-control);
+@container skill-list (width < 960px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-/* 列宽走基线的语义列类，页面不再自带 220 / 92 / 132 / 88px 一套尺子。
-   「描述」列不设宽，自动占剩余空间。 */
+@container skill-list (width < 600px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 
-.skillName {
-  width: 100%;
-  height: auto;
+.skeletonCard {
+  height: 116px;
+  border-radius: var(--radius-md);
+}
+
+.empty {
+  padding: 48px 16px;
+}
+
+/* UCard outline 变体默认用 ring 描边，这里换成项目统一的边框与面板底色。 */
+.card {
   min-width: 0;
-  justify-content: flex-start;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  gap: 9px;
-  text-align: left;
-}
-
-.skillIcon {
-  width: 26px;
-  height: 26px;
-  flex: 0 0 26px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-elevated);
-  color: var(--text-muted);
-  display: grid;
-  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+  box-shadow: none;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
 }
 
-.skillCopy {
-  min-width: 0;
+.card:hover {
+  border-color: var(--border-visible);
+  background: var(--bg-surface);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--accent-agent);
+  outline-offset: 2px;
+}
+
+/* ?highlight= 命中卡片：与表格行高亮同一套 2s 淡出。 */
+.card.highlighted {
+  border-color: var(--accent-agent);
+  animation: highlight-fade 2s var(--ease-out) forwards;
+}
+
+@keyframes highlight-fade {
+  from { background: var(--accent-agent-dim); }
+  to { background: var(--bg-panel); }
+}
+
+.cardInner {
   display: flex;
+  height: 100%;
+  min-height: 116px;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
+  padding: 12px 12px 10px 14px;
 }
 
-.skillCopy strong {
-  max-width: 200px;
+.cardHead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardName {
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--text-primary);
   font-size: var(--fs-sm);
   font-weight: 600;
-}
-
-.desc {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cardVer {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-agent-dim);
+  color: var(--accent-agent);
+  font-size: var(--fs-xs);
+}
+
+.cardMenu {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.cardDesc {
+  display: -webkit-box;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   color: var(--text-dim);
   font-size: var(--fs-xs);
 }
 
-.rowActions {
+.cardSwitch {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  opacity: 0.42;
-  transition: opacity var(--dur-fast);
-}
-
-.table :global(tr:hover) .rowActions,
-.rowActions:focus-within {
-  opacity: 1;
 }

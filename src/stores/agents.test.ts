@@ -57,7 +57,9 @@ const skill = {
   workspace_id: 3,
   name: 'equipment-check',
   description: '设备检查',
+  version: null,
   scope: 'workspace',
+  is_enabled: true,
   created_at: '2026-08-01T00:00:00Z',
   updated_at: '2026-08-01T00:00:00Z',
 }

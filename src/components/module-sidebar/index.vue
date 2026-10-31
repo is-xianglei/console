@@ -11,7 +11,8 @@ const props = defineProps<{ module: PlatformModuleKey }>()
 const route = useRoute()
 const router = useRouter()
 const config = computed(() => PLATFORM_MODULES[props.module])
-const activeResource = computed(() => route.name === 'skills' ? 'skills' : String(route.params.resource ?? ''))
+// skills 列表、详情、新建、编辑都在 /skills 下，统一高亮 Skills 入口。
+const activeResource = computed(() => route.path.startsWith('/skills') ? 'skills' : String(route.params.resource ?? ''))
 
 function openItem(key: string, routePath?: string) {
   router.push(routePath ?? `/platform/${props.module}/${key}`)

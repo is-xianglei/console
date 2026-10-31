@@ -27,6 +27,7 @@ import WorkflowEditLoader from './platform-resource/workflows/edit/Loader.vue'
 import ProfileLoader from './profile/Loader.vue'
 import RegisterLoader from './register/Loader.vue'
 import SettingsLoader from './settings/Loader.vue'
+import SkillCreateLoader from './skills/create/Loader.vue'
 import SkillDetailLoader from './skills/detail/Loader.vue'
 import SkillEditLoader from './skills/edit/Loader.vue'
 import SkillsLoader from './skills/Loader.vue'
@@ -71,16 +72,21 @@ const router = createRouter({
           meta: { requiresAuth: true },
         },
         {
-          // skills 的 :name 是字符串（slug / 文件名，可能含 .zip），不能像 memories 用 (\d+)。
-          path: 'skills/:name/edit',
-          name: 'skill-edit',
-          component: SkillEditLoader,
+          path: 'skills/new',
+          name: 'skill-create',
+          component: SkillCreateLoader,
           meta: { requiresAuth: true },
         },
         {
-          path: 'skills/:name',
+          path: 'skills/:id(\\d+)',
           name: 'skill-detail',
           component: SkillDetailLoader,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'skills/:id(\\d+)/edit',
+          name: 'skill-edit',
+          component: SkillEditLoader,
           meta: { requiresAuth: true },
         },
         {

@@ -1,0 +1,53 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.drop {
+  width: 100%;
+}
+
+.status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.statusIcon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.ok .statusIcon {
+  color: var(--status-success);
+}
+
+.fail {
+  color: var(--status-error);
+}
+
+.statusCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statusCopy strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.statusCopy small {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}

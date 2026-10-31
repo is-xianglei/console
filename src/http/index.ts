@@ -4,15 +4,18 @@ import type { ApiResponse } from '../interfaces/common/api'
  *  生产期同源部署也走 /api。需要改基址时只动这里。 */
 const BASE = '/api'
 
-/** API 调用异常:携带后端 ErrorBody 的 code/message */
+/** API 调用异常:携带后端 ErrorBody 的 code/message/details */
 export class ApiError extends Error {
   code: string
   status: number
-  constructor(message: string, code: string, status: number) {
+  /** 后端 error.details:409 冲突字段、422 的 errors 数组等。 */
+  details: Record<string, unknown>
+  constructor(message: string, code: string, status: number, details: Record<string, unknown> = {}) {
     super(message)
     this.name = 'ApiError'
     this.code = code
     this.status = status
+    this.details = details
   }
 }
 
@@ -126,13 +129,55 @@ export async function request<T>(path: string, init?: ConsoleRequestInit): Promi
     throw new ApiError('响应不是合法 JSON', 'PARSE_ERROR', resp.status)
   }
 
-  if (!resp.ok || body.error) {
-    const code = body.error?.code ?? 'HTTP_ERROR'
-    const msg = body.error?.message ?? `HTTP ${resp.status}`
-    throw new ApiError(msg, code, resp.status)
-  }
+  if (!resp.ok || body.error) throw envelopeError(body, resp.status)
 
   return body.data as T
+}
+
+/** 把统一外壳的 error 转成 ApiError;后端运行时不返回 code,缺省记为 HTTP_ERROR。 */
+function envelopeError(body: Partial<ApiResponse<unknown>> | null, status: number): ApiError {
+  const code = body?.error?.code ?? 'HTTP_ERROR'
+  const msg = body?.error?.message ?? `HTTP ${status}`
+  return new ApiError(msg, code, status, body?.error?.details ?? {})
+}
+
+/**
+ * 下载二进制文件(如 skill 导出 zip):成功返回 Blob,不解包外壳。
+ * 失败时响应是统一外壳的 JSON,解析后抛 ApiError;只走 Authorization 头,不在 query 里带 token。
+ */
+export async function requestBlob(path: string, init?: ConsoleRequestInit): Promise<Blob> {
+  const headers: Record<string, string> = {}
+  const token = localStorage.getItem('auth_token')
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const method = init?.method ?? BASE_METHOD
+  const allowRetry = init?.retry === true || (method === BASE_METHOD && init?.retry !== false)
+  const fetchFn = () => fetch(BASE + path, {
+    ...init,
+    headers: { ...headers, ...(init?.headers ?? {}) },
+  })
+
+  let resp: Response
+  try {
+    resp = allowRetry
+      ? await withRetry(() => fetchFn(), {
+          retries: 1,
+          when: (error) => error instanceof ApiError && error.status === 0,
+        })
+      : await fetchFn()
+  } catch (e) {
+    throw new ApiError(`网络请求失败: ${(e as Error).message}`, 'NETWORK_ERROR', 0)
+  }
+
+  if (resp.ok) return resp.blob()
+
+  let body: Partial<ApiResponse<unknown>> | null = null
+  try {
+    body = (await resp.json()) as ApiResponse<unknown>
+  } catch {
+    // 非 JSON 错误体:保留原始状态码。
+  }
+  throw envelopeError(body, resp.status)
 }
 
 /**
