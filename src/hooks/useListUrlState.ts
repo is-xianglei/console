@@ -24,7 +24,7 @@ export interface ListUrlStateOptions<T extends Record<string, unknown>> {
   codecs?: Partial<{ [K in keyof T]: ListUrlCodec<T[K]> }>
   /** page / pageSize 对应的 query key 名。 */
   pageKeys?: { page?: string; pageSize?: string }
-  /** 这些字段变化时把 page 复位为 1；缺省为非 page/pageSize 的所有字段。 */
+  /** 这些字段变化时把 page 复位为 1；缺省为非 page/pageSize 的所有字段。pageSize 变化总会复位 page。 */
   resetPageOn?: (keyof T)[]
 }
 
@@ -95,7 +95,7 @@ export function inDateRange(iso: string, start: string, end: string): boolean {
  * - 数组用逗号拼接；数字回读 `Number()`，NaN 回退默认；
  * - 筛选变化用 `router.replace`（不制造历史），`page` 变化用 `router.push`（后退可回上一页）；
  * - 初始化先从 query 读入再开始 watch，避免首帧把 query 清空；
- * - `watch(route.query)` 只响应本路由（`route.name` / `params` 未变时）；组件卸载自动停止。
+ * - 路由变化时只回读 state、不写回 URL；组件卸载自动停止。
  */
 export function useListUrlState<T extends Record<string, unknown>>(
   options: ListUrlStateOptions<T>,
@@ -145,9 +145,8 @@ export function useListUrlState<T extends Record<string, unknown>>(
     return query
   }
 
-  /** 与当前 route.query 逐键比较，相同则不写，切断「写 query → watch → 再写」回环。 */
-  function queryEquals(next: LocationQueryRaw): boolean {
-    const current = route.query
+  /** 与即将生效的 query 逐键比较，相同则不写，切断「写 query → watch → 再写」回环。 */
+  function queryEquals(next: LocationQueryRaw, current: LocationQueryRaw): boolean {
     const nextKeys = Object.keys(next)
     if (nextKeys.length !== Object.keys(current).length) return false
     for (const key of nextKeys) {
@@ -161,14 +160,14 @@ export function useListUrlState<T extends Record<string, unknown>>(
 
   // 初始化：先读入 query，再开始 watch，避免首帧把 query 清空。
   syncFromQuery()
-  // 记录初始路由标识，供 query watch 判定是否仍是同一路由实例。
-  let boundName = route.name
-  let boundParams = JSON.stringify(route.params)
 
   let prevState: Record<string, unknown> = snapshotState(state)
-  // 仅用于 page 复位时抑制嵌套 watcher；不用于拦截「写 query → watch → 再写」，
-  // 回环由 queryEquals / round-trip 稳定性保证。
+  // hook 自己改 state 时置位（page 复位、从 URL 回读），让 state watcher 跳过这次变化；
+  // 「写 query → watch → 再写」的回环由 queryEquals / round-trip 稳定性保证。
   let internalMutation = false
+  // 本 hook 已发出、还没落地的导航 query。push / replace 是异步的，落地前 route.query 仍是旧值，
+  // 同一 tick 内的下一次写入要和它比较，否则会误判「无需写入」，让先发的导航把旧值写回 URL。
+  let pendingQuery: LocationQueryRaw | null = null
 
   watch(
     () => ({ ...state }),
@@ -184,12 +183,12 @@ export function useListUrlState<T extends Record<string, unknown>>(
     const changedKeys = diffKeys(prevState, state)
     if (!changedKeys.length) { prevState = snapshotState(state); return }
 
-    // page 复位：非分页且命中的字段变化时 page 归 1。
-    const pageResetTriggered = changedKeys.some((key) => (
-      key !== pageKey
-      && key !== pageSizeKey
-      && resetPageOn.includes(key as keyof T)
-    ))
+    // page 复位：pageSize 变化，或 resetPageOn 里的非分页字段变化时 page 归 1。
+    // pageSize 变了，原页码对应的数据范围也变了，停在原页码没有意义。
+    const pageResetTriggered = changedKeys.some((key) => {
+      if (key === pageSizeKey) return true
+      return key !== pageKey && resetPageOn.includes(key as keyof T)
+    })
     // 仅当调用方确实声明了 page 字段时才复位；否则 defaults[pageKey] 是 undefined，
     // 会在 state 上凭空长出一个 page: undefined 键污染快照。
     if (pageResetTriggered && Object.prototype.hasOwnProperty.call(defaults, pageKey)) {
@@ -203,38 +202,46 @@ export function useListUrlState<T extends Record<string, unknown>>(
     prevState = snapshotState(state)
 
     const next = estimateQuery()
+    // 以「即将生效的 query」为准：有还没落地的导航就用它，否则用 route.query。
+    const currentQuery: LocationQueryRaw = pendingQuery ?? route.query
     // 合并保留非本组件管理的 query 键（如 highlight），仅覆盖托管字段。
-    const merged: LocationQueryRaw = { ...route.query }
+    const merged: LocationQueryRaw = { ...currentQuery }
     for (const key of Object.keys(defaults) as (keyof T)[]) {
       const name = key as string
       if (Object.prototype.hasOwnProperty.call(next, name)) merged[name] = next[name]
       else delete merged[name]
     }
-    if (queryEquals(merged)) return
+    if (queryEquals(merged, currentQuery)) return
 
     // 只有 page 本身变化且未触发筛选复位时，才视为「翻页」，用 push。
     const isPageWrite = changedKeys.length === 1 && changedKeys[0] === pageKey && !pageResetTriggered
+    pendingQuery = merged
+    let navigation: Promise<unknown>
     if (isPageWrite) {
-      void router.push({ query: merged })
+      navigation = router.push({ query: merged })
     } else {
-      void router.replace({ query: merged })
+      navigation = router.replace({ query: merged })
     }
+    // 导航结束（落地、被后发的导航取消或被守卫拦截）后不再算「未落地」；只清自己这次，不误清后发的。
+    void navigation.finally(() => {
+      if (pendingQuery === merged) pendingQuery = null
+    })
   }
 
   // route.query / params 变化（后退 / 前进 / 外部 push / 路由参数切换）→ 回读 state。
+  // 同一 hook 复用于 /platform/:module/:resource 等不同资源页时，也按新路由的 query 回读。
   watch(
     () => ({ name: route.name, params: route.params, query: route.query }),
     () => {
-      const paramsChanged = boundParams !== JSON.stringify(route.params)
-      const nameChanged = boundName !== route.name
-      if (nameChanged || paramsChanged) {
-        // 同一 hook 复用于 /platform/:module/:resource 等不同资源页时，重新绑定。
-        boundName = route.name
-        boundParams = JSON.stringify(route.params)
-        syncFromQuery()
-        return
-      }
+      // 有导航落地了（本 hook 发起的或外部的），此后以 route.query 为准。
+      pendingQuery = null
+      // 回读是逐个字段赋值的，中途 state 新旧混杂，这期间不能写回 URL：
+      // 否则后退时会把「新页码 + 旧每页条数」写回去；切换路由时，还没卸载的旧页面
+      // 会把自己的每页条数写进新路由。回读完再更新快照，下次 diff 才不会把回读当成用户修改。
+      internalMutation = true
       syncFromQuery()
+      internalMutation = false
+      prevState = snapshotState(state)
     },
     { deep: true, flush: 'sync' },
   )
