@@ -3,7 +3,7 @@ import { computed, ref, useCssModule, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { useToast } from '@nuxt/ui/composables'
-import { RelativeTime } from '@/components'
+import { MarketSubmitButton, RelativeTime } from '@/components'
 import { useSkillActions } from '@/hooks/useSkillActions'
 import type { SkillResponse } from '@/interfaces/skill/model'
 import SkillBundleModal from '@/routes/skills/components/skill-bundle-modal/index.vue'
@@ -132,6 +132,7 @@ async function onDeleteConfirm() {
           :loading="actions.isToggling(skill.id)"
           @update:model-value="onToggle"
         />
+        <MarketSubmitButton kind="skill" :source-id="skill.id" />
         <UButton v-if="actions.canWrite.value" color="neutral" variant="outline" icon="i-lucide-pencil" label="编辑" :disabled="!detail" @click="goToEdit" />
         <UDropdownMenu :items="menuItems">
           <UButton icon="i-lucide-ellipsis" color="neutral" variant="outline" square aria-label="更多操作" />

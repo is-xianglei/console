@@ -61,6 +61,11 @@ export const useAuthStore = defineStore('auth', () => {
     ?? state.workspaces[0]
     ?? null
   ))
+  /**
+   * 是否平台管理员：登录、注册时取自响应里的用户信息，刷新页面后取自恢复登录态时拉取的 /users/me。
+   * 字段缺失时按非管理员处理。
+   */
+  const isPlatformAdmin = computed(() => state.user?.is_platform_admin === true)
 
   // ===== Token 管理 =====
   function setTokens(access: string, refresh: string) {
@@ -215,6 +220,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     currentWorkspaceId,
     currentWorkspace,
+    isPlatformAdmin,
     login,
     register,
     logout,

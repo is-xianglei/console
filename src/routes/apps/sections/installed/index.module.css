@@ -1,0 +1,42 @@
+.installed {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  container: market-installed / inline-size;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.total {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@container market-installed (width < 900px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container market-installed (width < 560px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.skeleton {
+  height: 168px;
+  border-radius: var(--radius-md);
+}

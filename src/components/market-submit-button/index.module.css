@@ -1,0 +1,22 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.field {
+  width: 100%;
+}
+
+.origin {
+  max-width: 280px;
+}

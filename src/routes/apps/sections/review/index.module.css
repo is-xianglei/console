@@ -1,0 +1,123 @@
+.review {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton {
+  height: 180px;
+  border-radius: var(--radius-md);
+}
+
+.item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+}
+
+.itemHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.itemTitle {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kindIcon {
+  color: var(--accent-agent);
+  font-size: 16px;
+}
+
+.name {
+  color: var(--text-primary);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.version {
+  color: var(--accent-agent);
+  font-size: var(--fs-xs);
+}
+
+.itemActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.meta > div {
+  display: flex;
+  gap: 6px;
+}
+
+.meta dt {
+  color: var(--text-dim);
+}
+
+.meta dd {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.note {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note span {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+}
+
+.snapshot {
+  min-width: 0;
+}
+
+.snapshotBody {
+  min-width: 0;
+  padding-top: 12px;
+}

@@ -8,6 +8,8 @@ export interface UserInfo {
   phone?: string | null
   email_verified?: boolean
   suspended?: boolean
+  /** 是否平台管理员（平台首个注册用户），只读；登录、注册响应和 /users/me 都带这个字段。 */
+  is_platform_admin?: boolean
   auth_provider?: string
   last_login_at?: string | null
   created_at: string

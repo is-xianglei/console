@@ -5,6 +5,7 @@ import type { AgentResponse } from '@/interfaces/agent/api'
 import type { SkillResponse } from '@/interfaces/skill/model'
 import type { ToolResponse } from '@/interfaces/tool/model'
 import { useSaveFeedback } from '@/hooks/useSaveFeedback'
+import { MarketSubmitButton } from '@/components'
 import { RelativeTime } from '@/components/resource'
 import { useAgentsStore } from '@/stores/agents'
 
@@ -122,6 +123,7 @@ watch(
 
       <footer :class="styles['ag-detail-actions']">
         <UButton :class="styles['ag-icon-button']" icon="i-lucide-trash-2" color="error" variant="ghost" square aria-label="删除当前 Agent" @click="pendingDelete = true" />
+        <MarketSubmitButton kind="agent" :source-id="agent.id" />
         <UButton :class="styles['ag-secondary-button']" icon="i-lucide-copy" color="neutral" variant="outline" label="复制" @click="goToDuplicate" />
         <UButton :class="styles['ag-primary-button']" icon="i-lucide-sliders-horizontal" label="配置 Agent" @click="goToEdit" />
       </footer>

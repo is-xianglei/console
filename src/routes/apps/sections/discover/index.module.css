@@ -1,0 +1,67 @@
+.discover {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  container: market-discover / inline-size;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.kindTabs {
+  flex: 0 0 auto;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.category {
+  width: 140px;
+}
+
+.search {
+  width: 240px;
+}
+
+/* 卡片网格：宽 3 列、中 2 列、窄 1 列，按内容区宽度（容器查询）切换。 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@container market-discover (width < 900px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container market-discover (width < 560px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filters,
+  .search {
+    width: 100%;
+  }
+
+  .search {
+    flex: 1 1 100%;
+  }
+}
+
+.skeleton {
+  height: 168px;
+  border-radius: var(--radius-md);
+}

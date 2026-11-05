@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { AppShell } from '@/components'
 import { useAuthStore } from '@/stores/auth'
 import AppsLoader from './apps/Loader.vue'
+import MarketDetailLoader from './apps/detail/Loader.vue'
+import { resolveMarketSection } from './apps/sections'
 import ChatLoader from './chat/Loader.vue'
 import LoginLoader from './login/Loader.vue'
 import MemoriesLoader from './memories/Loader.vue'
@@ -60,9 +62,16 @@ const router = createRouter({
           meta: { requiresAuth: true },
         },
         {
-          path: 'apps',
+          // 应用市场：发现 / 已安装 / 版本更新 / 我的上架 / 审核队列；无权访问的模块由下方守卫重定向到「发现」
+          path: 'apps/:section?',
           name: 'apps',
           component: AppsLoader,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'apps/listings/:id(\\d+)',
+          name: 'market-detail',
+          component: MarketDetailLoader,
           meta: { requiresAuth: true },
         },
         {
@@ -252,6 +261,17 @@ router.beforeEach(async (to) => {
 
   if ((to.name === 'login' || to.name === 'register') && authStore.isAuthenticated) {
     return safeRedirect(to.query.redirect) ?? { name: 'chat' }
+  }
+
+  // 市场模块可见性：「我的上架」看当前工作区角色，「审核队列」只对平台管理员开放。
+  // 重定向不写 replace，沿用原导航的 push / replace：守卫里显式 replace 会顶掉来源页的历史记录，
+  // 从带分页参数的列表点「应用市场」后就退不回原来的页码。
+  if (to.name === 'apps') {
+    const section = resolveMarketSection(to.params.section, {
+      role: authStore.currentWorkspace?.membership_role,
+      isPlatformAdmin: authStore.isPlatformAdmin,
+    }).key
+    if (to.params.section !== section) return { name: 'apps', params: { section }, query: to.query, hash: to.hash }
   }
 
   return true

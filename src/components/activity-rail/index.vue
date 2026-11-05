@@ -28,7 +28,7 @@ const items = [
 const activeModule = computed(() => {
   if (route.name === 'chat') return 'workbench'
   if (route.name === 'memories') return 'memories'
-  if (route.name === 'apps') return 'market'
+  if (route.path.startsWith('/apps')) return 'market'
   if (route.path.startsWith('/skills')) return 'build'
   if (route.name === 'platform-resource') return route.params.module
   return ''
