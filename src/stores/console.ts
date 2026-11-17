@@ -44,11 +44,13 @@ import type {
   Task,
   TaskResponse,
   TaskState,
+  ToolSourceFault,
   WorkbenchMode,
   WorkflowMemberProgress,
   WorkflowProgressState,
 } from '../interfaces/console/model'
-import { createSseReducer, fmtToolCall } from '@/utils/sse-reducer'
+import { mergeFaults } from '@/utils/mcp-tool'
+import { createSseReducer, toolCardFields } from '@/utils/sse-reducer'
 import type { ChatModelSelection, ThinkingEffort } from '../interfaces/settings/models/model'
 import { getSessionSubAgentRuns } from '../http/session-runtime'
 import { mapSubAgentRuns, mergeSubAgentRuns } from '../utils/session-runtime'
@@ -258,10 +260,11 @@ function mapMessages(list: SessionMessageResponse[]): ChatMessage[] {
       } else if (b.type === 'text' && b.text) {
         blocks.push({ kind: 'answer', text: b.text, streaming: false })
       } else if (b.type === 'tool_use') {
+        // 历史消息不带来源，MCP 工具按 mcp__{server_key}__ 命名规则识别。
         const card: Extract<ChatBlock, { kind: 'tool' }> = {
           kind: 'tool',
           tag: b.name === 'Agent' || b.name === 'TeamSpawn' ? 'SPAWN' : 'TOOL',
-          fn: fmtToolCall(b.name ?? 'tool', b.input),
+          ...toolCardFields(b.name ?? 'tool', b.input),
           body: '',
           done: false,
         }
@@ -441,6 +444,31 @@ export const useConsoleStore = defineStore('console', () => {
     state.activeTurnId = turnId
   }
 
+  /**
+   * tool_sources 只在实时流里出现，历史消息和轮次快照都不带。按「会话:轮次」记下来，
+   * 每轮结束重拉历史、或从快照重建回复时，再挂回该轮第一条回复的最上面；刷新页面后不保留。
+   */
+  const toolSourceFaults = new Map<string, ToolSourceFault[]>()
+
+  function rememberToolSources(sessionId: string, turnId: string, faults: ToolSourceFault[]) {
+    const key = `${sessionId}:${turnId}`
+    toolSourceFaults.set(key, mergeFaults(toolSourceFaults.get(key) ?? [], faults))
+  }
+
+  function attachToolSources(sessionId: string, messages: ChatMessage[]) {
+    const seen = new Set<string>()
+    for (const message of messages) {
+      if (message.role !== 'ai' || !message.turnId || seen.has(message.turnId)) continue
+      seen.add(message.turnId)
+      const faults = toolSourceFaults.get(`${sessionId}:${message.turnId}`)
+      if (!faults?.length) continue
+      const blocks = message.blocks ?? (message.blocks = [])
+      const existing = blocks.find((block) => block.kind === 'sources')
+      if (existing?.kind === 'sources') existing.faults = mergeFaults(existing.faults, faults)
+      else blocks.unshift({ kind: 'sources', faults: [...faults] })
+    }
+  }
+
   function snapshotRecord(value: unknown): Record<string, unknown> | null {
     return value && typeof value === 'object' && !Array.isArray(value)
       ? value as Record<string, unknown>
@@ -455,6 +483,10 @@ export const useConsoleStore = defineStore('console', () => {
     sessionId: number,
     turnId: string,
   ) {
+    // 快照不记录 tool_sources：当前回复上已有的提示先登记到本轮，重建后由 attachToolSources 挂回。
+    for (const block of ai.blocks ?? []) {
+      if (block.kind === 'sources') rememberToolSources(String(sessionId), turnId, block.faults)
+    }
     // 完整快照包含本轮所有 segment，替换同轮助手历史，保留用户输入和其它轮次。
     // 截断快照缺少更早内容，必须保留数据库中的历史作为补充。
     if (snapshot.truncated !== true) {
@@ -464,6 +496,7 @@ export const useConsoleStore = defineStore('console', () => {
     }
     ai.turnId = turnId
     ai.blocks = []
+    attachToolSources(String(sessionId), [ai])
     const selectedAgentId = state.selectedAgentId
     const actorKeys = new Set((Array.isArray(snapshot.actors) ? snapshot.actors : []).flatMap((raw) => {
       const actor = snapshotRecord(snapshotRecord(raw)?.actor)
@@ -613,6 +646,7 @@ export const useConsoleStore = defineStore('console', () => {
     }
 
     state.messages = mapMessages(historyResult.value)
+    attachToolSources(id, state.messages)
     if (tasksResult.status === 'fulfilled') {
       state.tasks = tasksResult.value.filter((task) => task.status !== 'deleted').map(mapTask)
     }
@@ -653,6 +687,7 @@ export const useConsoleStore = defineStore('console', () => {
   function resetConsole() {
     dataGeneration += 1
     invalidateStream()
+    toolSourceFaults.clear()
     restoredAgentSessionId = null
     restoredAgents = []
 
@@ -1255,6 +1290,11 @@ export const useConsoleStore = defineStore('console', () => {
           expectedTurnId = ev.turn_id
           bindActiveTurn(eventSessionId ?? expectedSessionId ?? state.activeSessionId, ev.turn_id)
           state.recovering = false
+        }
+        if (ev.type === 'tool_sources') {
+          const turnId = ev.turn_id ?? expectedTurnId
+          const sessionId = eventSessionId ?? expectedSessionId
+          if (turnId && sessionId && ev.data?.faults?.length) rememberToolSources(sessionId, turnId, ev.data.faults)
         }
         if (ev.type === 'run_snapshot') {
           if (ev.turn_id) {

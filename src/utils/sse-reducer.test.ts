@@ -302,6 +302,46 @@ describe('createSseReducer', () => {
     })
   })
 
+  it('MCP 工具卡去掉 mcp__ 前缀并记下 server_key，内置工具不变', () => {
+    const ai: ChatMessage = { id: 'ai-mcp', role: 'ai', time: '10:00', blocks: [] }
+    const reducer = createSseReducer({ ai, agents: [], selectAgent: vi.fn() })
+
+    reducer.handle(createEvent('tool_use', {
+      tool: { id: 't1', name: 'mcp__deepwiki__ask_wiki_question', input: { repoName: 'vuejs/core' }, source: 'mcp:deepwiki' },
+    }))
+    reducer.handle(createEvent('tool_use', { tool: { id: 't2', name: 'Read', input: { file_path: '/a' } } }))
+    reducer.handle(createEvent('tool_result', { tool: { id: 't1', name: 'mcp__deepwiki__ask_wiki_question', output: '答案', is_error: false, source: 'mcp:deepwiki' } }))
+
+    expect(ai.blocks?.[0]).toMatchObject({ kind: 'tool', fn: 'ask_wiki_question(repoName="vuejs/core")', mcp: 'deepwiki', tag: 'RESULT', body: '答案' })
+    expect(ai.blocks?.[1]).not.toHaveProperty('mcp')
+  })
+
+  it('tool_sources 放在本轮回复最上面，重复推送去重', () => {
+    const ai: ChatMessage = { id: 'ai-src', role: 'ai', time: '10:00', blocks: [] }
+    const reducer = createSseReducer({ ai, agents: [], selectAgent: vi.fn() })
+    const auth = { source: 'mcp:linear', server_id: 3, kind: 'auth_required', message: '需要授权' }
+    const timeout = { source: 'mcp:jira', server_id: 4, kind: 'timeout', message: '获取超时' }
+
+    reducer.handle(createEvent('block_start', { block: { index: 0, block_type: 'text' } }))
+    reducer.handle(createEvent('tool_sources', { data: { session_id: 12, faults: [auth] } }))
+    reducer.handle(createEvent('tool_sources', { data: { session_id: 12, faults: [auth, timeout] } }))
+    reducer.handle(createEvent('tool_sources', { data: { session_id: 12, faults: [] } }))
+    reducer.handle(createEvent('text_delta', { block: { index: 0 }, text: '好' }))
+
+    expect(ai.blocks?.[0]).toEqual({ kind: 'sources', faults: [auth, timeout] })
+    expect(ai.blocks?.[1]).toMatchObject({ kind: 'answer', text: '好' })
+  })
+
+  it('子代理面板里的 MCP 工具同样标注来源', () => {
+    const agents: SubAgent[] = []
+    const reducer = createSseReducer({ ai: { id: 'ai-sub', role: 'ai', time: '10:00', blocks: [] }, agents, selectAgent: vi.fn() })
+    reducer.handle(createEvent('tool_use', {
+      actor: { role: 'subagent', name: 'research', run_id: 'r1' },
+      tool: { id: 't1', name: 'mcp__jira__search', input: {}, source: 'mcp:jira' },
+    }))
+    expect(agents[0]?.stream[0]).toMatchObject({ kind: 'tool', fn: 'search()', mcp: 'jira' })
+  })
+
   it('透传会话任务全量快照', () => {
     const onTaskSnapshot = vi.fn()
     const reducer = createSseReducer({

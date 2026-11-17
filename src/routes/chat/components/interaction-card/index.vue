@@ -9,7 +9,8 @@ import type {
 } from '@/interfaces/console/api'
 import type { InteractionStatus, SseInteraction } from '@/interfaces/console/model'
 import { useConsoleStore } from '@/stores/console'
-import { fmtToolCall } from '@/utils/sse-reducer'
+import { toolCardFields } from '@/utils/sse-reducer'
+import McpSourceBadge from '../mcp-source-badge/index.vue'
 
 defineOptions({ name: 'InteractionCard' })
 
@@ -50,10 +51,11 @@ const icon = computed(() => {
     default: return 'i-lucide-message-circle-question'
   }
 })
+/** MCP 工具去掉 mcp__{server_key}__ 前缀，来源单独用徽标标出。 */
 const toolSignature = computed(() => {
-  if (props.interaction.kind !== 'tool_approval') return ''
+  if (props.interaction.kind !== 'tool_approval') return { fn: '' }
   const tool = props.interaction.request_payload.tool
-  return fmtToolCall(tool.name, tool.input)
+  return toolCardFields(tool.name, tool.input, tool.source)
 })
 
 function submit(payload: InteractionResolutionRequest, label: string) {
@@ -157,7 +159,10 @@ function onCancelRun() {
 
     <template v-if="pending">
       <div v-if="interaction.kind === 'tool_approval'" :class="$style.body">
-        <code :class="$style.signature">{{ toolSignature }}</code>
+        <div :class="$style.signatureRow">
+          <McpSourceBadge v-if="toolSignature.mcp" :server-key="toolSignature.mcp" />
+          <code :class="$style.signature">{{ toolSignature.fn }}</code>
+        </div>
         <p>{{ interaction.request_payload.reason }}</p>
         <UFormField v-if="interaction.request_payload.can_update_input" label="调用参数 JSON">
           <UTextarea v-model="toolInputJson" :class="$style.codeInput" autoresize :maxrows="10" />

@@ -42,7 +42,15 @@
   line-height: 1.6;
 }
 
+.signatureRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
 .signature {
+  min-width: 0;
   overflow: hidden;
   color: var(--text-primary);
   font-family: var(--font-data);

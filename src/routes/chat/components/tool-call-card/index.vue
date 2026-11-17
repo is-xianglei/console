@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CliTag } from '@/interfaces'
+import McpSourceBadge from '../mcp-source-badge/index.vue'
 
 defineOptions({ name: 'ToolCallCard' })
 
@@ -8,6 +9,8 @@ defineProps<{
   fn: string
   body: string
   done: boolean
+  /** 来自 MCP server 时为 server_key。 */
+  mcp?: string
 }>()
 </script>
 
@@ -15,6 +18,7 @@ defineProps<{
   <div :class="$style['cli-card']">
     <div :class="$style['cli-bar']">
       <span :class="[$style['cli-tag'], $style[tag.toLowerCase()]]">{{ tag }}</span>
+      <McpSourceBadge v-if="mcp" :server-key="mcp" />
       <span :class="$style['cli-fn']">{{ fn }}</span>
       <span :class="$style['cli-state']">
         <template v-if="tag === 'ERROR'"><span :class="$style['error']">✕</span> 失败</template>

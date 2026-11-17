@@ -4,6 +4,7 @@ import type { ChatMessage } from '@/interfaces'
 import ApprovalCard from '../approval-card/index.vue'
 import InteractionCard from '../interaction-card/index.vue'
 import ToolCallCard from '../tool-call-card/index.vue'
+import ToolSourcesNotice from '../tool-sources-notice/index.vue'
 
 defineOptions({ name: 'ConversationMessage' })
 
@@ -37,7 +38,9 @@ defineProps<{ message: ChatMessage; busy: boolean }>()
             :fn="block.fn"
             :body="block.body"
             :done="block.done"
+            :mcp="block.mcp"
           />
+          <ToolSourcesNotice v-else-if="block.kind === 'sources'" :faults="block.faults" />
           <ApprovalCard
             v-else-if="block.kind === 'approval'"
             :request-id="block.requestId"

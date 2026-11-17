@@ -7,6 +7,7 @@ import type {
   SubAgent,
   TaskResponse,
 } from '../interfaces/console/model'
+import { mcpToolRef, mergeFaults } from './mcp-tool'
 
 /** 中间对话区与子代理面板共用的推理块、回答块形状 */
 type ThinkItem = Extract<ChatBlock | StreamEvent, { kind: 'think' }>
@@ -88,6 +89,13 @@ function ensureAgent(t: SseTarget, ev: SseEvent): SubAgent {
 }
 
 /** 工具 input 摘要为 CLI 卡片的函数签名展示。历史映射(mapMessages)复用同一格式,保证实时流与刷新后一致。 */
+/** 工具卡的展示字段：MCP 工具去掉 mcp__{server_key}__ 前缀，另给出 server_key 供卡片标注来源。 */
+export function toolCardFields(name: string, input?: Record<string, unknown>, source?: string | null): { fn: string; mcp?: string } {
+  const ref = mcpToolRef(name, source)
+  if (!ref) return { fn: fmtToolCall(name, input) }
+  return { fn: fmtToolCall(ref.toolName, input), mcp: ref.serverKey }
+}
+
 export function fmtToolCall(name: string, input?: Record<string, unknown>): string {
   if (!input || !Object.keys(input).length) return `${name}()`
   const args = Object.entries(input)
@@ -211,11 +219,14 @@ export function createSseReducer(target: SseTarget) {
       return
     }
 
-    // 编排节点事件:只做图状态归并,必须在 actor.role 分流前早退。
-    // 节点事件的 actor 是父 FlowAgent(名字为方案名),且 node_start 早于叶子 turn_start,
-    // 一旦流入 handleAgent 就会以方案名误建右栏面板并抢占标题。
-    if (ev.type === 'node_start' || ev.type === 'node_end') {
-      target.onNodeEvent?.(ev)
+    // 作用域工具来源故障(会话级,不带 actor):放进当前回复最上面的提示块,同来源同故障去重。
+    if (ev.type === 'tool_sources') {
+      const faults = ev.data?.faults ?? []
+      if (!faults.length) return
+      const blocks = target.ai.blocks!
+      const existing = blocks.find((block) => block.kind === 'sources')
+      if (existing?.kind === 'sources') existing.faults = mergeFaults(existing.faults, faults)
+      else blocks.unshift({ kind: 'sources', faults: mergeFaults([], faults) })
       return
     }
 
@@ -275,7 +286,7 @@ export function createSseReducer(target: SseTarget) {
         const card: Extract<ChatBlock, { kind: 'tool' }> = {
           kind: 'tool',
           tag: ev.tool?.name === 'Agent' || ev.tool?.name === 'TeamSpawn' ? 'SPAWN' : 'TOOL',
-          fn: fmtToolCall(ev.tool?.name ?? 'tool', ev.tool?.input),
+          ...toolCardFields(ev.tool?.name ?? 'tool', ev.tool?.input, ev.tool?.source),
           body: '',
           done: false,
         }
@@ -384,7 +395,7 @@ export function createSseReducer(target: SseTarget) {
         a.progress = Math.max(a.progress, 50)
         const item: Extract<StreamEvent, { kind: 'tool' }> = {
           kind: 'tool',
-          fn: fmtToolCall(ev.tool?.name ?? 'tool', ev.tool?.input),
+          ...toolCardFields(ev.tool?.name ?? 'tool', ev.tool?.input, ev.tool?.source),
           body: '',
           done: false,
         }

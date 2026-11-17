@@ -77,6 +77,7 @@ const statusLabel: Record<string, string> = {
                 :fn="s.fn"
                 :body="s.body"
                 :done="s.done"
+                :mcp="s.mcp"
               />
             </div>
           </template>

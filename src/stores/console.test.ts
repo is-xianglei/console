@@ -79,6 +79,22 @@ describe('console store 会话恢复', () => {
     vi.mocked(subscribeTurn).mockReturnValue(() => {})
   })
 
+  it('历史消息里的 MCP 工具按命名规则标注来源', async () => {
+    vi.mocked(getSessionMessageList).mockResolvedValue([{
+      ...message,
+      content: [{ type: 'tool_use', id: 'call-1', name: 'mcp__deepwiki__read_wiki_contents', input: { repoName: 'vuejs/core' } }],
+    }])
+    vi.mocked(getPendingInteraction).mockResolvedValue(null)
+
+    const store = useConsoleStore()
+    expect(await store.reloadConsole()).toBe(true)
+    expect(store.state.messages[0]?.blocks?.[0]).toMatchObject({
+      kind: 'tool',
+      fn: 'read_wiki_contents(repoName="vuejs/core")',
+      mcp: 'deepwiki',
+    })
+  })
+
   it('待处理交互查询失败时保留已加载的历史', async () => {
     vi.mocked(getSessionMessageList).mockResolvedValue([message])
     vi.mocked(getPendingInteraction).mockRejectedValue(new Error('暂时不可用'))
@@ -244,6 +260,48 @@ describe('console store 会话恢复', () => {
     expect(store.state.messages.at(-1)?.blocks).toContainEqual(expect.objectContaining({
       kind: 'tool', tag: 'ERROR', body: '可恢复错误',
     }))
+  })
+
+  it('每轮结束重拉历史后，MCP 不可用提示挂回该轮第一条回复', async () => {
+    vi.mocked(getSessionMessageList).mockResolvedValue([])
+    vi.mocked(getPendingInteraction).mockResolvedValue(null)
+    const store = useConsoleStore()
+    await store.reloadConsole()
+    store.dispatch('查一下')
+    const handlers = vi.mocked(sendMessage).mock.calls.at(-1)![1]
+    const fault = { source: 'mcp:linear', server_id: 3, kind: 'auth_required', message: '需要授权' }
+    handlers.onEvent({ type: 'run_started', sequence: 1, session_id: 42, turn_id: 'turn-9' })
+    handlers.onEvent({ type: 'tool_sources', sequence: 2, session_id: 42, turn_id: 'turn-9', data: { session_id: 42, faults: [fault] } })
+    vi.mocked(getSessionMessageList).mockResolvedValue([
+      { ...message, id: 8, turn_id: 'turn-9', content: [{ type: 'text', text: '第一段' }] },
+      { ...message, id: 9, turn_id: 'turn-9', content: [{ type: 'text', text: '第二段' }] },
+    ])
+    handlers.onEvent({ type: 'run_end', sequence: 5, session_id: 42, turn_id: 'turn-9' })
+    await vi.waitFor(() => expect(store.state.messages[0]?.blocks?.[0]).toEqual({ kind: 'sources', faults: [fault] }))
+    expect(store.state.messages[1]?.blocks?.some((block) => block.kind === 'sources')).toBe(false)
+  })
+
+  it('快照重建本轮回复时保留已收到的 MCP 不可用提示', async () => {
+    vi.mocked(getSessionMessageList).mockResolvedValue([])
+    vi.mocked(getPendingInteraction).mockResolvedValue(null)
+    vi.mocked(getActiveTurn).mockResolvedValue({
+      turn_id: 'turn-1', status: 'running', executing: true, last_event_offset: 3,
+    })
+    const store = useConsoleStore()
+    await store.reloadConsole()
+    await vi.waitFor(() => expect(subscribeTurn).toHaveBeenCalled())
+    const handlers = vi.mocked(subscribeTurn).mock.calls.at(-1)![2]
+    const fault = { source: 'mcp:linear', server_id: 3, kind: 'auth_required', message: '需要授权' }
+    handlers.onEvent({ type: 'tool_sources', sequence: 2, session_id: 42, turn_id: 'turn-1', data: { session_id: 42, faults: [fault] } })
+    handlers.onEvent({ type: 'run_snapshot', sequence: 3, session_id: 42, turn_id: 'turn-1', state: {
+      last_offset: 3,
+      actors: [{ actor: { role: 'orchestrator', name: 'orchestrator' }, in_turn: true,
+        blocks: [{ index: 0, kind: 'text', text: '继续回答', closed: true }] }],
+    } })
+    expect(store.state.messages.at(-1)?.blocks).toEqual([
+      { kind: 'sources', faults: [fault] },
+      { kind: 'answer', text: '继续回答', streaming: false },
+    ])
   })
 
   it('SSE 准入被拒绝时展示后端原因且不重放提交', () => {

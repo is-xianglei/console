@@ -112,7 +112,8 @@ export interface InteractionQuestion {
 }
 
 export interface ToolApprovalRequestPayload {
-  tool: { id: string; name: string; input: Record<string, unknown> }
+  /** source：MCP 工具为 "mcp:{server_key}"，内置工具不带。 */
+  tool: { id: string; name: string; input: Record<string, unknown>; source?: string }
   reason: string
   allowed_decisions: ApprovalDecision[]
   can_update_input: boolean
@@ -147,6 +148,16 @@ export type SseInteraction =
   | (SseInteractionBase & { kind: 'enter_plan_mode'; request_payload: EnterPlanModeRequestPayload })
   | (SseInteractionBase & { kind: 'exit_plan_mode'; request_payload: ExitPlanModeRequestPayload })
 
+/** tool_sources 事件里的一项：message 是可直接展示的中文，不带授权地址。 */
+export interface ToolSourceFault {
+  /** "mcp:{server_key}" */
+  source: string
+  /** 来源整体失败、对不上具体 server 时为 null。 */
+  server_id: number | null
+  kind: 'unavailable' | 'auth_required' | 'timeout' | 'invalid' | string
+  message: string
+}
+
 /** SSE 统一事件信封。 */
 export interface SseEvent {
   type:
@@ -163,6 +174,7 @@ export interface SseEvent {
     | 'interaction_request'
     | 'error'
     | 'task_snapshot'
+    | 'tool_sources'
     | 'workflow_progress'
     | 'run_started'
     | 'run_snapshot'
@@ -184,6 +196,8 @@ export interface SseEvent {
     status?: string
     reason?: 'baseline' | 'created' | 'updated' | string
     tasks?: TaskResponse[]
+    /** tool_sources：本回合不可用的作用域工具来源，只在有故障时紧随 turn_start 发出。 */
+    faults?: ToolSourceFault[]
   }
   block?: { index: number; block_type?: 'thinking' | 'text' | 'tool_use' | string }
   text?: string
@@ -193,6 +207,8 @@ export interface SseEvent {
     input?: Record<string, unknown>
     output?: string
     is_error?: boolean
+    /** MCP 工具为 "mcp:{server_key}"，内置工具不带。 */
+    source?: string
   }
   permission?: {
     request_id: string
@@ -298,7 +314,7 @@ export type CliTag =
 export type StreamEvent =
   | { kind: 'think'; text: string; done: boolean; seconds?: number }
   | { kind: 'answer'; text: string; streaming: boolean }
-  | { kind: 'tool'; fn: string; body: string; done: boolean; is_error?: boolean }
+  | { kind: 'tool'; fn: string; body: string; done: boolean; is_error?: boolean; mcp?: string }
 
 /** 控制台右栏中的子代理。 */
 export interface SubAgent {
@@ -330,8 +346,11 @@ export type InteractionStatus = 'pending' | 'resolved' | 'cancelled'
 export type ChatBlock =
   /** done：推理已结束（block_stop 或流收尾）；seconds：实时流测得的思考秒数，历史消息没有 */
   | { kind: 'think'; text: string; done: boolean; seconds?: number }
-  | { kind: 'tool'; tag: CliTag; fn: string; body: string; done: boolean }
+  /** mcp：来自 MCP server 时为 server_key，fn 里的工具名已去掉 mcp__ 前缀。 */
+  | { kind: 'tool'; tag: CliTag; fn: string; body: string; done: boolean; mcp?: string }
   | { kind: 'answer'; text: string; streaming: boolean }
+  /** 本回合不可用的 MCP server（未授权、超时、连不上），放在这一轮回复的最上面。 */
+  | { kind: 'sources'; faults: ToolSourceFault[] }
   | {
       kind: 'approval'
       requestId: string
