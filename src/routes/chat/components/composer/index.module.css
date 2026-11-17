@@ -291,6 +291,7 @@
 .row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   min-height: 30px;
 }
@@ -302,8 +303,11 @@
 .right {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
   margin-left: auto;
+  max-width: 100%;
 }
 
 .icon-btn {

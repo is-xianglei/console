@@ -1,6 +1,6 @@
 import type { ApiResponse } from '../interfaces/common/api'
 
-/** 后端基址前缀。开发期由 vite.config.ts 的 /api 代理转发到 :8001;
+/** 后端基址前缀。开发期由 vite.config.ts 的 /api 代理转发到 :8000;
  *  生产期同源部署也走 /api。需要改基址时只动这里。 */
 const BASE = '/api'
 
@@ -32,6 +32,16 @@ type ConsoleRequestInit = RequestInit & RetryOptions
 
 const BASE_METHOD = 'GET'
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError'
+}
+
+/** fetch 原生网络失败通常是 TypeError，不能等外层包装成 ApiError 后才判断重试。 */
+function isRetryableNetworkError(error: unknown): boolean {
+  if (isAbortError(error)) return false
+  return (error instanceof ApiError && error.status === 0) || error instanceof TypeError
+}
+
 /**
  * 网络抖动临时重试:仅对 `when` 判定的错误重试一次(默认 status 0 网络错误)。
  * 401/403 等服务端响应不会进入 `when`(其 status 非 0),故自动不重试。
@@ -46,7 +56,7 @@ export async function withRetry<T>(
   } = {},
 ): Promise<T> {
   const retries = opts.retries ?? 1
-  const when = opts.when ?? ((error: unknown) => error instanceof ApiError && error.status === 0)
+  const when = opts.when ?? isRetryableNetworkError
   const delay = opts.delay ?? RETRY_DELAY
   let lastError: unknown
   for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -113,7 +123,7 @@ export async function request<T>(path: string, init?: ConsoleRequestInit): Promi
     resp = allowRetry
       ? await withRetry(() => fetchFn(), {
           retries: 1,
-          when: (error) => error instanceof ApiError && error.status === 0,
+          when: isRetryableNetworkError,
         })
       : await fetchFn()
   } catch (e) {
@@ -129,16 +139,37 @@ export async function request<T>(path: string, init?: ConsoleRequestInit): Promi
     throw new ApiError('响应不是合法 JSON', 'PARSE_ERROR', resp.status)
   }
 
-  if (!resp.ok || body.error) throw envelopeError(body, resp.status)
+  if (!resp.ok || body.error) throw errorFromBody(body, resp.status)
 
   return body.data as T
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+/** 统一解析后端 {data,error,request_id}，并兼容认证接口旧的顶层 message/detail/code。 */
+export function errorFromBody(body: unknown, status: number): ApiError {
+  if (isRecord(body) && isRecord(body.error)) return envelopeError(body, status)
+
+  const message = isRecord(body) ? body.message ?? body.detail : undefined
+  const code = isRecord(body) ? body.code : undefined
+  const details = isRecord(body) && isRecord(body.details) ? body.details : {}
+  return new ApiError(
+    typeof message === 'string' && message.trim() ? message : `HTTP ${status}`,
+    typeof code === 'string' && code ? code : 'HTTP_ERROR',
+    status,
+    details,
+  )
+}
+
 /** 把统一外壳的 error 转成 ApiError;后端运行时不返回 code,缺省记为 HTTP_ERROR。 */
-function envelopeError(body: Partial<ApiResponse<unknown>> | null, status: number): ApiError {
-  const code = body?.error?.code ?? 'HTTP_ERROR'
-  const msg = body?.error?.message ?? `HTTP ${status}`
-  return new ApiError(msg, code, status, body?.error?.details ?? {})
+function envelopeError(body: Record<string, unknown>, status: number): ApiError {
+  const error = isRecord(body.error) ? body.error : {}
+  const code = typeof error.code === 'string' && error.code ? error.code : 'HTTP_ERROR'
+  const msg = typeof error.message === 'string' && error.message ? error.message : `HTTP ${status}`
+  const details = isRecord(error.details) ? error.details : {}
+  return new ApiError(msg, code, status, details)
 }
 
 /**
@@ -162,7 +193,7 @@ export async function requestBlob(path: string, init?: ConsoleRequestInit): Prom
     resp = allowRetry
       ? await withRetry(() => fetchFn(), {
           retries: 1,
-          when: (error) => error instanceof ApiError && error.status === 0,
+          when: isRetryableNetworkError,
         })
       : await fetchFn()
   } catch (e) {
@@ -177,7 +208,7 @@ export async function requestBlob(path: string, init?: ConsoleRequestInit): Prom
   } catch {
     // 非 JSON 错误体:保留原始状态码。
   }
-  throw envelopeError(body, resp.status)
+  throw errorFromBody(body, resp.status)
 }
 
 /**
@@ -209,7 +240,7 @@ export async function authRequest<T>(path: string, init?: ConsoleRequestInit): P
     resp = allowRetry
       ? await withRetry(() => fetchFn(), {
           retries: 1,
-          when: (error) => error instanceof ApiError && error.status === 0,
+          when: isRetryableNetworkError,
         })
       : await fetchFn()
   } catch (e) {
@@ -226,15 +257,7 @@ export async function authRequest<T>(path: string, init?: ConsoleRequestInit): P
   }
 
   if (!resp.ok) {
-    let msg = `HTTP ${resp.status}`
-    let code = 'HTTP_ERROR'
-    if (parsed) {
-      const record = (body ?? {}) as Record<string, unknown>
-      const nextMsg = record.message ?? record.detail
-      if (typeof nextMsg === 'string' && nextMsg.trim()) msg = nextMsg
-      if (typeof record.code === 'string' && record.code) code = record.code
-    }
-    throw new ApiError(msg, code, resp.status)
+    throw errorFromBody(parsed ? body : null, resp.status)
   }
 
   return body

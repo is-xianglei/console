@@ -10,14 +10,22 @@ import type {
   UserQuestionRequestPayload,
 } from './model'
 
+import type { ChatModelSelection } from '../settings/models/model'
+
+/** 修改会话名称或聊天配置。 */
+export type UpdateSessionRequest = Partial<ChatModelSelection> & { title?: string }
+
 /** 发送会话消息请求。 */
-export interface SendMessageRequest {
+export interface SendMessageRequest extends Partial<ChatModelSelection> {
+  /** 已存在会话 ID；不传时由后端创建会话。 */
   session_id?: number | null
+  /** 新会话绑定的 Agent ID，与 workflow_id 互斥。 */
   agent_id?: number | null
   /** 编排方案 ID:仅开新会话时可传,与 agent_id 互斥 */
   orchestration_plan_id?: number | null
-  /** Workflow ID:仅新会话首发可传(会话落库后锁定),与 agent_id 互斥 */
+  /** 新会话绑定的 Workflow ID，与 agent_id 互斥。 */
   workflow_id?: number | null
+  /** 用户消息正文。 */
   content: string
 }
 
@@ -134,6 +142,21 @@ export interface RuntimeSuspensionResponse {
 export interface PendingInteractionResponse {
   suspension: RuntimeSuspensionResponse
   requests: InteractionRequestResponse[]
+}
+
+/** 会话当前最新轮次的执行快照。 */
+export interface ActiveTurnResponse {
+  turn_id: string
+  status: string
+  executing: boolean
+  last_event_offset: number
+}
+
+/** 取消轮次后的状态。 */
+export interface TurnCancelResponse {
+  turn_id: string
+  status: string
+  session_status: string
 }
 
 /** 控制台 SSE 生命周期回调。 */

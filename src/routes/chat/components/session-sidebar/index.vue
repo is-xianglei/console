@@ -65,6 +65,7 @@ const appGroups = computed(() => {
 const activeAppId = computed<SessionAppId | null>(() => state.activeAppId)
 const activeAppGroupId = computed(() => activeAppId.value && knownAppIds.has(activeAppId.value) ? activeAppId.value : activeAppId.value ? 'other' : null)
 const allSelected = computed(() => state.sessions.length > 0 && state.sessions.every((session) => selected.value.has(session.id)))
+const selectedReadOnly = computed(() => [...selected.value].some((id) => state.sessions.find((session) => session.id === id)?.readOnly))
 
 watch(activeAppGroupId, (id) => {
   if (!id) return
@@ -141,12 +142,13 @@ function toggleSelectAll() {
 }
 
 function requestDelete(ids: string[]) {
-  if (!ids.length) return
+  if (!ids.length || ids.some((id) => state.sessions.find((session) => session.id === id)?.readOnly)) return
   pendingDeleteIds.value = ids
   deleteConfirmOpen.value = true
 }
 
 function openShare(session: Session) {
+  if (session.readOnly) return
   sharingSession.value = session
   shareForm.visibility = session.visibility ?? 'private'
   shareForm.users = (session.sharedWith ?? []).join(', ')
@@ -209,19 +211,20 @@ function sessionMenuItems(session: Session): DropdownMenuItem[] {
     {
       label: '共享设置',
       icon: 'i-lucide-share-2',
-      disabled: !backendSession,
+      disabled: !backendSession || session.readOnly,
       onSelect: () => openShare(session),
     },
     {
       label: '归档会话',
       icon: 'i-lucide-archive',
-      disabled: !backendSession,
+      disabled: !backendSession || session.readOnly,
       onSelect: () => { void confirmArchive(session) },
     },
   ]
 }
 
 async function startRename(session: Session) {
+  if (session.readOnly) return
   editingId.value = session.id
   editingText.value = session.title
   await nextTick()
@@ -281,7 +284,7 @@ async function confirmDelete() {
       <div v-if="selectMode" :class="$style['batch-bar']">
         <UButton color="neutral" variant="ghost" @click="toggleSelectAll"><i :class="`icon icon-${allSelected ? 'square-check-big' : 'square'}`"></i>全选</UButton>
         <span class="mono">{{ selected.size }}</span>
-        <UButton color="error" variant="ghost" square :disabled="!selected.size" aria-label="删除选中的会话" @click="requestDelete([...selected])"><i class="icon icon-trash-2"></i></UButton>
+        <UButton color="error" variant="ghost" square :disabled="!selected.size || selectedReadOnly" aria-label="删除选中的会话" @click="requestDelete([...selected])"><i class="icon icon-trash-2"></i></UButton>
       </div>
 
       <section :class="$style['nav-section']">
@@ -364,8 +367,8 @@ async function confirmDelete() {
                 <UDropdownMenu :items="sessionMenuItems(session)">
                   <UButton color="neutral" variant="ghost" square title="更多操作" @click.stop><i class="icon icon-ellipsis"></i></UButton>
                 </UDropdownMenu>
-                <UButton color="neutral" variant="ghost" square title="重命名" @click.stop="startRename(session)"><i class="icon icon-pencil"></i></UButton>
-                <UButton color="error" variant="ghost" square title="删除" @click.stop="requestDelete([session.id])"><i class="icon icon-trash-2"></i></UButton>
+                <UButton color="neutral" variant="ghost" square title="重命名" :disabled="session.readOnly" @click.stop="startRename(session)"><i class="icon icon-pencil"></i></UButton>
+                <UButton color="error" variant="ghost" square title="删除" :disabled="session.readOnly" @click.stop="requestDelete([session.id])"><i class="icon icon-trash-2"></i></UButton>
               </div>
             </div>
           </div>
@@ -418,8 +421,8 @@ async function confirmDelete() {
             <UDropdownMenu :items="sessionMenuItems(session)">
               <UButton color="neutral" variant="ghost" square title="更多操作" @click.stop><i class="icon icon-ellipsis"></i></UButton>
             </UDropdownMenu>
-            <UButton color="neutral" variant="ghost" square title="重命名" @click.stop="startRename(session)"><i class="icon icon-pencil"></i></UButton>
-            <UButton color="error" variant="ghost" square title="删除" @click.stop="requestDelete([session.id])"><i class="icon icon-trash-2"></i></UButton>
+            <UButton color="neutral" variant="ghost" square title="重命名" :disabled="session.readOnly" @click.stop="startRename(session)"><i class="icon icon-pencil"></i></UButton>
+            <UButton color="error" variant="ghost" square title="删除" :disabled="session.readOnly" @click.stop="requestDelete([session.id])"><i class="icon icon-trash-2"></i></UButton>
           </div>
         </div>
       </section>

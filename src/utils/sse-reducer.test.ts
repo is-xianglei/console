@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ChatMessage, SseEvent } from '@/interfaces/console/model'
+import { nextTick, reactive, watchEffect } from 'vue'
+import type { ChatMessage, SseEvent, SubAgent } from '@/interfaces/console/model'
 import { createSseReducer, fmtToolCall } from './sse-reducer'
 
 let sequence = 0
@@ -120,6 +121,124 @@ describe('createSseReducer', () => {
       },
       { kind: 'tool', tag: 'ERROR', fn: 'MODEL_TIMEOUT', body: '模型超时', done: true },
     ])
+  })
+
+  it('按 tool.id 将同轮主 Agent 的多个工具结果写回各自卡片', () => {
+    const ai: ChatMessage = { id: 'ai-tools', role: 'ai', time: '10:04', blocks: [] }
+    const reducer = createSseReducer({ ai, agents: [], selectAgent: vi.fn() })
+
+    reducer.handle(createEvent('tool_use', {
+      tool: { id: 'tool-a', name: 'Search', input: { query: 'a' } },
+    }))
+    reducer.handle(createEvent('tool_use', {
+      tool: { id: 'tool-b', name: 'Search', input: { query: 'b' } },
+    }))
+    reducer.handle(createEvent('tool_result', {
+      tool: { id: 'tool-a', name: 'Search', output: '结果 A', is_error: false },
+    }))
+    reducer.handle(createEvent('tool_result', {
+      tool: { id: 'tool-b', name: 'Search', output: '结果 B', is_error: true },
+    }))
+
+    expect(ai.blocks).toEqual([
+      { kind: 'tool', tag: 'RESULT', fn: 'Search(query="a")', body: '结果 A', done: true },
+      { kind: 'tool', tag: 'ERROR', fn: 'Search(query="b")', body: '结果 B', done: true },
+    ])
+  })
+
+  it.each([
+    ['orchestrator', false], ['orchestrator', true],
+    ['subagent', false], ['subagent', true],
+  ] as const)('%s 的工具结果 is_error=%s 会触发响应式视图更新', async (role, is_error) => {
+    const ai = reactive<ChatMessage>({ id: 'ai-reactive-tools', role: 'ai', time: '10:04', blocks: [] })
+    const agents = reactive<Parameters<typeof createSseReducer>[0]['agents']>([])
+    const reducer = createSseReducer({ ai, agents, selectAgent: vi.fn() })
+    const actor = role === 'orchestrator' ? undefined : { role, name: 'research', run_id: 'run-reactive' }
+    const observed = vi.fn()
+    const stop = watchEffect(() => {
+      const items = role === 'orchestrator' ? ai.blocks : agents[0]?.stream
+      observed(items?.filter((item) => item.kind === 'tool').map((item) => ({
+        body: item.body, done: item.done,
+        tag: 'tag' in item ? item.tag : item.is_error ? 'ERROR' : item.done ? 'RESULT' : 'TOOL',
+      })))
+    })
+
+    try {
+      reducer.handle(createEvent('tool_use', { actor, tool: { id: 'tool-reactive', name: 'Search' } }))
+      // 先让视图渲染运行态，避免数组 push 排队的更新掩盖 tool_result 的响应式缺口。
+      await nextTick()
+      expect(observed).toHaveBeenLastCalledWith([{ body: '', done: false, tag: 'TOOL' }])
+      const renders = observed.mock.calls.length
+
+      reducer.handle(createEvent('tool_result', {
+        actor, tool: { id: 'tool-reactive', name: 'Search', output: '真实工具结果', is_error },
+      }))
+      await nextTick()
+
+      expect(observed).toHaveBeenCalledTimes(renders + 1)
+      expect(observed).toHaveBeenLastCalledWith([{
+        body: '真实工具结果', done: true, tag: is_error ? 'ERROR' : 'RESULT',
+      }])
+    } finally {
+      stop()
+    }
+  })
+
+  it('按 actor + tool.id 区分主 Agent 与子 Agent 的同名工具调用', () => {
+    const ai: ChatMessage = { id: 'ai-tool-scopes', role: 'ai', time: '10:04', blocks: [] }
+    const agents: Parameters<typeof createSseReducer>[0]['agents'] = []
+    const reducer = createSseReducer({ ai, agents, selectAgent: vi.fn() })
+    const actor = { role: 'subagent' as const, name: 'research', run_id: 'run-tools' }
+
+    reducer.handle(createEvent('tool_use', {
+      tool: { id: 'shared-id', name: 'Search', input: { query: '主 Agent' } },
+    }))
+    reducer.handle(createEvent('turn_start', { actor }))
+    reducer.handle(createEvent('tool_use', {
+      actor,
+      tool: { id: 'shared-id', name: 'Search', input: { query: '子 Agent' } },
+    }))
+    reducer.handle(createEvent('tool_result', {
+      actor,
+      tool: { id: 'shared-id', name: 'Search', output: '子结果', is_error: false },
+    }))
+    // 子 Agent 的重复结果不能因精确卡已完成而回退写入主 Agent 的同 id 卡片。
+    reducer.handle(createEvent('tool_result', {
+      actor,
+      tool: { id: 'shared-id', name: 'Search', output: '重复子结果', is_error: false },
+    }))
+    reducer.handle(createEvent('tool_result', {
+      tool: { id: 'shared-id', name: 'Search', output: '主结果', is_error: false },
+    }))
+
+    expect(ai.blocks).toEqual([
+      { kind: 'tool', tag: 'RESULT', fn: 'Search(query="主 Agent")', body: '主结果', done: true },
+    ])
+    expect(agents[0].stream).toEqual([
+      { kind: 'tool', fn: 'Search(query="子 Agent")', body: '子结果', done: true, is_error: false },
+    ])
+  })
+
+  it.each([
+    ['subagent', true], ['subagent', false], ['subagent', undefined],
+    ['teammate', true], ['teammate', false], ['teammate', undefined],
+  ] as const)('%s 工具结果保留 is_error=%s，兼容未带标记的旧事件', (role, is_error) => {
+    const agents: Parameters<typeof createSseReducer>[0]['agents'] = []
+    const reducer = createSseReducer({
+      ai: { id: 'ai-tool-errors', role: 'ai', time: '10:04', blocks: [] },
+      agents, selectAgent: vi.fn(),
+    })
+    const actor = { role, name: 'research', run_id: 'run-tool-errors' }
+    reducer.handle(createEvent('tool_use', { actor, tool: { id: 'tool-1', name: 'Search' } }))
+    const flag = typeof is_error === 'boolean' ? { is_error } : {}
+    // 正文出现 ERROR 不代表调用失败，状态只能来自协议标记。
+    reducer.handle(createEvent('tool_result', {
+      actor, tool: { id: 'tool-1', name: 'Search', output: '找到 ERROR 日志', ...flag },
+    }))
+
+    expect(agents[0]?.stream).toEqual([{
+      kind: 'tool', fn: 'Search()', body: '找到 ERROR 日志', done: true, ...flag,
+    }])
   })
 
   describe('推理块的结束状态与思考秒数', () => {
@@ -382,7 +501,7 @@ describe('createSseReducer', () => {
       expect(agents[0].stream).toEqual([
         { kind: 'think', text: '查历史工单', done: true, seconds: 3 },
         { kind: 'answer', text: '找到 3 条', streaming: false },
-        { kind: 'tool', fn: 'TOOL_FAILED', body: '检索失败', done: true },
+        { kind: 'tool', fn: 'TOOL_FAILED', body: '检索失败', done: true, is_error: true },
       ])
     })
 

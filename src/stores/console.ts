@@ -1,19 +1,26 @@
+import { readStandardEffort, rememberStandardEffort } from '@/utils/chat-models'
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
 import { getWorkbenchApp } from '../constants/app-registry'
 import { SESSIONS } from '../constants/seed'
 import {
   archiveSession,
+  cancelTurn,
   cancelInteraction,
   deleteSession,
   deleteSessionList,
+  getActiveTurn,
   getPendingInteraction,
   getSessionList,
   getSessionMessageList,
+  getSessionTasks,
   respondInteraction,
   sendMessage,
   shareSession,
+  subscribeTurn,
+  SseOpenError,
   updateSession,
+  updateSessionChatSelection,
 } from '../http/console'
 import type {
   InteractionRequestResponse,
@@ -43,9 +50,13 @@ import type {
   WorkflowProgressState,
 } from '../interfaces/console/model'
 import { createSseReducer, fmtToolCall } from '@/utils/sse-reducer'
+import type { ChatModelSelection, ThinkingEffort } from '../interfaces/settings/models/model'
+import { getSessionSubAgentRuns } from '../http/session-runtime'
+import { mapSubAgentRuns, mergeSubAgentRuns } from '../utils/session-runtime'
 import { usePermissionsStore } from './permissions'
 import { useSkillsStore } from './skills'
 import { useMemoriesStore } from './memories'
+import { useAuthStore } from './auth'
 
 // ===== 工具函数 =====
 const now = () => new Date().toLocaleTimeString('zh-CN', { hour12: false })
@@ -70,7 +81,7 @@ function normalizeVisibility(value: string): SessionVisibility {
 }
 
 /** 后端 SessionResponse → 前端 Session 视图模型 */
-function mapSession(s: SessionResponse): Session {
+function mapSession(s: SessionResponse, currentUserId?: number | null): Session {
   const metadata = s.metadata ?? {}
   const metadataAppId = metadata.app_id ?? metadata.appId
   const appId = typeof metadataAppId === 'string'
@@ -84,10 +95,17 @@ function mapSession(s: SessionResponse): Session {
     time: formatTime(s.last_active_at),
     count: 0,
     appId,
+    userId: s.user_id ?? null,
+    readOnly: s.user_id != null && currentUserId != null && s.user_id !== currentUserId,
     agentId: s.agent_id ?? null,
     orchestrationPlanId: s.orchestration_plan_id ?? null,
     workflowId: s.workflow_id ?? null,
     modelName: s.model_name ?? null,
+    modelProviderId: s.model_provider_id ?? null,
+    modelProviderOverride: metadata.model_provider_override === true,
+    modeSlug: s.mode_slug ?? 'standard',
+    thinkingEffort: s.thinking_effort ?? 'fast',
+    standardThinkingEffort: s.mode_slug === 'turbo' ? 'fast' : s.thinking_effort ?? 'fast',
     status: s.status,
     visibility: normalizeVisibility(s.visibility),
     sharedWith: [...(s.shared_with ?? [])],
@@ -119,10 +137,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
+/**
+ * 单个历史内容块归一化为前端的 MsgContentBlock(type 判别)。兼容三种落库形状:
+ * - 后端中立块协议(AgentOS llm/types.py):判别键是 kind 不是 type,思考正文在 text 里
+ * - tool 角色消息(ToolResultMessage.to_content_dict):扁平 dict,无判别键,结果在 output 里
+ * - 旧的 provider wire 形状:type 判别,思考正文在 thinking 里
+ */
 function normalizeBlock(value: unknown): MsgContentBlock | null {
   if (typeof value === 'string') return value ? { type: 'text', text: value } : null
-  if (!isRecord(value) || typeof value.type !== 'string') return null
+  if (!isRecord(value)) return null
 
+  if (typeof value.tool_use_id === 'string' && 'output' in value && value.kind === undefined && value.type === undefined) {
+    const block: MsgContentBlock = { type: 'tool_result', tool_use_id: value.tool_use_id, content: value.output }
+    if (typeof value.is_error === 'boolean') block.is_error = value.is_error
+    return block
+  }
+
+  if (typeof value.kind === 'string') {
+    const block: MsgContentBlock = { type: value.kind }
+    if (typeof value.text === 'string') {
+      if (value.kind === 'thinking') block.thinking = value.text
+      else block.text = value.text
+    }
+    if (typeof value.id === 'string') block.id = value.id
+    if (typeof value.name === 'string') block.name = value.name
+    if (isRecord(value.input)) block.input = value.input
+    return block
+  }
+
+  if (typeof value.type !== 'string') return null
   const block: MsgContentBlock = { type: value.type }
   if (typeof value.thinking === 'string') block.thinking = value.thinking
   if (typeof value.text === 'string') block.text = value.text
@@ -197,7 +240,7 @@ function mapMessages(list: SessionMessageResponse[]): ChatMessage[] {
 
     if (m.role === 'user') {
       const text = messageText(m.content)
-      if (text) out.push({ id: 'm-' + m.id, role: 'user', time, text })
+      if (text) out.push({ id: 'm-' + m.id, role: 'user', time, text, ...(m.turn_id ? { turnId: m.turn_id } : {}) })
       continue
     }
 
@@ -231,7 +274,7 @@ function mapMessages(list: SessionMessageResponse[]): ChatMessage[] {
       }
     }
 
-    if (blocks.length) out.push({ id: 'm-' + m.id, role: 'ai', time, blocks })
+    if (blocks.length) out.push({ id: 'm-' + m.id, role: 'ai', time, blocks, ...(m.turn_id ? { turnId: m.turn_id } : {}) })
   }
 
   // 收尾:历史中被中断、始终没等到 tool_result 的工具卡,置为完成态,避免前端一直转圈
@@ -298,12 +341,19 @@ interface ConsoleState {
   newSessionPlanId: number | null
   /** 新会话草稿选中的 Workflow ID;与 newSessionAgentId/newSessionPlanId 互斥 */
   newSessionWorkflowId: number | null
+  chatSelection: ChatModelSelection
+  chatSelectionSaving: boolean
+  standardDraftEffort: ThinkingEffort
   tasks: Task[]
   /** 编排执行图节点状态,按去掉 #N 轮次的裸路径归并;表中无该键即 pending */
   graphNodes: Record<string, GraphNodeState>
   /** Workflow 进度图状态:按 agent_id 归并的成员 + 路由/汇总阶段 */
   workflowProgress: WorkflowProgressState
   busy: boolean
+  /** 当前跟随的后端轮次；断流恢复和停止执行都以它为准。 */
+  activeTurnId: string | null
+  activeTurnSessionId: string | null
+  recovering: boolean
   theme: 'dark' | 'light'
 }
 
@@ -315,11 +365,19 @@ interface ConsoleState {
  * 渲染层(组件)无需改动。
  */
 export const useConsoleStore = defineStore('console', () => {
+  const authStore = useAuthStore()
   const permissionsStore = usePermissionsStore()
   const skillsStore = useSkillsStore()
   const memoriesStore = useMemoriesStore()
   let activeStreamAbort: (() => void) | null = null
   let dataGeneration = 0
+  let streamGeneration = 0
+  let activeStreamSessionId: string | null = null
+  let activeStreamTurnId: string | null = null
+  let activeStreamTerminal = false
+  let restoredAgentSessionId: string | null = null
+  let restoredAgents: SubAgent[] = []
+  let activeResolution: { requestId: string; syntheticMessageId: string } | null = null
 
   const state = reactive<ConsoleState>({
     leftCollapsed: false,
@@ -338,10 +396,16 @@ export const useConsoleStore = defineStore('console', () => {
     newSessionAgentId: null,
     newSessionPlanId: null,
     newSessionWorkflowId: null,
+    chatSelection: { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast' },
+    chatSelectionSaving: false,
+    standardDraftEffort: 'fast',
     tasks: [],
     graphNodes: {},
     workflowProgress: emptyWorkflowProgress(),
     busy: false,
+    activeTurnId: null,
+    activeTurnSessionId: null,
+    recovering: false,
     theme: 'dark',
   })
 
@@ -353,6 +417,122 @@ export const useConsoleStore = defineStore('console', () => {
     state.rightCollapsed = !state.rightCollapsed
   }
 
+  /** 当前会话是否允许写入；共享读取者只能浏览历史和跟随执行流。 */
+  function canWriteSession(id = state.activeSessionId): boolean {
+    const session = state.sessions.find((item) => item.id === id)
+    return !session?.readOnly
+  }
+
+  function clearActiveTurn() {
+    activeStreamSessionId = null
+    activeStreamTurnId = null
+    activeStreamTerminal = false
+    state.activeTurnId = null
+    state.activeTurnSessionId = null
+    state.recovering = false
+  }
+
+  /** 只切断本页 SSE；后端轮次继续执行，回到会话时由 active-turn 重新订阅。 */
+  function invalidateStream() {
+    streamGeneration += 1
+    activeStreamAbort?.()
+    activeStreamAbort = null
+    activeResolution = null
+    clearActiveTurn()
+    state.busy = false
+  }
+
+  function bindActiveTurn(sessionId: string, turnId: string) {
+    activeStreamSessionId = sessionId
+    activeStreamTurnId = turnId
+    state.activeTurnSessionId = sessionId
+    state.activeTurnId = turnId
+  }
+
+  function snapshotRecord(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : null
+  }
+
+  /** 把轮次快照折叠成现有 reducer 能理解的事件，避免刷新后丢失已输出内容。 */
+  function hydrateRunSnapshot(
+    snapshot: Record<string, unknown>,
+    reducer: ReturnType<typeof createSseReducer>,
+    ai: ChatMessage,
+    sessionId: number,
+    turnId: string,
+  ) {
+    // 完整快照包含本轮所有 segment，替换同轮助手历史，保留用户输入和其它轮次。
+    // 截断快照缺少更早内容，必须保留数据库中的历史作为补充。
+    if (snapshot.truncated !== true) {
+      state.messages = state.messages.filter((message) =>
+        message.id === ai.id || message.role !== 'ai' || message.turnId !== turnId,
+      )
+    }
+    ai.turnId = turnId
+    ai.blocks = []
+    const selectedAgentId = state.selectedAgentId
+    const actorKeys = new Set((Array.isArray(snapshot.actors) ? snapshot.actors : []).flatMap((raw) => {
+      const actor = snapshotRecord(snapshotRecord(raw)?.actor)
+      return actor?.role === 'subagent' && typeof actor.run_id === 'string' ? [actor.run_id] : []
+    }))
+    // 快照只覆盖当前轮次，先保留不属于本轮的持久化运行，再重建本轮实时事件。
+    const previousRuns = restoredAgentSessionId === String(sessionId)
+      ? restoredAgents.filter((agent) => !actorKeys.has(agent.id))
+      : []
+    state.agents.splice(0, state.agents.length, ...previousRuns)
+    state.selectedAgentId = null
+    // 快照从未收到 task_snapshot 时 tasks 为 null，保留 REST 已恢复的会话任务。
+    state.workflowProgress = emptyWorkflowProgress()
+
+    const session = snapshotRecord(snapshot.session)
+    if (session) {
+      reducer.handle({
+        type: 'session_ready', sequence: Number(snapshot.last_offset ?? 0), session_id: sessionId,
+        turn_id: turnId,
+        data: { session_id: sessionId, title: typeof session.title === 'string' ? session.title : undefined },
+      })
+    }
+    if (Array.isArray(snapshot.tasks)) {
+      reducer.handle({
+        type: 'task_snapshot', sequence: Number(snapshot.last_offset ?? 0), session_id: sessionId,
+        turn_id: turnId, data: { session_id: sessionId, tasks: snapshot.tasks as TaskResponse[] },
+      })
+    }
+    if (Array.isArray(snapshot.workflow)) {
+      for (const item of snapshot.workflow) {
+        const progress = snapshotRecord(item)
+        if (!progress) continue
+        reducer.handle({
+          type: 'workflow_progress',
+          sequence: Number(snapshot.last_offset ?? 0),
+          session_id: sessionId,
+          turn_id: turnId,
+          progress: progress as unknown as SseWorkflowProgress,
+        })
+      }
+    }
+    if (selectedAgentId && state.agents.some((agent) => agent.id === selectedAgentId)) {
+      state.selectedAgentId = selectedAgentId
+    } else if (!state.selectedAgentId) {
+      state.selectedAgentId = state.agents[0]?.id ?? null
+    }
+    const interaction = snapshotRecord(snapshot.interaction)
+    if (interaction) {
+      const requestId = interaction.request_id
+      const existingInteraction = state.messages.some((message) =>
+        message.blocks?.some((block) => block.kind === 'interaction' && block.interaction.request_id === requestId),
+      )
+      // REST 待处理卡和快照引用同一请求，只保留一个可操作入口。
+      if (existingInteraction) return
+      reducer.handle({
+        type: 'interaction_request', sequence: Number(snapshot.last_offset ?? 0), session_id: sessionId, turn_id: turnId,
+        interaction: interaction as unknown as SseInteraction,
+      })
+    }
+  }
+
   // ===== 后端接入:会话列表 =====
   /** 拉取真实会话列表;可优先恢复 URL 指定会话,成功返回 true。 */
   async function loadSessions(preferredSessionId?: string): Promise<boolean> {
@@ -362,11 +542,20 @@ export const useConsoleStore = defineStore('console', () => {
       const list = await getSessionList()
       if (generation !== dataGeneration) return false
 
-      state.sessions = list.map(mapSession)
+      const sessions = list.map((item) => {
+        const session = mapSession(item, authStore.state.user?.id ?? null)
+        if (session.modeSlug === 'turbo') {
+          session.standardThinkingEffort = readStandardEffort(authStore.state.user?.id ?? null, authStore.currentWorkspaceId, session.id)
+        }
+        return session
+      })
       const preferred = preferredSessionId
-        ? state.sessions.find((session) => session.id === preferredSessionId)?.id
+        ? sessions.find((session) => session.id === preferredSessionId)?.id
         : undefined
-      state.activeSessionId = preferred ?? state.sessions[0]?.id ?? ''
+      const nextActiveSessionId = preferred ?? sessions[0]?.id ?? ''
+      if (state.activeSessionId && nextActiveSessionId !== state.activeSessionId) invalidateStream()
+      state.sessions = sessions
+      state.activeSessionId = nextActiveSessionId
       const activeSession = state.sessions.find((session) => session.id === state.activeSessionId)
       state.activeAppId = activeSession?.appId ?? null
       state.messages = []
@@ -421,15 +610,19 @@ export const useConsoleStore = defineStore('console', () => {
    */
   async function loadMessages(id: string) {
     const generation = dataGeneration
+    const streamId = streamGeneration
     if (!isBackendSession(id)) {
       if (id === state.activeSessionId) state.messages = []
       return
     }
-    const [historyResult, pendingResult] = await Promise.allSettled([
+    const [historyResult, pendingResult, tasksResult, runsResult] = await Promise.allSettled([
       getSessionMessageList(id),
       getPendingInteraction(id),
+      getSessionTasks(id),
+      getSessionSubAgentRuns(id),
     ])
-    if (generation !== dataGeneration || id !== state.activeSessionId) return
+    // 旧轮次的刷新不能覆盖新发送的乐观消息，也不能回填到已切换的会话。
+    if (generation !== dataGeneration || streamId !== streamGeneration || id !== state.activeSessionId) return
 
     if (historyResult.status === 'rejected') {
       state.messages = []
@@ -438,12 +631,20 @@ export const useConsoleStore = defineStore('console', () => {
     }
 
     state.messages = mapMessages(historyResult.value)
-    if (pendingResult.status === 'rejected') {
-      state.health = 'degraded'
-      return
+    if (tasksResult.status === 'fulfilled') {
+      state.tasks = tasksResult.value.filter((task) => task.status !== 'deleted').map(mapTask)
     }
 
-    const pending = pendingResult.value
+    if (runsResult.status === 'fulfilled') {
+      restoredAgentSessionId = id
+      restoredAgents = mapSubAgentRuns(runsResult.value, Number(id))
+      state.agents = mergeSubAgentRuns(state.agents, restoredAgents)
+      if (!state.agents.some((agent) => agent.id === state.selectedAgentId)) {
+        state.selectedAgentId = state.agents[0]?.id ?? null
+      }
+    }
+
+    const pending = pendingResult.status === 'fulfilled' ? pendingResult.value : null
     const pendingRequests = pending?.requests.filter((request) => request.status === 'pending') ?? []
     if (pendingRequests.length) {
       state.messages.push({
@@ -457,7 +658,10 @@ export const useConsoleStore = defineStore('console', () => {
         })),
       })
     }
-    state.health = 'ok'
+    state.health = pendingResult.status === 'rejected' || tasksResult.status === 'rejected' || runsResult.status === 'rejected'
+      ? 'degraded'
+      : 'ok'
+    if (options.recover !== false) void recoverActiveTurn(id)
   }
 
   /**
@@ -466,9 +670,13 @@ export const useConsoleStore = defineStore('console', () => {
    */
   function resetConsole() {
     dataGeneration += 1
-    activeStreamAbort?.()
-    activeStreamAbort = null
+    invalidateStream()
+    restoredAgentSessionId = null
+    restoredAgents = []
 
+    state.chatSelection = { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast' }
+    state.chatSelectionSaving = false
+    state.standardDraftEffort = 'fast'
     state.health = 'unknown'
     state.sessionsLoading = false
     state.sessions = []
@@ -487,6 +695,9 @@ export const useConsoleStore = defineStore('console', () => {
     state.graphNodes = {}
     state.workflowProgress = emptyWorkflowProgress()
     state.busy = false
+    state.activeTurnId = null
+    state.activeTurnSessionId = null
+    state.recovering = false
     permissionsStore.resetPermissions()
     skillsStore.resetSkills()
     memoriesStore.resetMemories()
@@ -506,6 +717,8 @@ export const useConsoleStore = defineStore('console', () => {
 
   // ===== 左侧:会话 =====
   function selectSession(id: string) {
+    if (id === state.activeSessionId) return
+    invalidateStream()
     state.activeSessionId = id
     const session = state.sessions.find((item) => item.id === id)
     state.activeAppId = session?.appId ?? null
@@ -520,6 +733,7 @@ export const useConsoleStore = defineStore('console', () => {
     loadMessages(id)
   }
   function newSession(appId?: Session['appId']) {
+    invalidateStream()
     const s: Session = {
       id: uid('sess'),
       title: '新会话 ' + now().slice(0, 5),
@@ -527,6 +741,11 @@ export const useConsoleStore = defineStore('console', () => {
       count: 0,
       appId,
     }
+    s.modelProviderId = state.chatSelection.model_provider_id
+    s.modelProviderOverride = state.chatSelection.model_provider_id !== null
+    s.modeSlug = state.chatSelection.mode_slug
+    s.thinkingEffort = state.chatSelection.thinking_effort
+    s.standardThinkingEffort = state.standardDraftEffort
     state.sessions.unshift(s)
     state.activeSessionId = s.id
     state.activeAppId = appId ?? null
@@ -597,6 +816,8 @@ export const useConsoleStore = defineStore('console', () => {
 
   /** 从左侧应用节点进入运行工作台；优先恢复该应用最近一条会话。 */
   function openApp(appId: string) {
+    if (appId === state.activeAppId) return
+    invalidateStream()
     state.activeAppId = appId
     // 打开应用是显式动作,即使会话绑了编排方案也切到分屏
     state.workbenchMode = 'split'
@@ -627,12 +848,64 @@ export const useConsoleStore = defineStore('console', () => {
     state.workbenchMode = getWorkbenchApp(state.activeAppId) ? mode : 'chat'
   }
 
+  /** 当前配置随会话恢复，未建会话时使用草稿配置。 */
+  function activeChatSelection(): ChatModelSelection {
+    const session = state.sessions.find((item) => item.id === state.activeSessionId)
+    const selection = session ? {
+      model_provider_id: session.modelProviderOverride === true ? session.modelProviderId ?? null : null,
+      mode_slug: session.modeSlug ?? 'standard',
+      thinking_effort: session.thinkingEffort ?? 'fast',
+    } : { ...state.chatSelection }
+    if (selection.mode_slug === 'turbo') selection.thinking_effort = 'fast'
+    return selection
+  }
+
+  function standardThinkingEffort(): ThinkingEffort {
+    const session = state.sessions.find((item) => item.id === state.activeSessionId)
+    return session?.standardThinkingEffort ?? state.standardDraftEffort
+  }
+
+  /** 持久会话保存成功后才更新界面，保存期间禁止发送旧配置。 */
+  async function setChatSelection(selection: ChatModelSelection): Promise<boolean> {
+    if (state.busy || state.chatSelectionSaving || !canWriteSession()) return false
+    const id = state.activeSessionId
+    const generation = dataGeneration
+    const next = { ...selection, thinking_effort: selection.mode_slug === 'turbo' ? 'fast' as const : selection.thinking_effort }
+    const previous = activeChatSelection()
+    const remembered = next.mode_slug === 'standard' ? next.thinking_effort
+      : previous.mode_slug === 'standard' ? previous.thinking_effort : standardThinkingEffort()
+    state.chatSelectionSaving = true
+    try {
+      const saved = isBackendSession(id) ? await updateSessionChatSelection(id, next) : null
+      if (generation !== dataGeneration) return false
+      const target = state.sessions.find((item) => item.id === id)
+      let effectiveRemembered = remembered
+      if (target) {
+        // 后端返回实际解析模型，显式覆盖仍以本次请求语义为准，不能把角色模型变成选择。
+        target.modelProviderId = saved?.model_provider_id ?? next.model_provider_id
+        target.modelProviderOverride = saved?.metadata?.model_provider_override === undefined
+          ? next.model_provider_id !== null : saved.metadata.model_provider_override === true
+        target.modeSlug = saved?.mode_slug ?? next.mode_slug
+        target.thinkingEffort = saved?.thinking_effort ?? next.thinking_effort
+        target.standardThinkingEffort = target.modeSlug === 'standard' ? target.thinkingEffort : remembered
+        effectiveRemembered = target.standardThinkingEffort
+      } else if (id === state.activeSessionId) {
+        state.chatSelection = next
+        state.standardDraftEffort = remembered
+      }
+      rememberStandardEffort(authStore.state.user?.id ?? null, authStore.currentWorkspaceId, id, effectiveRemembered)
+      return true
+    } finally {
+      if (generation === dataGeneration) state.chatSelectionSaving = false
+    }
+  }
+
   /** 重命名会话:后端会话(数字 id)同步 PATCH,本地占位会话仅改内存。
    *  关键:从 state.sessions 取回 reactive 代理再改 title,避免 Proxy 陷阱。 */
   async function renameSessionAction(id: string, title: string) {
     const next = title.trim()
     const target = state.sessions.find((s) => s.id === id)
-    if (!next || !target || target.title === next) return
+    if (!next || !target || target.title === next || !canWriteSession(id)) return
     target.title = next
     if (isBackendSession(id)) {
       try {
@@ -646,7 +919,7 @@ export const useConsoleStore = defineStore('console', () => {
   /** 批量删除会话:后端会话批量物理删除,本地会话仅从内存移除。
    *  删除后若命中当前会话,回退到剩余第一条或清空对话。 */
   async function deleteSessionsAction(ids: string[]) {
-    if (!ids.length) return
+    if (!ids.length || ids.some((id) => !canWriteSession(id))) return
     const generation = dataGeneration
     const backendIds = ids.filter((id) => isBackendSession(id)).map(Number)
     if (backendIds.length) {
@@ -682,7 +955,7 @@ export const useConsoleStore = defineStore('console', () => {
 
   /** 归档后端会话并从当前列表移除。 */
   async function archiveSessionAction(id: string): Promise<boolean> {
-    if (!isBackendSession(id)) return false
+    if (!isBackendSession(id) || !canWriteSession(id)) return false
     try {
       await archiveSession(id)
       await loadSessions()
@@ -694,7 +967,7 @@ export const useConsoleStore = defineStore('console', () => {
 
   /** 覆盖后端会话共享范围，并同步本地可见性。 */
   async function shareSessionAction(id: string, payload: ShareSessionRequest): Promise<boolean> {
-    if (!isBackendSession(id)) return false
+    if (!isBackendSession(id) || !canWriteSession(id)) return false
     const generation = dataGeneration
     const expectedSessionId = Number(id)
     try {
@@ -811,6 +1084,8 @@ export const useConsoleStore = defineStore('console', () => {
     configuredPlanId?: number,
     configuredWorkflowId?: number,
   ) {
+    const chatSelection = activeChatSelection()
+    const standardEffort = standardThinkingEffort()
     return createSseReducer({
       ai,
       agents: state.agents,
@@ -839,6 +1114,11 @@ export const useConsoleStore = defineStore('console', () => {
               agentId: configuredAgentId ?? null,
               orchestrationPlanId: configuredPlanId ?? null,
               workflowId: configuredWorkflowId ?? null,
+              modelProviderId: chatSelection.model_provider_id,
+              modelProviderOverride: chatSelection.model_provider_id !== null,
+              modeSlug: chatSelection.mode_slug,
+              thinkingEffort: chatSelection.thinking_effort,
+              standardThinkingEffort: standardEffort,
             })
           }
           state.activeSessionId = idStr
@@ -846,6 +1126,7 @@ export const useConsoleStore = defineStore('console', () => {
         // 会话已落库,绑定关系改由会话自身承载;草稿字段必须清空,否则下一个新会话会继承它
         const promoted = state.sessions.find((s) => s.id === idStr)
         if (promoted) {
+          rememberStandardEffort(authStore.state.user?.id ?? null, authStore.currentWorkspaceId, idStr, promoted.standardThinkingEffort ?? standardEffort)
           if (configuredAgentId != null) promoted.agentId = configuredAgentId
           if (configuredPlanId != null) promoted.orchestrationPlanId = configuredPlanId
           if (configuredWorkflowId != null) promoted.workflowId = configuredWorkflowId
@@ -869,39 +1150,245 @@ export const useConsoleStore = defineStore('console', () => {
     })
   }
 
+  type StreamOptions = {
+    sessionId?: string
+    turnId?: string
+    streamId?: number
+    recoveryAttempt?: number
+    completedSnapshot?: boolean
+  }
+
+  function removeSyntheticMessage(id: string) {
+    const index = state.messages.findIndex((message) => message.id === id)
+    if (index >= 0 && state.messages[index]?.role === 'ai' && !(state.messages[index]?.blocks?.length)) {
+      state.messages.splice(index, 1)
+    }
+  }
+
+  function restorePendingResolution() {
+    const resolution = activeResolution
+    if (!resolution) return
+    for (const message of state.messages) {
+      for (const block of message.blocks ?? []) {
+        if (block.kind === 'interaction' && block.interaction.request_id === resolution.requestId) {
+          block.status = 'pending'
+          delete block.responseLabel
+        } else if (block.kind === 'approval' && block.requestId === resolution.requestId) {
+          block.status = 'pending'
+        }
+      }
+    }
+    removeSyntheticMessage(resolution.syntheticMessageId)
+    activeResolution = null
+  }
+
+  async function refreshMessages(id: string) {
+    await loadMessages(id, { recover: false })
+  }
+
+  /** 刷新/断流后通过 active-turn 找到轮次，再挂上快照续播订阅。 */
+  async function recoverActiveTurn(
+    id: string,
+    options: { ai?: ChatMessage; expectedTurnId?: string; streamId?: number; recoveryAttempt?: number } = {},
+  ): Promise<boolean> {
+    if (!isBackendSession(id) || id !== state.activeSessionId) return false
+    const generation = dataGeneration
+    const streamId = options.streamId ?? streamGeneration
+    if (streamId !== streamGeneration) return false
+    let active
+    try {
+      active = await getActiveTurn(id)
+    } catch {
+      if (options.ai) {
+        state.busy = false
+        state.recovering = false
+        restorePendingResolution()
+        clearActiveTurn()
+      }
+      return false
+    }
+    if (generation !== dataGeneration || streamId !== streamGeneration || id !== state.activeSessionId) return false
+    if (!active?.turn_id) {
+      if (options.ai) {
+        state.busy = false
+        state.recovering = false
+        restorePendingResolution()
+        clearActiveTurn()
+        await refreshMessages(id)
+      }
+      return false
+    }
+    if (options.expectedTurnId && active.turn_id !== options.expectedTurnId) {
+      if (options.ai) {
+        state.busy = false
+        state.recovering = false
+        restorePendingResolution()
+        clearActiveTurn()
+        await refreshMessages(id)
+      }
+      return false
+    }
+    if (!options.ai) state.messages.push({ id: uid('m'), role: 'ai', time: now(), blocks: [] })
+    // reducer 必须持有 reactive 代理，否则恢复后的增量不会触发界面更新。
+    const ai = options.ai ?? state.messages[state.messages.length - 1]!
+    // 已结束轮次也恢复一次快照中的错误和执行图，但不阻止用户发送新消息。
+    state.busy = active.executing
+    state.recovering = true
+    bindActiveTurn(id, active.turn_id)
+    activeStreamTerminal = false
+    activeStreamAbort = subscribeTurn(
+      Number(id),
+      active.turn_id,
+      streamHandlers(ai, undefined, undefined, {
+        sessionId: id,
+        turnId: active.turn_id,
+        streamId,
+        recoveryAttempt: options.recoveryAttempt,
+        completedSnapshot: !active.executing,
+      }),
+    )
+    return true
+  }
+
+  function finalizeStream(
+    reducer: ReturnType<typeof createSseReducer>, sessionId: string, error?: Error, refresh = true,
+  ) {
+    reducer.settleStreams()
+    if (error) {
+      state.messages[state.messages.length - 1]?.blocks?.push({
+        kind: 'tool', tag: 'ERROR', fn: '连接错误', body: error.message, done: true,
+      })
+    }
+    state.busy = false
+    state.recovering = false
+    activeStreamAbort = null
+    clearActiveTurn()
+    activeResolution = null
+    if (refresh && !error && isBackendSession(sessionId) && sessionId === state.activeSessionId) {
+      const generation = dataGeneration
+      const streamId = streamGeneration
+      // 先对齐持久历史，再恢复终态错误/执行图；终态订阅收尾时不再次刷新。
+      void refreshMessages(sessionId).then(() => {
+        if (generation === dataGeneration && streamId === streamGeneration && sessionId === state.activeSessionId) {
+          return recoverActiveTurn(sessionId, { streamId })
+        }
+      })
+    }
+  }
+
   /** 为一条 AI 消息构造 SSE 回调(错误块 + 收尾停流式;dispatch 与 respondApproval 共用)。 */
   function streamHandlers(
     ai: ChatMessage,
     configuredAgentId?: number,
     configuredPlanId?: number,
     configuredWorkflowId?: number,
+    options: StreamOptions = {},
   ): SseHandlers {
     const reducer = buildReducer(ai, configuredAgentId, configuredPlanId, configuredWorkflowId)
     const generation = dataGeneration
+    const streamId = options.streamId ?? streamGeneration
+    let expectedSessionId = options.sessionId ?? (isBackendSession(state.activeSessionId) ? state.activeSessionId : null)
+    let expectedTurnId = options.turnId ?? activeStreamTurnId
+    let terminalSeen = false
+    let recoveryStarted = false
+    let recoveryAttempt = options.recoveryAttempt ?? 0
+    const current = () => generation === dataGeneration && streamId === streamGeneration
+    const finishCompletedSnapshot = (error?: Error) => {
+      terminalSeen = true
+      finalizeStream(reducer, expectedSessionId ?? state.activeSessionId, error, false)
+      removeSyntheticMessage(ai.id)
+    }
+    const recover = (error?: Error) => {
+      if (!current() || recoveryStarted || terminalSeen) return
+      reducer.settleStreams()
+      const sessionId = expectedSessionId ?? activeStreamSessionId ?? state.activeSessionId
+      if (!isBackendSession(sessionId)) {
+        terminalSeen = true
+        finalizeStream(reducer, sessionId, error ?? new Error('连接已关闭，请重新发送消息'))
+        return
+      }
+      recoveryAttempt += 1
+      if (recoveryAttempt > 3) {
+        terminalSeen = true
+        finalizeStream(reducer, sessionId, error ?? new Error('执行流连接中断，请刷新会话重试'))
+        return
+      }
+      recoveryStarted = true
+      state.recovering = true
+      const resume = async () => {
+        if (recoveryAttempt > 1) {
+          await new Promise((resolve) => setTimeout(resolve, 300 * (2 ** (recoveryAttempt - 2))))
+        }
+        if (!current()) return
+        await recoverActiveTurn(sessionId, {
+          ai,
+          expectedTurnId: expectedTurnId ?? undefined,
+          streamId,
+          recoveryAttempt,
+        })
+      }
+      void resume().finally(() => { recoveryStarted = false })
+    }
     return {
       onEvent: (ev) => {
-        if (generation === dataGeneration) reducer.handle(ev)
+        if (!current()) return
+        recoveryAttempt = 0
+        const eventSessionId = ev.session_id != null ? String(ev.session_id) : null
+        if (expectedSessionId && eventSessionId && eventSessionId !== expectedSessionId) return
+        if (expectedTurnId && ev.turn_id && ev.turn_id !== expectedTurnId) return
+        if (ev.type === 'run_started' && ev.turn_id) {
+          if (eventSessionId) {
+            expectedSessionId = eventSessionId
+            if (state.activeSessionId !== eventSessionId && !isBackendSession(state.activeSessionId)) {
+              reducer.handle({
+                type: 'session_ready', sequence: ev.sequence, session_id: Number(eventSessionId),
+                turn_id: ev.turn_id, data: { session_id: Number(eventSessionId) },
+              })
+            }
+          }
+          expectedTurnId = ev.turn_id
+          bindActiveTurn(eventSessionId ?? expectedSessionId ?? state.activeSessionId, ev.turn_id)
+          state.recovering = false
+        }
+        if (ev.type === 'run_snapshot') {
+          if (ev.turn_id) {
+            expectedTurnId = ev.turn_id
+            bindActiveTurn(eventSessionId ?? expectedSessionId ?? state.activeSessionId, ev.turn_id)
+          }
+          const snapshot = snapshotRecord(ev.state)
+          const numericSessionId = Number(eventSessionId ?? state.activeSessionId)
+          if (snapshot && expectedTurnId && Number.isFinite(numericSessionId)) {
+            hydrateRunSnapshot(snapshot, reducer, ai, numericSessionId, expectedTurnId)
+          }
+          state.recovering = false
+        } else if (ev.type === 'run_end') {
+          terminalSeen = true
+          activeStreamTerminal = true
+          if (options.completedSnapshot) finishCompletedSnapshot()
+          else finalizeStream(reducer, eventSessionId ?? expectedSessionId ?? state.activeSessionId)
+        } else {
+          reducer.handle(ev)
+        }
       },
-      onError: (err) => {
-        if (generation !== dataGeneration) return
-        // 出错同样收尾:对话区和子代理面板的推理块标为已结束、回答停止流式光标,否则会一直闪
-        reducer.settleStreams()
-        ai.blocks!.push({
-          kind: 'tool',
-          tag: 'ERROR',
-          fn: '连接错误',
-          body: err.message,
-          done: true,
-        })
-        state.busy = false
-        activeStreamAbort = null
+      onError: (error) => {
+        if (!current() || activeStreamTerminal || terminalSeen) return
+        if (options.completedSnapshot) {
+          finishCompletedSnapshot(error)
+          return
+        }
+        if (error instanceof SseOpenError && error.status >= 400 && error.status < 500) {
+          terminalSeen = true
+          restorePendingResolution()
+          finalizeStream(reducer, expectedSessionId ?? state.activeSessionId, error)
+          return
+        }
+        recover(error)
       },
       onDone: () => {
-        if (generation !== dataGeneration) return
-        // 收尾:对话区和子代理面板里未收到 block_stop 的推理块标为已结束、回答块停止流式光标
-        reducer.settleStreams()
-        state.busy = false
-        activeStreamAbort = null
+        if (current() && !activeStreamTerminal && !terminalSeen) {
+          if (options.completedSnapshot) finishCompletedSnapshot()
+          else recover()
+        }
       },
     }
   }
@@ -912,7 +1399,13 @@ export const useConsoleStore = defineStore('console', () => {
     options?: { agentId?: number | null; planId?: number | null; workflowId?: number | null },
   ): boolean {
     const content = text.trim()
-    if (state.busy || !content) return false
+    if (!canWriteSession() || state.busy || state.chatSelectionSaving || !content) return false
+    const streamId = ++streamGeneration
+    activeStreamSessionId = isBackendSession(state.activeSessionId) ? state.activeSessionId : null
+    activeStreamTurnId = null
+    activeStreamTerminal = false
+    activeResolution = null
+    state.recovering = false
     state.busy = true
 
     // 用户消息上屏
@@ -981,7 +1474,7 @@ export const useConsoleStore = defineStore('console', () => {
     payload: InteractionResolutionRequest,
     responseLabel: string,
   ) {
-    if (state.busy) return
+    if (!canWriteSession() || state.busy) return
     const sessionId = /^\d+$/.test(state.activeSessionId)
       ? Number(state.activeSessionId)
       : undefined
@@ -1007,12 +1500,26 @@ export const useConsoleStore = defineStore('console', () => {
     }
     if (!matched) return
 
+    const streamId = ++streamGeneration
+    activeStreamSessionId = String(sessionId)
+    activeStreamTurnId = null
+    activeStreamTerminal = false
+    activeResolution = null
     state.busy = true
     // 恢复流承接到一条新 AI 消息(后端 resume 会重发 turn_start / tool_result / 后续文本)。
     state.messages.push({ id: uid('m'), role: 'ai', time: now(), blocks: [] })
     const ai = state.messages[state.messages.length - 1]
+    activeResolution = { requestId, syntheticMessageId: ai.id }
 
-    activeStreamAbort = respondInteraction(sessionId, requestId, payload, streamHandlers(ai))
+    activeStreamAbort = respondInteraction(
+      sessionId,
+      requestId,
+      payload,
+      streamHandlers(ai, undefined, undefined, {
+        sessionId: String(sessionId),
+        streamId,
+      }),
+    )
   }
 
   /** 兼容旧 permission_request 卡片，并统一改走新版 interaction 恢复端点。 */
@@ -1021,21 +1528,28 @@ export const useConsoleStore = defineStore('console', () => {
     decision: ApprovalDecision,
     updatedInput?: Record<string, unknown>,
   ) {
+    if (!canWriteSession() || state.busy) return
     const legacy = state.messages
       .flatMap((message) => message.blocks ?? [])
       .find((block) => block.kind === 'approval' && block.requestId === requestId)
     if (!legacy || legacy.kind !== 'approval' || legacy.status !== 'pending') return
-    legacy.status = decision
     const responseLabel = decision === 'deny'
       ? '已拒绝该工具调用'
       : decision === 'always_allow'
         ? '已允许并记住本会话规则'
         : '已允许本次执行'
     const sessionId = /^\d+$/.test(state.activeSessionId) ? Number(state.activeSessionId) : undefined
-    if (sessionId === undefined || state.busy) return
+    if (sessionId === undefined) return
+    legacy.status = decision
+    const streamId = ++streamGeneration
+    activeStreamSessionId = String(sessionId)
+    activeStreamTurnId = null
+    activeStreamTerminal = false
+    activeResolution = null
     state.busy = true
     state.messages.push({ id: uid('m'), role: 'ai', time: now(), blocks: [] })
     const ai = state.messages[state.messages.length - 1]
+    activeResolution = { requestId, syntheticMessageId: ai.id }
     activeStreamAbort = respondInteraction(
       sessionId,
       requestId,
@@ -1047,7 +1561,10 @@ export const useConsoleStore = defineStore('console', () => {
           always_scope: 'session',
         },
       },
-      streamHandlers(ai),
+      streamHandlers(ai, undefined, undefined, {
+        sessionId: String(sessionId),
+        streamId,
+      }),
     )
     void responseLabel
   }
@@ -1055,7 +1572,7 @@ export const useConsoleStore = defineStore('console', () => {
   /** 取消交互所在暂停点，不再恢复本轮执行。 */
   async function cancelInteractionAction(requestId: string, suspensionId: string): Promise<boolean> {
     const sessionId = /^\d+$/.test(state.activeSessionId) ? Number(state.activeSessionId) : undefined
-    if (sessionId === undefined || state.busy) return false
+    if (!canWriteSession() || sessionId === undefined || state.busy) return false
     try {
       await cancelInteraction(sessionId, suspensionId)
       for (const message of state.messages) {
@@ -1070,6 +1587,45 @@ export const useConsoleStore = defineStore('console', () => {
     } catch {
       return false
     }
+  }
+
+  /** 真正停止当前后端轮次；仅断开 SSE 不会停止服务端执行。 */
+  async function cancelActiveTurn(): Promise<boolean> {
+    if (!canWriteSession() || !isBackendSession(state.activeSessionId)) return false
+    const streamId = streamGeneration
+    const activeSessionId = state.activeSessionId
+    const sessionId = Number(activeStreamSessionId ?? state.activeSessionId)
+    if (!Number.isFinite(sessionId)) return false
+
+    let turnId = activeStreamTurnId ?? state.activeTurnId
+    if (!turnId) {
+      try {
+        const active = await getActiveTurn(sessionId)
+        if (!active?.turn_id || !active.executing) return false
+        turnId = active.turn_id
+        bindActiveTurn(String(sessionId), turnId)
+      } catch {
+        return false
+      }
+    }
+
+    try {
+      await cancelTurn(sessionId, turnId)
+    } catch {
+      return false
+    }
+
+    if (streamId !== streamGeneration || activeSessionId !== state.activeSessionId) return true
+    activeStreamTerminal = true
+    streamGeneration += 1
+    activeStreamAbort?.()
+    activeStreamAbort = null
+    activeResolution = null
+    state.busy = false
+    state.recovering = false
+    clearActiveTurn()
+    await refreshMessages(String(sessionId))
+    return true
   }
 
   /** 首屏种子对话 */
@@ -1109,6 +1665,10 @@ export const useConsoleStore = defineStore('console', () => {
 
   return {
     state,
+    canWriteSession,
+    activeChatSelection,
+    standardThinkingEffort,
+    setChatSelection,
     toggleLeft,
     toggleRight,
     loadSessions,
@@ -1134,6 +1694,8 @@ export const useConsoleStore = defineStore('console', () => {
     respondInteraction: respondInteractionAction,
     respondApproval: respondApprovalAction,
     cancelInteraction: cancelInteractionAction,
+    cancelActiveTurn,
+    stopExecution: cancelActiveTurn,
     seedConversation,
   }
 })

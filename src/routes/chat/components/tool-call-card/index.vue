@@ -17,7 +17,8 @@ defineProps<{
       <span :class="[$style['cli-tag'], $style[tag.toLowerCase()]]">{{ tag }}</span>
       <span :class="$style['cli-fn']">{{ fn }}</span>
       <span :class="$style['cli-state']">
-        <template v-if="done"><span :class="$style['ok']">✓</span> 完成</template>
+        <template v-if="tag === 'ERROR'"><span :class="$style['error']">✕</span> 失败</template>
+        <template v-else-if="done"><span :class="$style['ok']">✓</span> 完成</template>
         <template v-else><span :class="$style['cli-spin']"></span>运行</template>
       </span>
     </div>

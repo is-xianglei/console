@@ -1,5 +1,6 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import type {
+  ActiveTurnResponse,
   InteractionResolutionRequest,
   PendingInteractionResponse,
   RuntimeSuspensionResponse,
@@ -8,18 +9,28 @@ import type {
   ShareSessionResponse,
   SendMessageRequest,
   SseHandlers,
+  TurnCancelResponse,
 } from '../interfaces/console/api'
 import type {
   SessionMessageResponse,
   SessionResponse,
   SseEvent,
+  TaskResponse,
 } from '../interfaces/console/model'
-import { request } from './index'
+import { ApiError, errorFromBody, request } from './index'
 
 const BASE = '/api'
 
-/** 致命错误抛出后终止 SSE，避免流式任务被自动重放。 */
-class FatalError extends Error {}
+/** 建流被 HTTP 拒绝时保留后端错误，不把业务拒绝误当成流式断线。 */
+export class SseOpenError extends ApiError {}
+
+async function requireEventStream(response: Response): Promise<void> {
+  const contentType = response.headers.get('content-type') ?? ''
+  if (response.ok && contentType.includes('text/event-stream')) return
+  const body: unknown = await response.json().catch(() => null)
+  const error = errorFromBody(body, response.status)
+  throw new SseOpenError(error.message, error.code, error.status, error.details)
+}
 
 /** 以 POST 建立 SSE 流，并返回主动中止函数。 */
 function streamPost(path: string, body: unknown, handlers: SseHandlers): () => void {
@@ -34,11 +45,42 @@ function streamPost(path: string, body: unknown, handlers: SseHandlers): () => v
     body: JSON.stringify(body),
     signal: controller.signal,
     openWhenHidden: true,
-    async onopen(response) {
-      const contentType = response.headers.get('content-type') ?? ''
-      if (response.ok && contentType.includes('text/event-stream')) return
-      throw new FatalError(`SSE 打开失败: HTTP ${response.status}`)
+    onopen: requireEventStream,
+    onmessage(message) {
+      if (!message.data || message.data === '[DONE]') return
+      try {
+        handlers.onEvent(JSON.parse(message.data) as SseEvent)
+      } catch {
+        // 心跳、注释或损坏帧不会中断仍然有效的事件流。
+      }
     },
+    onclose() {
+      handlers.onDone?.()
+    },
+    onerror(error) {
+      handlers.onError?.(error as Error)
+      throw error
+    },
+  }).catch(() => {
+    // 错误已通过 onError 上报，此处只消费被拒绝的 Promise。
+  })
+
+  return () => controller.abort()
+}
+
+/** 以 GET 建立轮次订阅 SSE。订阅与执行解耦，断开连接不会取消后端执行。 */
+function streamGet(path: string, handlers: SseHandlers): () => void {
+  const controller = new AbortController()
+  const token = localStorage.getItem('auth_token')
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  fetchEventSource(BASE + path, {
+    method: 'GET',
+    headers,
+    signal: controller.signal,
+    openWhenHidden: true,
+    onopen: requireEventStream,
     onmessage(message) {
       if (!message.data || message.data === '[DONE]') return
       try {
@@ -73,6 +115,12 @@ export function getSessionMessageList(
   return request<SessionMessageResponse[]>(`/sessions/${sessionId}/messages`)
 }
 
+/** GET /api/tasks?session_id=... — 恢复会话任务，包括已结束轮次。 */
+export function getSessionTasks(sessionId: number | string): Promise<TaskResponse[]> {
+  const query = new URLSearchParams({ session_id: String(sessionId) })
+  return request<TaskResponse[]>('/tasks?' + query)
+}
+
 /** PATCH /api/sessions/{id} — 重命名会话 */
 export function updateSession(
   sessionId: number | string,
@@ -82,6 +130,14 @@ export function updateSession(
     method: 'PATCH',
     body: JSON.stringify({ title }),
   })
+}
+
+/** 保存模式、模型及思考强度，不触发新一轮执行。 */
+export function updateSessionChatSelection(
+  sessionId: number | string,
+  payload: import('../interfaces/settings/models/model').ChatModelSelection,
+): Promise<SessionResponse> {
+  return request(`/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify(payload) })
 }
 
 /** POST /api/sessions/{id}/archive — 归档会话。 */
@@ -153,6 +209,34 @@ export function cancelInteraction(
 ): Promise<RuntimeSuspensionResponse> {
   return request<RuntimeSuspensionResponse>(
     `/interactions/sessions/${sessionId}/suspensions/${encodeURIComponent(suspensionId)}/cancel`,
+    { method: 'POST' },
+  )
+}
+
+/** 查询会话最新轮次；刷新或断流后据此决定是否续订阅。 */
+export function getActiveTurn(sessionId: number | string): Promise<ActiveTurnResponse | null> {
+  return request<ActiveTurnResponse | null>(`/sessions/${sessionId}/active-turn`)
+}
+
+/** 订阅指定轮次的快照续播流。 */
+export function subscribeTurn(
+  sessionId: number | string,
+  turnId: string,
+  handlers: SseHandlers,
+): () => void {
+  return streamGet(
+    `/sessions/${sessionId}/turns/${encodeURIComponent(turnId)}/subscription`,
+    handlers,
+  )
+}
+
+/** 真正取消后端轮次执行；仅断开 SSE 不会停止执行。 */
+export function cancelTurn(
+  sessionId: number | string,
+  turnId: string,
+): Promise<TurnCancelResponse> {
+  return request<TurnCancelResponse>(
+    `/sessions/${sessionId}/turns/${encodeURIComponent(turnId)}/cancel`,
     { method: 'POST' },
   )
 }

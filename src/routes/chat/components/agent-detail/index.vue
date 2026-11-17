@@ -73,7 +73,7 @@ const statusLabel: Record<string, string> = {
             <div :class="[$style['stream-lbl'], $style['tool']]"><i class="icon icon-terminal"></i>工具调用</div>
             <div :class="$style['stream-cli']">
               <ToolCallCard
-                :tag="s.done ? 'RESULT' : 'TOOL'"
+                :tag="s.is_error ? 'ERROR' : s.done ? 'RESULT' : 'TOOL'"
                 :fn="s.fn"
                 :body="s.body"
                 :done="s.done"

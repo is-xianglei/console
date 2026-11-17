@@ -11,6 +11,7 @@ import type {
 /** 中间对话区与子代理面板共用的推理块、回答块形状 */
 type ThinkItem = Extract<ChatBlock | StreamEvent, { kind: 'think' }>
 type AnswerItem = Extract<ChatBlock | StreamEvent, { kind: 'answer' }>
+type ToolItem = Extract<ChatBlock | StreamEvent, { kind: 'tool' }>
 
 /** reducer 操作的可变状态切片(由 store 传入其响应式对象引用) */
 export interface SseTarget {
@@ -37,6 +38,13 @@ function agentKey(ev: SseEvent): string {
   if (a.role === 'subagent') return a.run_id || a.name
   if (a.role === 'teammate') return a.name
   return a.name
+}
+
+/** 工具调用的归属范围。相同 tool.id 可能同时出现在主 Agent 和多个子 Agent 中。 */
+function eventScope(ev: SseEvent): string {
+  const actor = ev.actor
+  if (!actor || actor.role === 'orchestrator') return 'orchestrator'
+  return `${actor.role}:${agentKey(ev)}`
 }
 
 /** 按 agent_type/角色给子代理挑一个图标 */
@@ -101,8 +109,10 @@ export function fmtToolCall(name: string, input?: Record<string, unknown>): stri
 export function createSseReducer(target: SseTarget) {
   // orchestrator 当前轮的块映射:block.index → ChatBlock 引用
   const oBlocks = new Map<number, ChatBlock>()
-  // 子代理当前块映射:agentKey → (index → 面板 stream 里的累加目标,存 reactive 代理)
+  // 子代理当前块映射:actor scope → (index → 面板 stream 里的累加目标,存 reactive 代理)
   const aBlocks = new Map<string, Map<number, ThinkItem | AnswerItem>>()
+  // 工具卡按 scope + tool.id 建索引，不能再按“最近一个未完成卡片”猜测归属。
+  const tools = new Map<string, Map<string, ToolItem>>()
   // 推理块开始时间:只用于算思考秒数,不放进块对象,免得触发响应式更新。
   // 后端信封不带事件时间戳,按前端收到 block_start 的时刻计。
   const thinkStartedAt = new WeakMap<ThinkItem, number>()
@@ -134,6 +144,57 @@ export function createSseReducer(target: SseTarget) {
   function settleStreams() {
     for (const b of target.ai.blocks ?? []) settleItem(b)
     for (const a of target.agents) settleAgent(a)
+  }
+
+  function rememberTool(ev: SseEvent, item: ToolItem) {
+    const id = ev.tool?.id
+    if (!id) return
+    const scope = eventScope(ev)
+    const scoped = tools.get(scope) ?? new Map<string, ToolItem>()
+    scoped.set(id, item)
+    tools.set(scope, scoped)
+  }
+
+  /**
+   * 优先按 actor scope 精确查找；只有事件缺 actor 且全局只有一个同 id 卡片时才兼容旧流。
+   * 如果同 id 同时存在于多个 scope，宁可不更新也不能把结果写入错误面板。
+   */
+  function findTool(ev: SseEvent): ToolItem | undefined {
+    const id = ev.tool?.id
+    if (!id) return undefined
+
+    const scoped = tools.get(eventScope(ev))
+    const exact = scoped?.get(id)
+    if (exact && !exact.done) return exact
+    // 已带 actor 的结果找不到精确卡片时不能跨面板猜测，避免重复结果污染其他 Agent。
+    if (ev.actor) return undefined
+
+    const candidates: ToolItem[] = []
+    for (const candidateScope of tools.values()) {
+      const candidate = candidateScope.get(id)
+      if (candidate && !candidate.done) candidates.push(candidate)
+    }
+    return candidates.length === 1 ? candidates[0] : undefined
+  }
+
+  function forgetTool(ev: SseEvent, item: ToolItem) {
+    const id = ev.tool?.id
+    if (!id) return
+    const scope = eventScope(ev)
+    const scoped = tools.get(scope)
+    if (scoped?.get(id) === item) {
+      scoped.delete(id)
+      if (!scoped.size) tools.delete(scope)
+      return
+    }
+    // actor 缺失时 findTool 可能走了唯一候选兼容路径，按对象身份清理其真实 scope。
+    for (const [candidateScope, candidateMap] of tools) {
+      if (candidateMap.get(id) === item) {
+        candidateMap.delete(id)
+        if (!candidateMap.size) tools.delete(candidateScope)
+        return
+      }
+    }
   }
 
   function handle(ev: SseEvent) {
@@ -213,7 +274,7 @@ export function createSseReducer(target: SseTarget) {
         break
       }
       case 'tool_use': {
-        const card: ChatBlock = {
+        const card: Extract<ChatBlock, { kind: 'tool' }> = {
           kind: 'tool',
           tag: ev.tool?.name === 'Agent' || ev.tool?.name === 'TeamSpawn' ? 'SPAWN' : 'TOOL',
           fn: fmtToolCall(ev.tool?.name ?? 'tool', ev.tool?.input),
@@ -221,19 +282,18 @@ export function createSseReducer(target: SseTarget) {
           done: false,
         }
         blocks.push(card)
+        // 索引保存响应式数组读回的代理，结果回填才能触发视图更新。
+        rememberTool(ev, blocks[blocks.length - 1] as ToolItem)
         break
       }
       case 'tool_result': {
-        // 匹配最近一个未完成的同类工具卡,填充结果
-        for (let i = blocks.length - 1; i >= 0; i--) {
-          const b = blocks[i]
-          if (b.kind === 'tool' && !b.done) {
-            b.done = true
-            b.tag = ev.tool?.is_error ? 'ERROR' : 'RESULT'
-            b.body = typeof ev.tool?.output === 'string' ? ev.tool.output : ''
-            break
-          }
-        }
+        const b = findTool(ev)
+        if (!b || b.kind !== 'tool') break
+        const card = b as Extract<ChatBlock, { kind: 'tool' }>
+        card.done = true
+        card.tag = ev.tool?.is_error ? 'ERROR' : 'RESULT'
+        card.body = typeof ev.tool?.output === 'string' ? ev.tool.output : ''
+        forgetTool(ev, b)
         break
       }
       case 'permission_request': {
@@ -277,20 +337,20 @@ export function createSseReducer(target: SseTarget) {
 
   // ===== subagent / teammate → 右栏面板 =====
   function handleAgent(ev: SseEvent) {
-    const key = agentKey(ev)
+    const scope = eventScope(ev)
     switch (ev.type) {
       case 'turn_start': {
         const a = ensureAgent(target, ev)
         a.status = 'think'
         a.progress = 10
-        aBlocks.set(key, new Map())
+        aBlocks.set(scope, new Map())
         break
       }
       case 'block_start': {
         const a = ensureAgent(target, ev)
         const bt = ev.block?.block_type
-        const map = aBlocks.get(key) ?? new Map()
-        aBlocks.set(key, map)
+        const map = aBlocks.get(scope) ?? new Map()
+        aBlocks.set(scope, map)
         // 同 orchestrator:存回 reactive 数组里的代理,后续增量直接累加到它上面
         if (bt === 'thinking') {
           a.stream.push({ kind: 'think', text: '', done: false })
@@ -310,13 +370,13 @@ export function createSseReducer(target: SseTarget) {
       case 'thinking_delta':
       case 'text_delta': {
         ensureAgent(target, ev)
-        const slot = aBlocks.get(key)?.get(ev.block!.index)
+        const slot = aBlocks.get(scope)?.get(ev.block!.index)
         if (!slot) break
         slot.text += ev.text ?? ''
         break
       }
       case 'block_stop': {
-        const slot = aBlocks.get(key)?.get(ev.block!.index)
+        const slot = aBlocks.get(scope)?.get(ev.block!.index)
         if (slot) settleItem(slot)
         break
       }
@@ -324,24 +384,24 @@ export function createSseReducer(target: SseTarget) {
         const a = ensureAgent(target, ev)
         a.status = 'run'
         a.progress = Math.max(a.progress, 50)
-        a.stream.push({
+        const item: Extract<StreamEvent, { kind: 'tool' }> = {
           kind: 'tool',
           fn: fmtToolCall(ev.tool?.name ?? 'tool', ev.tool?.input),
           body: '',
           done: false,
-        })
+        }
+        a.stream.push(item)
+        rememberTool(ev, a.stream[a.stream.length - 1] as ToolItem)
         break
       }
       case 'tool_result': {
-        const a = ensureAgent(target, ev)
-        for (let i = a.stream.length - 1; i >= 0; i--) {
-          const it = a.stream[i]
-          if (it.kind === 'tool' && !it.done) {
-            it.done = true
-            it.body = typeof ev.tool?.output === 'string' ? ev.tool.output : ''
-            break
-          }
-        }
+        const item = findTool(ev)
+        if (!item || item.kind !== 'tool') break
+        const tool = item as Extract<StreamEvent, { kind: 'tool' }>
+        tool.done = true
+        tool.body = typeof ev.tool?.output === 'string' ? ev.tool.output : ''
+        if (typeof ev.tool?.is_error === 'boolean') tool.is_error = ev.tool.is_error
+        forgetTool(ev, item)
         break
       }
       case 'turn_end': {
@@ -360,6 +420,7 @@ export function createSseReducer(target: SseTarget) {
           fn: ev.error?.code ?? 'ERROR',
           body: ev.error?.message ?? '错误',
           done: true,
+          is_error: true,
         })
         break
       }

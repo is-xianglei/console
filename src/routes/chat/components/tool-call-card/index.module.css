@@ -67,6 +67,9 @@
 .cli-state .ok {
   color: var(--status-success);
 }
+.cli-state .error {
+  color: var(--status-error);
+}
 .cli-spin {
   width: 11px;
   height: 11px;

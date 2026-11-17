@@ -1,4 +1,5 @@
 import type { SessionAppId } from '../app/model'
+import type { ChatModeSlug, ThinkingEffort } from '../settings/models/model'
 
 /** 后端会话摘要。 */
 export interface SessionResponse {
@@ -6,6 +7,9 @@ export interface SessionResponse {
   title: string
   status: string
   model_name?: string | null
+  model_provider_id?: string | null
+  mode_slug?: ChatModeSlug
+  thinking_effort?: ThinkingEffort
   system_prompt?: string | null
   user_id?: number | null
   workspace_id?: number | null
@@ -181,9 +185,18 @@ export interface SseEvent {
     | 'node_start'
     | 'node_end'
     | 'workflow_progress'
+    | 'run_started'
+    | 'run_snapshot'
+    | 'run_end'
     | string
   sequence: number
   session_id: number
+  /** 轮次级 SSE 的稳定关联键。 */
+  turn_id?: string
+  /** run_snapshot 快照内容。 */
+  state?: Record<string, unknown>
+  expired?: boolean
+  cancelled?: boolean
   ts?: number
   actor?: SseActor
   data?: {
@@ -289,12 +302,23 @@ export interface Session {
   count: number
   badge?: string
   appId?: SessionAppId
+  /** 会话创建者 ID；共享会话也必须保留，供前端判断写权限。 */
+  userId?: number | null
+  /** 当前用户是否仅拥有读取权限。 */
+  readOnly?: boolean
   agentId?: number | null
   /** 会话绑定的编排方案 ID;与 agentId 互斥 */
   orchestrationPlanId?: number | null
   /** 会话绑定的 Workflow ID;与 agentId 互斥 */
   workflowId?: number | null
   modelName?: string | null
+  modelProviderId?: string | null
+  /** 仅 metadata.model_provider_override=true 表示用户显式选模型。 */
+  modelProviderOverride?: boolean
+  modeSlug?: ChatModeSlug
+  thinkingEffort?: ThinkingEffort
+  /** 切回标准模式时恢复本会话上次选择的思考强度。 */
+  standardThinkingEffort?: ThinkingEffort
   status?: string
   visibility?: SessionVisibility
   sharedWith?: number[]
@@ -316,7 +340,7 @@ export type CliTag =
 export type StreamEvent =
   | { kind: 'think'; text: string; done: boolean; seconds?: number }
   | { kind: 'answer'; text: string; streaming: boolean }
-  | { kind: 'tool'; fn: string; body: string; done: boolean }
+  | { kind: 'tool'; fn: string; body: string; done: boolean; is_error?: boolean }
 
 /** 控制台右栏中的子代理。 */
 export interface SubAgent {
@@ -369,6 +393,8 @@ export type ChatBlock =
 export interface ChatMessage {
   id: string
   role: 'user' | 'ai'
+  /** 后端轮次 ID，用于完整快照覆盖同轮次的助手历史。 */
+  turnId?: string | null
   time: string
   text?: string
   blocks?: ChatBlock[]
