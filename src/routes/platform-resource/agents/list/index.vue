@@ -33,6 +33,7 @@ function metaText(agent: AgentResponse) {
   const parts = [agent.model_name || '默认模型']
   if (agent.skill_ids?.length) parts.push(`${agent.skill_ids.length} 技能`)
   if (agent.tool_ids?.length) parts.push(`${agent.tool_ids.length} 工具`)
+  if (agent.mcp_servers?.length) parts.push(`${agent.mcp_servers.length} MCP`)
   return parts.join(' · ')
 }
 

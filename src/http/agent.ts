@@ -2,6 +2,7 @@ import type {
   AgentCreateRequest,
   AgentDeleteResult,
   AgentListResponse,
+  AgentMcpBindingsRequest,
   AgentResponse,
   AgentSkillBindingsRequest,
   AgentToolBindingsRequest,
@@ -71,6 +72,17 @@ export function updateAgentSkills(
   payload: AgentSkillBindingsRequest,
 ): Promise<AgentResponse> {
   return request<AgentResponse>(`/agents/${agentId}/skills`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+/** 全量替换 Agent 的 MCP server 绑定；只能绑定本工作区已启用的共享 server。 */
+export function updateAgentMcpServers(
+  agentId: number,
+  payload: AgentMcpBindingsRequest,
+): Promise<AgentResponse> {
+  return request<AgentResponse>(`/agents/${agentId}/mcp-servers`, {
     method: 'PUT',
     body: JSON.stringify(payload),
   })

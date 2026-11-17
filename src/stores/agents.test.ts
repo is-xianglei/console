@@ -6,9 +6,11 @@ import {
   getAgentDetail,
   getAgentList,
   updateAgent,
+  updateAgentMcpServers,
   updateAgentSkills,
   updateAgentTools,
 } from '../http/agent'
+import { getMcpServerList } from '../http/mcp'
 import { ApiError } from '../http'
 import type { AgentResponse } from '../interfaces/agent/api'
 import { getSkillList } from '../http/skill'
@@ -21,9 +23,11 @@ vi.mock('../http/agent', () => ({
   getAgentDetail: vi.fn(),
   getAgentList: vi.fn(),
   updateAgent: vi.fn(),
+  updateAgentMcpServers: vi.fn(),
   updateAgentSkills: vi.fn(),
   updateAgentTools: vi.fn(),
 }))
+vi.mock('../http/mcp', () => ({ getMcpServerList: vi.fn() }))
 vi.mock('../http/skill', () => ({ getSkillList: vi.fn() }))
 vi.mock('../http/tool', () => ({ getToolList: vi.fn() }))
 
@@ -84,6 +88,7 @@ describe('agents store', () => {
       offset: 0,
     }))
     vi.mocked(getSkillList).mockResolvedValue([skill])
+    vi.mocked(getMcpServerList).mockResolvedValue([])
   })
 
   it('加载 Agent 及启用和停用工具目录', async () => {
@@ -446,5 +451,80 @@ describe('agents store', () => {
     expect(await store.setAgentEnabled(agent.id, false)).toBe('无权限')
     expect(store.state.items[0]?.is_enabled).toBe(true)
     expect(store.state.togglingIds).toEqual([])
+  })
+
+  describe('MCP 绑定', () => {
+    const mcpServer = {
+      id: 31,
+      server_key: 'deepwiki',
+      visibility: 'workspace' as const,
+      name: 'DeepWiki',
+      url: 'https://mcp.deepwiki.com/mcp',
+      auth_type: 'none',
+      approval_mode: 'always',
+      tool_allowlist: [],
+      tool_denylist: [],
+      config_rev: 1,
+      is_enabled: true,
+      writable: true,
+      tool_count: 3,
+      created_at: '2026-11-01T00:00:00Z',
+      updated_at: '2026-11-01T00:00:00Z',
+    }
+    const baseInput = {
+      name: agent.name,
+      description: agent.description,
+      systemPrompt: agent.system_prompt,
+      modelName: agent.model_name,
+      isEnabled: true,
+      toolIds: agent.tool_ids,
+      skillIds: agent.skill_ids,
+    }
+
+    it('能力目录同时加载 MCP server，MCP 失败不影响技能和工具', async () => {
+      const store = useAgentsStore()
+      vi.mocked(getMcpServerList).mockResolvedValueOnce([mcpServer])
+      expect(await store.loadCatalogs()).toBeNull()
+      expect(store.state.mcpServers).toEqual([mcpServer])
+
+      vi.mocked(getMcpServerList).mockRejectedValueOnce(new ApiError('MCP 功能未启用', 'FORBIDDEN', 403))
+      expect(await store.loadCatalogs()).toBeNull()
+      expect(store.state.mcpServers).toEqual([])
+      expect(store.state.mcpCatalogError).toBe('MCP 功能未启用')
+      expect(store.state.skills).toEqual([skill])
+    })
+
+    it('创建后单独提交 MCP 绑定，空白名单传 null', async () => {
+      const bound = { ...agent, mcp_servers: [{ server_id: 31, tool_names: null }] }
+      vi.mocked(createAgent).mockResolvedValue(agent)
+      vi.mocked(updateAgentMcpServers).mockResolvedValue(bound)
+      const result = await useAgentsStore().saveAgent({ ...baseInput, mcpServers: [{ server_id: 31, tool_names: null }] })
+
+      expect(result).toEqual({ item: bound, error: null })
+      expect(updateAgentMcpServers).toHaveBeenCalledWith(7, { servers: [{ server_id: 31, tool_names: null }] })
+    })
+
+    it('创建成功但 MCP 绑定失败时返回已创建的 Agent 和错误', async () => {
+      vi.mocked(createAgent).mockResolvedValue(agent)
+      vi.mocked(updateAgentMcpServers).mockRejectedValue(new ApiError('只能绑定已启用的共享 server', 'BAD_REQUEST', 400))
+      const result = await useAgentsStore().saveAgent({ ...baseInput, mcpServers: [{ server_id: 31, tool_names: ['ask'] }] })
+
+      expect(result.item).toEqual(agent)
+      expect(result.error).toContain('只能绑定已启用的共享 server')
+    })
+
+    it('更新时绑定没变不提交，变了才全量替换', async () => {
+      const current = { ...agent, mcp_servers: [{ server_id: 31, tool_names: ['b', 'a'] }] }
+      vi.mocked(updateAgent).mockResolvedValue(current)
+      vi.mocked(getAgentDetail).mockResolvedValue(current)
+      const store = useAgentsStore()
+
+      await store.saveAgent({ ...baseInput, id: 7, mcpServers: [{ server_id: 31, tool_names: ['a', 'b'] }] })
+      expect(updateAgentMcpServers).not.toHaveBeenCalled()
+
+      vi.mocked(updateAgentMcpServers).mockResolvedValue({ ...agent, mcp_servers: [] })
+      await store.saveAgent({ ...baseInput, id: 7, mcpServers: [] })
+      expect(updateAgentMcpServers).toHaveBeenCalledWith(7, { servers: [] })
+    })
   })
 })

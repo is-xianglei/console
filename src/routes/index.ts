@@ -6,6 +6,7 @@ import MarketDetailLoader from './apps/detail/Loader.vue'
 import { resolveMarketSection } from './apps/sections'
 import ChatLoader from './chat/Loader.vue'
 import LoginLoader from './login/Loader.vue'
+import McpOAuthCallbackLoader from './mcp-oauth-callback/Loader.vue'
 import MemoriesLoader from './memories/Loader.vue'
 import MemoryCreateLoader from './memories/create/Loader.vue'
 import MemoryDetailLoader from './memories/detail/Loader.vue'
@@ -14,6 +15,9 @@ import PlatformResourceLoader from './platform-resource/Loader.vue'
 import AgentCreateLoader from './platform-resource/agents/create/Loader.vue'
 import AgentDetailLoader from './platform-resource/agents/detail/Loader.vue'
 import AgentEditLoader from './platform-resource/agents/edit/Loader.vue'
+import McpCreateLoader from './platform-resource/mcp/create/Loader.vue'
+import McpDetailLoader from './platform-resource/mcp/detail/Loader.vue'
+import McpEditLoader from './platform-resource/mcp/edit/Loader.vue'
 import DepartmentDetailLoader from './platform-resource/organization/departments/detail/Loader.vue'
 import GroupDetailLoader from './platform-resource/organization/groups/detail/Loader.vue'
 import PersonDetailLoader from './platform-resource/organization/people/detail/Loader.vue'
@@ -141,6 +145,31 @@ const router = createRouter({
           path: 'platform/build/agents/:id(\\d+)/edit',
           name: 'agent-edit',
           component: AgentEditLoader,
+          meta: { requiresAuth: true, platform: true, module: 'build' },
+        },
+        {
+          path: 'platform/build/mcp/create',
+          name: 'mcp-create',
+          component: McpCreateLoader,
+          meta: { requiresAuth: true, platform: true, module: 'build' },
+        },
+        {
+          path: 'platform/build/mcp/:id(\\d+)',
+          name: 'mcp-detail',
+          component: McpDetailLoader,
+          meta: { requiresAuth: true, platform: true, module: 'build' },
+        },
+        {
+          path: 'platform/build/mcp/:id(\\d+)/edit',
+          name: 'mcp-edit',
+          component: McpEditLoader,
+          meta: { requiresAuth: true, platform: true, module: 'build' },
+        },
+        {
+          // OAuth 授权服务器回跳地址（后端 AGENTOS_PUBLIC_BASE_URL + /mcp/oauth/callback）
+          path: 'mcp/oauth/callback',
+          name: 'mcp-oauth-callback',
+          component: McpOAuthCallbackLoader,
           meta: { requiresAuth: true, platform: true, module: 'build' },
         },
         {

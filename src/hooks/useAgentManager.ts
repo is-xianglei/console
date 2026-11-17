@@ -3,6 +3,7 @@ import type { AgentResponse } from '@/interfaces/agent/api'
 import type { AgentFormModel, AgentValidationIssue } from '@/interfaces/agent/model'
 import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
+import { bindingsToDrafts } from '@/utils/mcp'
 import { useListUrlState } from './useListUrlState'
 
 /** 启用状态筛选值（与 URL 里 enabled 字段共用）。 */
@@ -24,6 +25,7 @@ export function emptyAgentForm(): AgentFormModel {
     isEnabled: false,
     toolIds: [],
     skillIds: [],
+    mcpServers: [],
     createdAt: '',
     updatedAt: '',
   }
@@ -41,6 +43,7 @@ export function agentResponseToForm(agent: AgentResponse): AgentFormModel {
     isEnabled: agent.is_enabled,
     toolIds: [...(agent.tool_ids ?? [])],
     skillIds: [...(agent.skill_ids ?? [])],
+    mcpServers: bindingsToDrafts(agent.mcp_servers),
     createdAt: agent.created_at,
     updatedAt: agent.updated_at,
   }

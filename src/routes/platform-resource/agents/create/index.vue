@@ -64,6 +64,8 @@ function onPublish() {
     :issues="editor.issues.value"
     :skills="editor.skills.value"
     :tools="editor.tools.value"
+    :mcp-servers="editor.mcpServers.value"
+    :mcp-catalog-error="editor.mcpCatalogError.value"
     :saving="editor.saving.value"
     :loading="editor.loadingDetail.value"
     :catalogs-loading="editor.catalogsLoading.value"

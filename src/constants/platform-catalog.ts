@@ -26,11 +26,8 @@ const buildRows: Record<string, ResourceRow[]> = {
     { id: 'SKILL-0012', name: 'work-order-query', status: 'nominal', values: ['v2.6.0', '组织共享', '11 Agents', 'PASSED'], description: '查询维修工单、故障记录和备件消耗。', tags: ['MES READ', 'CMMS READ', 'SIGNED'], owner: '设备工程部' },
     { id: 'SKILL-0041', name: 'schedule-optimizer', status: 'warning', values: ['v0.8.4', '开发分支', '2 Agents', 'PENDING'], description: '运行多约束排产优化并返回可解释方案。', tags: ['4 Dependencies', 'EXECUTE', 'REVIEW'], owner: '计划运营部' },
   ],
-  mcp: [
-    { id: 'MCP-0001', name: 'factory-data-hub', status: 'nominal', values: ['SSE', '18 Tools', '42 ms', 'OAuth 2.0'], description: '连接 MES、IoT 与设备主数据的统一入口。', tags: ['12 Resources', '8 Agents', 'HEALTHY'], owner: '数据平台组' },
-    { id: 'MCP-0005', name: 'maintenance-cmms', status: 'nominal', values: ['HTTP', '9 Tools', '71 ms', 'API Key'], description: '维修工单、故障编码与备件资源服务。', tags: ['6 Resources', '5 Agents', 'HEALTHY'], owner: '设备工程部' },
-    { id: 'MCP-0009', name: 'vision-gateway', status: 'warning', values: ['STDIO', '7 Tools', '1.8 s', 'mTLS'], description: '视觉样本与检测推理网关，最近握手延迟升高。', tags: ['3 Resources', '4 Agents', 'DEGRADED'], owner: '质量工程部' },
-  ],
+  // MCP Servers 已对接后端接口（routes/platform-resource/mcp），不再使用模拟行。
+  mcp: [],
 }
 
 const governanceRows: Record<string, ResourceRow[]> = {

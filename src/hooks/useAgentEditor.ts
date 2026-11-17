@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router'
 import type { AgentResponse } from '@/interfaces/agent/api'
 import type { AgentFormModel, AgentValidationIssue } from '@/interfaces/agent/model'
 import { useAgentsStore } from '@/stores/agents'
+import { draftsToBindings, isBindableMcpServer } from '@/utils/mcp'
 import {
   agentResponseToForm,
   emptyAgentForm,
@@ -34,6 +35,12 @@ export function useAgentEditor() {
 
   const tools = computed(() => agentsStore.state.tools)
   const skills = computed(() => agentsStore.state.skills)
+  /** 可绑定的 server，加上已绑定但已停用 / 不可见的（保留以便取消）。 */
+  const mcpServers = computed(() => agentsStore.state.mcpServers.filter(
+    (server) => isBindableMcpServer(server) || draft.value.mcpServers.some((binding) => binding.serverId === server.id),
+  ))
+  const mcpCatalogError = computed(() => agentsStore.state.mcpCatalogError)
+  const catalogsLoading = computed(() => agentsStore.state.catalogsLoading)
   const issues = computed<AgentValidationIssue[]>(() => validateAgent(draft.value))
 
   function goToList() {
@@ -118,6 +125,7 @@ export function useAgentEditor() {
       isEnabled: enabled,
       toolIds: [...draft.value.toolIds],
       skillIds: [...draft.value.skillIds],
+      mcpServers: draftsToBindings(draft.value.mcpServers),
     })
     if (result.error) {
       if (result.item) draft.value = agentResponseToForm(result.item)
@@ -166,6 +174,8 @@ export function useAgentEditor() {
     issues,
     tools,
     skills,
+    mcpServers,
+    mcpCatalogError,
     catalogsLoading,
     loadingDetail,
     saving,

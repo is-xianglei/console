@@ -35,6 +35,17 @@ const toolNames = computed(() => new Map(agentsStore.state.tools.map((tool) => [
 /** 目录里找不到的 id（目录加载失败或已删除）退回显示 #id。 */
 const skills = computed(() => (agent.value?.skill_ids ?? []).map((id) => ({ id, name: skillNames.value.get(id) ?? `#${id}` })))
 const tools = computed(() => (agent.value?.tool_ids ?? []).map((id) => ({ id, name: toolNames.value.get(id) ?? `#${id}` })))
+const mcpNames = computed(() => new Map(agentsStore.state.mcpServers.map((server) => [server.id, server.name])))
+/** 有工具白名单时标出数量，tooltip 列出工具名。 */
+const mcpServers = computed(() => (agent.value?.mcp_servers ?? []).map((binding) => {
+  const name = mcpNames.value.get(binding.server_id) ?? `#${binding.server_id}`
+  const toolNames = binding.tool_names ?? []
+  return {
+    id: binding.server_id,
+    label: toolNames.length ? `${name} · ${toolNames.length}` : name,
+    tooltip: toolNames.length ? toolNames.join('、') : '全部工具',
+  }
+}))
 const promptHtml = computed(() => (agent.value?.system_prompt ? renderMarkdown(agent.value.system_prompt) : ''))
 
 const menuItems = computed<DropdownMenuItem[][]>(() => {
@@ -170,6 +181,17 @@ async function onDeleteConfirm() {
                 <div :class="$style.chips">
                   <UBadge v-for="tool in tools" :key="tool.id" :label="tool.name" color="neutral" variant="soft" size="xs" />
                   <span v-if="!tools.length" :class="$style.none">无</span>
+                </div>
+              </div>
+              <div :class="$style.row">
+                <span :class="$style.rowLabel">MCP</span>
+                <div :class="$style.chips">
+                  <UTooltip v-for="server in mcpServers" :key="server.id" :text="server.tooltip">
+                    <RouterLink :class="$style.chipLink" :to="{ name: 'mcp-detail', params: { id: String(server.id) } }">
+                      <UBadge :label="server.label" color="neutral" variant="soft" size="xs" />
+                    </RouterLink>
+                  </UTooltip>
+                  <span v-if="!mcpServers.length" :class="$style.none">无</span>
                 </div>
               </div>
             </div>

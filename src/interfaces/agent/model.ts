@@ -4,6 +4,8 @@ export interface AgentValidationIssue {
   message: string
 }
 
+import type { AgentMcpBindingDraft } from '../mcp/model'
+
 /** Agent 创建与编辑页使用的表单模型，仅包含后端可持久化字段。 */
 export interface AgentFormModel {
   id: number | null
@@ -16,6 +18,8 @@ export interface AgentFormModel {
   isEnabled: boolean
   toolIds: number[]
   skillIds: number[]
+  /** MCP 绑定：toolNames 为空表示该 server 的全部工具。 */
+  mcpServers: AgentMcpBindingDraft[]
   createdAt: string
   updatedAt: string
 }

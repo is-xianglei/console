@@ -1,0 +1,38 @@
+.inactive {
+  margin-left: var(--space-sm);
+  color: var(--text-dim);
+}
+
+/* 每个已选 server 一行：左侧名称，右侧工具下拉。 */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 160px) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.serverName {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--fs-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tools {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xs);
+  }
+}

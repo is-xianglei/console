@@ -1,0 +1,28 @@
+/* 卡片列表与智能体列表一致，这里只补 MCP 特有的状态图标。 */
+@import '@/routes/platform-resource/agents/list/index.module.css';
+
+.lock {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--text-dim);
+}
+
+.statusIcon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--text-dim);
+}
+
+.statusIcon[data-tone='success'] { color: var(--status-success); }
+.statusIcon[data-tone='warning'] { color: var(--status-warning); }
+.statusIcon[data-tone='error'] { color: var(--status-error); }
+
+/* 没有描述时显示地址，单行截断。 */
+.cardUrl {
+  font-size: var(--fs-sm);
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  word-break: break-all;
+}

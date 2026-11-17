@@ -3,9 +3,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ActionIconButton } from '@/components'
 import { focusFirstError } from '@/hooks/useFormHelpers'
 import type { AgentFormModel, AgentValidationIssue } from '@/interfaces/agent/model'
+import type { McpServerResponse } from '@/interfaces/mcp/api'
 import type { SkillResponse } from '@/interfaces/skill/model'
 import type { ToolResponse } from '@/interfaces/tool/model'
 import { getAgentToolItems } from '@/utils/agent-tools'
+import AgentMcpBindings from '../agent-mcp-bindings/index.vue'
 
 /** 新建 / 编辑 / 复制共用的 Agent 表单：页头操作 + 基本信息、系统提示词、能力三组。 */
 defineOptions({ name: 'AgentForm' })
@@ -16,6 +18,8 @@ const props = defineProps<{
   issues: AgentValidationIssue[]
   skills: SkillResponse[]
   tools: ToolResponse[]
+  mcpServers: McpServerResponse[]
+  mcpCatalogError?: string
   saving: boolean
   /** 详情 / 复制源加载中：显示骨架，禁用保存。 */
   loading?: boolean
@@ -203,6 +207,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
                   </template>
                 </USelectMenu>
               </UFormField>
+              <AgentMcpBindings
+                v-model="agent.mcpServers"
+                :class="$style.span2"
+                :servers="mcpServers"
+                :loading="catalogsLoading"
+                :error="mcpCatalogError"
+              />
             </div>
           </div>
         </section>

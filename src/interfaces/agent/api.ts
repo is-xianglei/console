@@ -38,6 +38,8 @@ export interface AgentResponse {
   created_by_user_id: number
   tool_ids?: number[]
   skill_ids?: number[]
+  /** 绑定的 MCP server 与工具白名单，按 server_id 排序。 */
+  mcp_servers?: AgentMcpBinding[]
   created_at: string
   updated_at: string
 }
@@ -58,6 +60,17 @@ export interface AgentToolBindingsRequest {
 /** 全量替换 Agent Skill 绑定请求。 */
 export interface AgentSkillBindingsRequest {
   skill_ids?: number[]
+}
+
+/** 一项 MCP 绑定：tool_names 为 null 表示该 server 的全部工具，不允许空列表。 */
+export interface AgentMcpBinding {
+  server_id: number
+  tool_names: string[] | null
+}
+
+/** 全量替换 Agent MCP 绑定请求；空列表表示解除全部绑定。 */
+export interface AgentMcpBindingsRequest {
+  servers: AgentMcpBinding[]
 }
 
 /** Agent 删除结果。 */

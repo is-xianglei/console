@@ -1,0 +1,90 @@
+/* 骨架、分组、行与智能体详情一致，这里只补 MCP 特有的部分。 */
+@import '@/routes/platform-resource/agents/detail/index.module.css';
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.lock {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--text-dim);
+}
+
+.rowLabel {
+  width: 80px;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.errorText {
+  margin: var(--space-xs) 0 0;
+  color: var(--status-error);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.toolsLoading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg) 0;
+}
+
+.toolSkeleton {
+  height: 40px;
+  border-radius: var(--radius-control);
+}
+
+.toolsAlert {
+  margin: var(--space-lg) 0;
+}
+
+.emptyTools {
+  margin: 0;
+  padding: var(--space-lg) 0;
+  color: var(--text-dim);
+  font-size: var(--fs-base);
+}
+
+.toolName {
+  color: var(--text-primary);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.toolFlags {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.flag {
+  width: 16px;
+  height: 16px;
+  color: var(--text-dim);
+}
+
+.flag[data-tone='warning'] {
+  color: var(--status-warning);
+}
+
+/* 被名单过滤掉的工具置灰。 */
+.filtered .toolName,
+.filtered .rowMeta {
+  color: var(--text-dim);
+  text-decoration: line-through;
+  text-decoration-color: var(--border-visible);
+}

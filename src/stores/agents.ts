@@ -7,14 +7,18 @@ import {
   getAgentDetail,
   getAgentList,
   updateAgent,
+  updateAgentMcpServers,
   updateAgentSkills,
   updateAgentTools,
 } from '@/http/agent'
+import { getMcpServerList } from '@/http/mcp'
 import { getSkillList } from '@/http/skill'
 import { getToolList } from '@/http/tool'
-import type { AgentCreateRequest, AgentResponse } from '@/interfaces/agent/api'
+import type { AgentCreateRequest, AgentMcpBinding, AgentResponse } from '@/interfaces/agent/api'
+import type { McpServerResponse } from '@/interfaces/mcp/api'
 import type { SkillResponse } from '@/interfaces/skill/model'
 import type { ToolResponse } from '@/interfaces/tool/model'
+import { sameMcpBindings } from '@/utils/mcp'
 import { useAuthStore } from './auth'
 
 interface AgentsState {
@@ -22,6 +26,10 @@ interface AgentsState {
   total: number
   tools: ToolResponse[]
   skills: SkillResponse[]
+  /** 可见的 MCP server（表单里只列可绑定的，详情用它显示名称）。 */
+  mcpServers: McpServerResponse[]
+  /** MCP 目录单独加载：MCP 关闭或失败不影响技能 / 工具目录。 */
+  mcpCatalogError: string
   loading: boolean
   catalogsLoading: boolean
   saving: boolean
@@ -44,6 +52,8 @@ export interface SaveAgentInput {
   isEnabled: boolean
   toolIds: number[]
   skillIds: number[]
+  /** 不传表示不改 MCP 绑定。 */
+  mcpServers?: AgentMcpBinding[]
 }
 
 export type AgentDetailResult =
@@ -95,6 +105,8 @@ export const useAgentsStore = defineStore('agents', () => {
     total: 0,
     tools: [],
     skills: [],
+    mcpServers: [],
+    mcpCatalogError: '',
     loading: false,
     catalogsLoading: false,
     saving: false,
@@ -131,6 +143,8 @@ export const useAgentsStore = defineStore('agents', () => {
     state.total = 0
     state.tools = []
     state.skills = []
+    state.mcpServers = []
+    state.mcpCatalogError = ''
     state.loading = false
     state.catalogsLoading = false
     state.saving = false
@@ -168,20 +182,27 @@ export const useAgentsStore = defineStore('agents', () => {
     const workspaceId = authStore.currentWorkspaceId
     const requestGeneration = ++catalogGeneration
     state.catalogsLoading = true
+    const mcpRequest = getMcpServerList()
+      .then((servers) => ({ servers, error: '' }))
+      .catch((error: unknown) => ({ servers: [] as McpServerResponse[], error: errorMessage(error, 'MCP server 目录加载失败') }))
     try {
-      const [enabledTools, disabledTools, skills] = await Promise.all([
+      const [enabledTools, disabledTools, skills, mcp] = await Promise.all([
         getAllToolPages(true),
         getAllToolPages(false),
         getSkillList(),
+        mcpRequest,
       ])
       if (contextChanged(generation, workspaceId) || requestGeneration !== catalogGeneration) return null
       state.tools = [...enabledTools, ...disabledTools]
       state.skills = skills
+      state.mcpServers = mcp.servers
+      state.mcpCatalogError = mcp.error
       return null
     } catch (error) {
       if (contextChanged(generation, workspaceId) || requestGeneration !== catalogGeneration) return null
       state.tools = []
       state.skills = []
+      state.mcpServers = []
       return errorMessage(error, 'Agent 能力目录加载失败')
     } finally {
       if (!contextChanged(generation, workspaceId) && requestGeneration === catalogGeneration) {
@@ -272,6 +293,21 @@ export const useAgentsStore = defineStore('agents', () => {
       let saved: AgentResponse
       if (input.id == null) {
         saved = await createAgent(payload)
+        // 创建接口不接收 MCP 绑定，建好后再单独绑定。
+        const mcpServers = input.mcpServers ?? []
+        if (mcpServers.length) {
+          if (contextChanged(generation, workspaceId)) return { item: null, error: null }
+          try {
+            saved = await updateAgentMcpServers(saved.id, { servers: mcpServers })
+          } catch (error) {
+            if (contextChanged(generation, workspaceId)) return { item: null, error: null }
+            upsertAgent(saved)
+            return {
+              item: saved,
+              error: `Agent 已创建，但 MCP 绑定失败（${errorMessage(error, '更新失败')}）。请检查后重新保存。`,
+            }
+          }
+        }
       } else {
         saved = await updateAgent(input.id, {
           name: payload.name,
@@ -281,13 +317,16 @@ export const useAgentsStore = defineStore('agents', () => {
           is_enabled: payload.is_enabled,
         })
         if (contextChanged(generation, workspaceId)) return { item: null, error: null }
-        const [toolsResult, skillsResult] = await Promise.allSettled([
+        const [toolsResult, skillsResult, mcpResult] = await Promise.allSettled([
           sameBindingIds(saved.tool_ids, input.toolIds)
             ? Promise.resolve(saved)
             : updateAgentTools(input.id, { tool_ids: input.toolIds }),
           sameBindingIds(saved.skill_ids, input.skillIds)
             ? Promise.resolve(saved)
             : updateAgentSkills(input.id, { skill_ids: input.skillIds }),
+          input.mcpServers === undefined || sameMcpBindings(saved.mcp_servers, input.mcpServers)
+            ? Promise.resolve(saved)
+            : updateAgentMcpServers(input.id, { servers: input.mcpServers }),
         ])
         if (contextChanged(generation, workspaceId)) return { item: null, error: null }
 
@@ -297,6 +336,9 @@ export const useAgentsStore = defineStore('agents', () => {
         }
         if (skillsResult.status === 'rejected') {
           bindingErrors.push(`Skill 绑定：${errorMessage(skillsResult.reason, '更新失败')}`)
+        }
+        if (mcpResult.status === 'rejected') {
+          bindingErrors.push(`MCP 绑定：${errorMessage(mcpResult.reason, '更新失败')}`)
         }
         if (bindingErrors.length) {
           let current: AgentResponse | null = null
@@ -365,6 +407,7 @@ export const useAgentsStore = defineStore('agents', () => {
         ...updated,
         tool_ids: updated.tool_ids ?? current?.tool_ids,
         skill_ids: updated.skill_ids ?? current?.skill_ids,
+        mcp_servers: updated.mcp_servers ?? current?.mcp_servers,
       })
       return null
     } catch (error) {

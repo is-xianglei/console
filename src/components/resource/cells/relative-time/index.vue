@@ -11,10 +11,10 @@ const props = withDefaults(
     value?: string | null
     /** 'relative'：相对时间，超过 7 天自动切绝对；'absolute'：始终 YYYY-MM-DD HH:mm:ss。 */
     mode?: 'relative' | 'absolute'
-    /** 可注入的当前时间（ms），供单测固定。 */
+    /** 可注入的当前时间（ms），供单测固定；不传时每次重算，值更新后不会被当成未来时间。 */
     now?: number
   }>(),
-  { value: null, mode: 'relative', now: () => Date.now() },
+  { value: null, mode: 'relative', now: undefined },
 )
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
@@ -40,7 +40,7 @@ const full = computed(() => {
 const relative = computed(() => {
   const at = parsedAt.value
   if (at == null) return ''
-  const now = props.now
+  const now = props.now ?? Date.now()
   const diff = now - at
   const abs = Math.abs(diff)
   // diff >= 0：过去；diff < 0：未来。

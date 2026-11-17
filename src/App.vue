@@ -8,6 +8,7 @@ import { useAgentsStore } from './stores/agents'
 import { useDepartmentsStore } from './stores/departments'
 import { useGroupsStore } from './stores/groups'
 import { useMemoriesStore } from './stores/memories'
+import { useMcpStore } from './stores/mcp'
 import { useSkillsStore } from './stores/skills'
 import { useWorkspacesStore } from './stores/workspaces'
 
@@ -18,6 +19,7 @@ const departmentsStore = useDepartmentsStore()
 const groupsStore = useGroupsStore()
 const memoriesStore = useMemoriesStore()
 const skillsStore = useSkillsStore()
+const mcpStore = useMcpStore()
 const workspacesStore = useWorkspacesStore()
 const router = useRouter()
 let lifecycleStarted = false
@@ -62,6 +64,7 @@ watch(
     groupsStore.resetGroups(workspaceId)
     memoriesStore.resetMemories()
     skillsStore.resetSkills()
+    mcpStore.resetMcp()
     workspacesStore.resetWorkspaces(workspaceId)
   },
   { immediate: true },

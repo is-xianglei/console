@@ -1,0 +1,59 @@
+/* 页面骨架、分组、两列表单与智能体表单一致，这里只补 MCP 特有的部分。 */
+@import '@/routes/platform-resource/agents/components/agent-form/index.module.css';
+
+.inner {
+  max-width: 720px;
+}
+
+/* 智能体表单给 [data-slot='base'] 设了输入框高度和内边距，单选圆点要还原。 */
+.radios :global([data-slot='base']) {
+  min-height: 0;
+  padding: 0;
+}
+
+/* 认证方式：分段选择，宽度随内容。 */
+.segmented {
+  width: fit-content;
+}
+
+.headerRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.headerName {
+  flex: 2;
+  min-width: 0;
+}
+
+.headerValue {
+  flex: 3;
+  min-width: 0;
+}
+
+.addHeader {
+  align-self: flex-start;
+}
+
+.unit {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 640px) {
+  .headerRow {
+    flex-wrap: wrap;
+  }
+
+  .headerName,
+  .headerValue {
+    flex-basis: 100%;
+  }
+}

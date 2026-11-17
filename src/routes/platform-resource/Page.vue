@@ -5,6 +5,7 @@ import { useToast } from '@nuxt/ui/composables'
 import { useRoute, useRouter } from 'vue-router'
 import AgentResource from './agents/list/index.vue'
 import BuildResourceManager from './components/build-resource-manager/index.vue'
+import McpResource from './mcp/list/index.vue'
 import DepartmentResourceList from './organization/departments/list/index.vue'
 import GroupResourceList from './organization/groups/list/index.vue'
 import PeopleResourceList from './organization/people/list/index.vue'
@@ -250,6 +251,7 @@ onBeforeUnmount(() => {
   <AgentResource v-if="moduleKey === 'build' && page.key === 'agents'" />
   <WorkflowResource v-else-if="moduleKey === 'build' && page.key === 'workflows'" />
   <TeamResource v-else-if="moduleKey === 'build' && page.key === 'teams'" />
+  <McpResource v-else-if="moduleKey === 'build' && page.key === 'mcp'" />
   <BuildResourceManager v-else-if="moduleKey === 'build'" :page="page" />
   <DepartmentResourceList v-else-if="moduleKey === 'organization' && page.key === 'departments'" />
   <GroupResourceList v-else-if="moduleKey === 'organization' && page.key === 'groups'" />
