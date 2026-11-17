@@ -32,7 +32,6 @@ import type {
   ApprovalDecision,
   ChatBlock,
   ChatMessage,
-  GraphNodeState,
   MsgContentBlock,
   Session,
   SessionMessageResponse,
@@ -98,7 +97,6 @@ function mapSession(s: SessionResponse, currentUserId?: number | null): Session 
     userId: s.user_id ?? null,
     readOnly: s.user_id != null && currentUserId != null && s.user_id !== currentUserId,
     agentId: s.agent_id ?? null,
-    orchestrationPlanId: s.orchestration_plan_id ?? null,
     workflowId: s.workflow_id ?? null,
     modelName: s.model_name ?? null,
     modelProviderId: s.model_provider_id ?? null,
@@ -337,16 +335,12 @@ interface ConsoleState {
   agents: SubAgent[]
   selectedAgentId: string | null
   newSessionAgentId: number | null
-  /** 新会话草稿选中的编排方案 ID;与 newSessionAgentId 互斥 */
-  newSessionPlanId: number | null
-  /** 新会话草稿选中的 Workflow ID;与 newSessionAgentId/newSessionPlanId 互斥 */
+  /** 新会话草稿选中的 Workflow ID;与 newSessionAgentId 互斥 */
   newSessionWorkflowId: number | null
   chatSelection: ChatModelSelection
   chatSelectionSaving: boolean
   standardDraftEffort: ThinkingEffort
   tasks: Task[]
-  /** 编排执行图节点状态,按去掉 #N 轮次的裸路径归并;表中无该键即 pending */
-  graphNodes: Record<string, GraphNodeState>
   /** Workflow 进度图状态:按 agent_id 归并的成员 + 路由/汇总阶段 */
   workflowProgress: WorkflowProgressState
   busy: boolean
@@ -387,20 +381,18 @@ export const useConsoleStore = defineStore('console', () => {
     sessions: [...SESSIONS],
     activeSessionId: SESSIONS[0].id,
     activeAppId: SESSIONS[0].appId ?? null,
-    // seed 会话不含编排方案,初始视图只需区分是否带应用
+    // seed 会话不绑定 Workflow,初始视图只需区分是否带应用
     workbenchMode: SESSIONS[0].appId ? 'split' : 'chat',
     search: '',
     messages: [],
     agents: [],
     selectedAgentId: null,
     newSessionAgentId: null,
-    newSessionPlanId: null,
     newSessionWorkflowId: null,
     chatSelection: { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast' },
     chatSelectionSaving: false,
     standardDraftEffort: 'fast',
     tasks: [],
-    graphNodes: {},
     workflowProgress: emptyWorkflowProgress(),
     busy: false,
     activeTurnId: null,
@@ -563,9 +555,8 @@ export const useConsoleStore = defineStore('console', () => {
       state.tasks = []
       state.selectedAgentId = null
       state.newSessionAgentId = null
-      state.newSessionPlanId = null
       state.newSessionWorkflowId = null
-      // 先清空草稿选择,再按会话绑定关系计算默认视图,避免上个草稿的方案泄漏
+      // 先清空草稿选择,再按会话绑定关系计算默认视图,避免上个草稿的 Workflow 泄漏
       state.workbenchMode = defaultWorkbenchMode(state.activeSessionId)
       if (state.activeSessionId) await loadMessages(state.activeSessionId)
       return true
@@ -582,13 +573,6 @@ export const useConsoleStore = defineStore('console', () => {
     return /^\d+$/.test(id)
   }
 
-  /** 会话绑定的编排方案 ID;本地草稿会话回退到 newSessionPlanId。 */
-  function sessionPlanId(id: string): number | null {
-    const session = state.sessions.find((item) => item.id === id)
-    if (session?.orchestrationPlanId != null) return session.orchestrationPlanId
-    return isBackendSession(id) ? null : state.newSessionPlanId
-  }
-
   /** 会话绑定的 Workflow ID;本地草稿会话回退到 newSessionWorkflowId。 */
   function sessionWorkflowId(id: string): number | null {
     const session = state.sessions.find((item) => item.id === id)
@@ -596,12 +580,10 @@ export const useConsoleStore = defineStore('console', () => {
     return isBackendSession(id) ? null : state.newSessionWorkflowId
   }
 
-  /** 会话切换后的默认工作台模式:打开应用优先分屏,绑定编排(方案或 Workflow)落到执行图。 */
+  /** 会话切换后的默认工作台模式:打开应用优先分屏,绑定 Workflow 落到执行图。 */
   function defaultWorkbenchMode(sessionId: string): WorkbenchMode {
     if (getWorkbenchApp(state.activeAppId)) return 'split'
-    return sessionPlanId(sessionId) != null || sessionWorkflowId(sessionId) != null
-      ? 'graph'
-      : 'chat'
+    return sessionWorkflowId(sessionId) != null ? 'graph' : 'chat'
   }
 
   /**
@@ -682,17 +664,15 @@ export const useConsoleStore = defineStore('console', () => {
     state.sessions = []
     state.activeSessionId = ''
     state.activeAppId = null
-    // 全量重置后无会话亦无方案,对话视图是唯一合法模式
+    // 全量重置后无会话亦无 Workflow,对话视图是唯一合法模式
     state.workbenchMode = 'chat'
     state.search = ''
     state.messages = []
     state.agents = []
     state.selectedAgentId = null
     state.newSessionAgentId = null
-    state.newSessionPlanId = null
     state.newSessionWorkflowId = null
     state.tasks = []
-    state.graphNodes = {}
     state.workflowProgress = emptyWorkflowProgress()
     state.busy = false
     state.activeTurnId = null
@@ -726,7 +706,6 @@ export const useConsoleStore = defineStore('console', () => {
     state.tasks = []
     state.selectedAgentId = null
     state.newSessionAgentId = null
-    state.newSessionPlanId = null
     state.newSessionWorkflowId = null
     state.workflowProgress = emptyWorkflowProgress()
     state.workbenchMode = defaultWorkbenchMode(id)
@@ -755,7 +734,6 @@ export const useConsoleStore = defineStore('console', () => {
     state.tasks = []
     state.selectedAgentId = null
     state.newSessionAgentId = null
-    state.newSessionPlanId = null
     state.newSessionWorkflowId = null
     state.workflowProgress = emptyWorkflowProgress()
   }
@@ -763,45 +741,19 @@ export const useConsoleStore = defineStore('console', () => {
   function setNewSessionAgent(agentId: number | null) {
     if (isBackendSession(state.activeSessionId)) return
     state.newSessionAgentId = agentId
-    // 后端约束 agent 与编排互斥:选中 Agent 即放弃方案草稿;
-    // Workflow 草稿无条件解绑(含回到平台默认 Agent),composer 切回时自动生效
-    if (agentId != null) setNewSessionPlanDraft(null)
+    // 后端约束 agent 与 Workflow 互斥:Workflow 草稿无条件解绑(含回到平台默认 Agent),
+    // composer 切回时自动生效
     state.newSessionWorkflowId = null
     const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
     if (localSession) localSession.agentId = agentId
   }
 
-  /** 仅更新方案草稿及本地会话标记,不处理与 Agent 的互斥(由调用方决定)。 */
-  function setNewSessionPlanDraft(planId: number | null) {
-    state.newSessionPlanId = planId
-    const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
-    if (localSession) localSession.orchestrationPlanId = planId
-  }
-
-  /** 为新会话草稿绑定编排方案;绑定后默认切到执行图视图。 */
-  function setNewSessionPlan(planId: number | null) {
-    if (isBackendSession(state.activeSessionId)) return
-    setNewSessionPlanDraft(planId)
-    // 与 Agent/Workflow 互斥:选中方案即回退到平台默认 Agent,并解绑 Workflow 草稿
-    if (planId != null) {
-      state.newSessionAgentId = null
-      const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
-      if (localSession) localSession.agentId = null
-    }
-    state.newSessionWorkflowId = null
-    if (!getWorkbenchApp(state.activeAppId)) {
-      state.workbenchMode = planId != null ? 'graph' : 'chat'
-    }
-  }
-
   /** 为新会话草稿绑定 Workflow;绑定后默认切到执行图视图。
-   *  与 setNewSessionPlan 同构:后端约束 workflow_id / agent_id / 方案 ID 互斥。 */
+   *  后端约束 workflow_id / agent_id 互斥。 */
   function setNewSessionWorkflow(workflowId: number | null) {
     if (isBackendSession(state.activeSessionId)) return
     state.newSessionWorkflowId = workflowId
     if (workflowId != null) {
-      // 选中 Workflow 即放弃 Agent 与方案草稿
-      setNewSessionPlanDraft(null)
       state.newSessionAgentId = null
       const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
       if (localSession) localSession.agentId = null
@@ -819,7 +771,7 @@ export const useConsoleStore = defineStore('console', () => {
     if (appId === state.activeAppId) return
     invalidateStream()
     state.activeAppId = appId
-    // 打开应用是显式动作,即使会话绑了编排方案也切到分屏
+    // 打开应用是显式动作,即使会话绑了 Workflow 也切到分屏
     state.workbenchMode = 'split'
     const appSession = state.sessions.find((session) => session.appId === appId)
     if (!appSession || appSession.id !== state.activeSessionId) {
@@ -829,7 +781,6 @@ export const useConsoleStore = defineStore('console', () => {
       state.tasks = []
       state.selectedAgentId = null
       state.newSessionAgentId = null
-      state.newSessionPlanId = null
       state.newSessionWorkflowId = null
       state.workflowProgress = emptyWorkflowProgress()
       if (appSession) void loadMessages(appSession.id)
@@ -837,12 +788,9 @@ export const useConsoleStore = defineStore('console', () => {
   }
 
   function setWorkbenchMode(mode: WorkbenchMode) {
-    // 执行图只依赖会话绑定的编排(方案或 Workflow),不要求打开应用
+    // 执行图只依赖会话绑定的 Workflow,不要求打开应用
     if (mode === 'graph') {
-      state.workbenchMode =
-        sessionPlanId(state.activeSessionId) != null || sessionWorkflowId(state.activeSessionId) != null
-          ? 'graph'
-          : 'chat'
+      state.workbenchMode = sessionWorkflowId(state.activeSessionId) != null ? 'graph' : 'chat'
       return
     }
     state.workbenchMode = getWorkbenchApp(state.activeAppId) ? mode : 'chat'
@@ -946,7 +894,6 @@ export const useConsoleStore = defineStore('console', () => {
         state.tasks = []
         state.selectedAgentId = null
         state.newSessionAgentId = null
-        state.newSessionPlanId = null
         state.newSessionWorkflowId = null
         state.workflowProgress = emptyWorkflowProgress()
       }
@@ -1004,38 +951,6 @@ export const useConsoleStore = defineStore('console', () => {
     return prompt ? dispatch(prompt) : false
   }
 
-  /** 把 node_start / node_end 归并进执行图状态。
-   *  key 用去掉 #N 轮次的裸路径:loop 同一成员跨轮次是不同 path,但图上复用同一个节点框。
-   *  并行模式下 start/end 不成对相邻到达(end 按各分支完成快慢返回),故按 path 建索引而非按序配对。 */
-  function mergeNodeEvent(ev: SseEvent) {
-    const node = ev.node
-    if (!node?.path) return
-    const key = node.path.replace(/#\d+/g, '')
-    const detail = node.detail ?? {}
-    const prev = state.graphNodes[key]
-    const next: GraphNodeState = {
-      ...prev,
-      path: key,
-      // node_start 无 status 字段;node_end 的 status 为节点终态
-      status: ev.type === 'node_end' ? nodeEndStatus(node.status) : 'running',
-    }
-    // run_id 带 turn 前缀,前端推不出来,只能取自事件;点节点切右栏流靠它
-    if (ev.actor?.run_id) next.runId = ev.actor.run_id
-    // 轮次取自 detail(从 1 起),不从 path 的 #N 解析(那个从 0 起且在根节点段)
-    if (typeof detail.iteration === 'number') next.iteration = detail.iteration
-    if (typeof detail.max_iterations === 'number') next.maxIterations = detail.max_iterations
-    // routing 命中的分支键,挂在被选中的叶子上;未命中分支无任何事件
-    if (typeof detail.route === 'string') next.route = detail.route
-    if (detail.root === true) next.root = true
-    state.graphNodes[key] = next
-  }
-
-  /** node_end 的 status 收窄到图状态;缺失或未知值按失败处理,避免节点卡在运行中。 */
-  function nodeEndStatus(status: string | undefined): GraphNodeState['status'] {
-    if (status === 'completed' || status === 'suspended' || status === 'escalated') return status
-    return 'failed'
-  }
-
   /** 把 workflow_progress 事件归并进进度图状态。
    *  member 按 agent_id 归并:status 覆盖、member_name 有值才覆盖、ordinal/total 透传;
    *  routing/merging 只写阶段状态,路由命中时记录 routedAgentId。 */
@@ -1081,7 +996,6 @@ export const useConsoleStore = defineStore('console', () => {
   function buildReducer(
     ai: ChatMessage,
     configuredAgentId?: number,
-    configuredPlanId?: number,
     configuredWorkflowId?: number,
   ) {
     const chatSelection = activeChatSelection()
@@ -1103,7 +1017,7 @@ export const useConsoleStore = defineStore('console', () => {
             draft.id = idStr
           } else if (!state.sessions.some((s) => s.id === idStr)) {
             // 草稿已被会话切换顶掉:补建会话对象,否则 activeSessionId 会悬空,
-            // 绑定的编排方案随之丢失,执行图会在跑起来的瞬间消失。
+            // 绑定的 Workflow 随之丢失,执行图会在跑起来的瞬间消失。
             const latestPrompt = [...state.messages].reverse().find((message) => message.role === 'user')?.text?.trim()
             state.sessions.unshift({
               id: idStr,
@@ -1112,7 +1026,6 @@ export const useConsoleStore = defineStore('console', () => {
               count: 0,
               appId: state.activeAppId ?? undefined,
               agentId: configuredAgentId ?? null,
-              orchestrationPlanId: configuredPlanId ?? null,
               workflowId: configuredWorkflowId ?? null,
               modelProviderId: chatSelection.model_provider_id,
               modelProviderOverride: chatSelection.model_provider_id !== null,
@@ -1128,20 +1041,14 @@ export const useConsoleStore = defineStore('console', () => {
         if (promoted) {
           rememberStandardEffort(authStore.state.user?.id ?? null, authStore.currentWorkspaceId, idStr, promoted.standardThinkingEffort ?? standardEffort)
           if (configuredAgentId != null) promoted.agentId = configuredAgentId
-          if (configuredPlanId != null) promoted.orchestrationPlanId = configuredPlanId
           if (configuredWorkflowId != null) promoted.workflowId = configuredWorkflowId
         }
         state.newSessionAgentId = null
-        state.newSessionPlanId = null
         state.newSessionWorkflowId = null
       },
       // 任务全量快照:随 SSE 流实时到达,直接整体替换任务面板
       onTaskSnapshot: (tasks) => {
         state.tasks = tasks.filter((t) => t.status !== 'deleted').map(mapTask)
-      },
-      // 编排节点事件:归并到执行图状态,不建右栏面板(面板仍由叶子自身的流事件创建)
-      onNodeEvent: (ev) => {
-        mergeNodeEvent(ev)
       },
       // Workflow 进度事件:按阶段归并到进度图状态
       onWorkflowProgress: (progress) => {
@@ -1280,11 +1187,10 @@ export const useConsoleStore = defineStore('console', () => {
   function streamHandlers(
     ai: ChatMessage,
     configuredAgentId?: number,
-    configuredPlanId?: number,
     configuredWorkflowId?: number,
     options: StreamOptions = {},
   ): SseHandlers {
-    const reducer = buildReducer(ai, configuredAgentId, configuredPlanId, configuredWorkflowId)
+    const reducer = buildReducer(ai, configuredAgentId, configuredWorkflowId)
     const generation = dataGeneration
     const streamId = options.streamId ?? streamGeneration
     let expectedSessionId = options.sessionId ?? (isBackendSession(state.activeSessionId) ? state.activeSessionId : null)
@@ -1396,7 +1302,7 @@ export const useConsoleStore = defineStore('console', () => {
   /** 派发一次任务:POST /api/sessions/messages,消费 SSE 流增量更新对话与右栏 */
   function dispatch(
     text: string,
-    options?: { agentId?: number | null; planId?: number | null; workflowId?: number | null },
+    options?: { agentId?: number | null; workflowId?: number | null },
   ): boolean {
     const content = text.trim()
     if (!canWriteSession() || state.busy || state.chatSelectionSaving || !content) return false
@@ -1414,9 +1320,7 @@ export const useConsoleStore = defineStore('console', () => {
     // 重置本轮舰队与任务
     state.agents = []
     state.tasks = []
-    // 执行图按轮重置:上一轮的节点状态不能残留到本轮
-    state.graphNodes = {}
-    // Workflow 进度图同理按轮重置
+    // Workflow 进度图按轮重置:上一轮的节点状态不能残留到本轮
     state.workflowProgress = emptyWorkflowProgress()
     state.selectedAgentId = null
 
@@ -1431,27 +1335,21 @@ export const useConsoleStore = defineStore('console', () => {
     const localSession = sessionId === undefined
       ? state.sessions.find((session) => session.id === state.activeSessionId)
       : undefined
-    // 后端约束:agent_id / orchestration_plan_id / workflow_id 仅开新会话可传且互斥;
-    // 优先级 workflow > plan > agent,已落库会话三者都不带。
+    // 后端只支持 agent_id / workflow_id 两种新会话目标。
     const requestedWorkflowId = options?.workflowId !== undefined
       ? options.workflowId
       : localSession?.workflowId ?? state.newSessionWorkflowId
-    const configuredWorkflowId = sessionId === undefined ? requestedWorkflowId ?? undefined : undefined
-    const requestedPlanId = options?.planId !== undefined
-      ? options.planId
-      : localSession?.orchestrationPlanId ?? state.newSessionPlanId
-    const configuredPlanId = sessionId === undefined && configuredWorkflowId == null
-      ? requestedPlanId ?? undefined
+    const configuredWorkflowId = sessionId === undefined
+      ? requestedWorkflowId ?? undefined
       : undefined
     const requestedAgentId = options?.agentId !== undefined
       ? options.agentId
       : localSession?.agentId ?? state.newSessionAgentId
-    const configuredAgentId = sessionId === undefined && configuredWorkflowId == null && configuredPlanId == null
+    const configuredAgentId = sessionId === undefined && configuredWorkflowId == null
       ? requestedAgentId ?? undefined
       : undefined
     if (localSession) {
       localSession.agentId = configuredAgentId ?? null
-      localSession.orchestrationPlanId = configuredPlanId ?? null
       localSession.workflowId = configuredWorkflowId ?? null
     }
 
@@ -1459,11 +1357,14 @@ export const useConsoleStore = defineStore('console', () => {
       {
         session_id: sessionId,
         ...(configuredAgentId == null ? {} : { agent_id: configuredAgentId }),
-        ...(configuredPlanId == null ? {} : { orchestration_plan_id: configuredPlanId }),
         ...(configuredWorkflowId == null ? {} : { workflow_id: configuredWorkflowId }),
         content,
+        ...activeChatSelection(),
       },
-      streamHandlers(ai, configuredAgentId, configuredPlanId, configuredWorkflowId),
+      streamHandlers(ai, configuredAgentId, configuredWorkflowId, {
+        sessionId: activeStreamSessionId ?? undefined,
+        streamId,
+      }),
     )
     return true
   }
@@ -1679,7 +1580,6 @@ export const useConsoleStore = defineStore('console', () => {
     newSession,
     openApp,
     setNewSessionAgent,
-    setNewSessionPlan,
     setNewSessionWorkflow,
     setWorkbenchMode,
     sessionWorkflowId,

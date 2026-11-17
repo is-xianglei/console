@@ -17,9 +17,6 @@ import AgentEditLoader from './platform-resource/agents/edit/Loader.vue'
 import DepartmentDetailLoader from './platform-resource/organization/departments/detail/Loader.vue'
 import GroupDetailLoader from './platform-resource/organization/groups/detail/Loader.vue'
 import PersonDetailLoader from './platform-resource/organization/people/detail/Loader.vue'
-import PlanCreateLoader from './platform-resource/plans/create/Loader.vue'
-import PlanDetailLoader from './platform-resource/plans/detail/Loader.vue'
-import PlanEditLoader from './platform-resource/plans/edit/Loader.vue'
 import TeamCreateLoader from './platform-resource/teams/create/Loader.vue'
 import TeamDetailLoader from './platform-resource/teams/detail/Loader.vue'
 import TeamEditLoader from './platform-resource/teams/edit/Loader.vue'
@@ -162,24 +159,6 @@ const router = createRouter({
           path: 'platform/build/workflows/:id(\\d+)/edit',
           name: 'workflow-edit',
           component: WorkflowEditLoader,
-          meta: { requiresAuth: true, platform: true, module: 'build' },
-        },
-        {
-          path: 'platform/build/plans/create',
-          name: 'plan-create',
-          component: PlanCreateLoader,
-          meta: { requiresAuth: true, platform: true, module: 'build' },
-        },
-        {
-          path: 'platform/build/plans/:id(\\d+)',
-          name: 'plan-detail',
-          component: PlanDetailLoader,
-          meta: { requiresAuth: true, platform: true, module: 'build' },
-        },
-        {
-          path: 'platform/build/plans/:id(\\d+)/edit',
-          name: 'plan-edit',
-          component: PlanEditLoader,
           meta: { requiresAuth: true, platform: true, module: 'build' },
         },
         {

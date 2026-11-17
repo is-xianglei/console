@@ -33,7 +33,6 @@ function previewMemberNode(label: string, slot: number): TopoNode {
     data: {
       kind: 'member',
       label,
-      position: null,
       agentId: null,
       disabled: false,
       status: 'pending',

@@ -11,7 +11,7 @@ const props = defineProps<{
   agentLabel: string
   mode: WorkbenchMode
   splitAvailable: boolean
-  /** 当前会话是否绑定了编排方案(执行图视图的可用条件) */
+  /** 当前会话是否绑定了 Workflow(执行图视图的可用条件) */
   planBound: boolean
 }>()
 const emit = defineEmits<{ selectMode: [mode: WorkbenchMode] }>()
@@ -25,7 +25,7 @@ const modeDescriptions: Record<WorkbenchMode, string> = {
   graph: '编排执行图视图',
 }
 
-// 分屏/应用依赖打开的应用,执行图依赖会话绑定的编排方案
+// 分屏/应用依赖打开的应用,执行图依赖会话绑定的 Workflow
 const modeOptions = computed(() =>
   modes
     .filter((mode) => {

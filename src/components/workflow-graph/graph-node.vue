@@ -81,23 +81,9 @@ function onActivate() {
     @keydown.enter.prevent="onActivate"
     @keydown.space.prevent="onActivate"
   >
-    <!-- 连接点不可见，只作为边的锚。上下走主流程，右侧留给 loop 回环 -->
+    <!-- 连接点不可见，只作为边的锚 -->
     <Handle type="target" :position="targetSide" :class="$style.handle" />
     <Handle type="source" :position="sourceSide" :class="$style.handle" />
-    <Handle
-      v-if="data.kind === 'member'"
-      id="loop-in"
-      type="target"
-      :position="Position.Right"
-      :class="$style.handle"
-    />
-    <Handle
-      v-if="data.kind === 'member'"
-      id="loop-out"
-      type="source"
-      :position="Position.Right"
-      :class="$style.handle"
-    />
 
     <span v-if="isAnchor" :class="$style['node-dot']"></span>
     <span v-else :class="[$style['node-icon'], iconClass]"></span>

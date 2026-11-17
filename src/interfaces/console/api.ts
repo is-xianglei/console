@@ -21,8 +21,6 @@ export interface SendMessageRequest extends Partial<ChatModelSelection> {
   session_id?: number | null
   /** 新会话绑定的 Agent ID，与 workflow_id 互斥。 */
   agent_id?: number | null
-  /** 编排方案 ID:仅开新会话时可传,与 agent_id 互斥 */
-  orchestration_plan_id?: number | null
   /** 新会话绑定的 Workflow ID，与 agent_id 互斥。 */
   workflow_id?: number | null
   /** 用户消息正文。 */

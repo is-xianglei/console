@@ -25,8 +25,6 @@ export interface SseTarget {
   onSessionId?: (id: number) => void
   /** task_snapshot 到达:携带该会话全量任务,前端整体替换任务面板 */
   onTaskSnapshot?: (tasks: TaskResponse[]) => void
-  /** 编排节点事件(node_start/node_end):图状态归并,不建面板 */
-  onNodeEvent?: (ev: SseEvent) => void
   /** Workflow 进度事件(workflow_progress):进度图状态归并 */
   onWorkflowProgress?: (progress: SseWorkflowProgress) => void
 }
@@ -221,7 +219,7 @@ export function createSseReducer(target: SseTarget) {
       return
     }
 
-    // Workflow 进度事件:与节点事件同理必须早退。它的 actor 也是 orchestrator,
+    // Workflow 进度事件:必须在 actor.role 分流前早退。它的 actor 是 orchestrator,
     // 但并不是内容块,落入 handleOrchestrator 只会被 switch 忽略;显式早退是为了语义清楚。
     if (ev.type === 'workflow_progress') {
       if (ev.progress) target.onWorkflowProgress?.(ev.progress)

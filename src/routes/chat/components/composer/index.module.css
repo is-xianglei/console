@@ -606,7 +606,7 @@
   to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
-/* ===== 保留的 Agent/编排方案下拉（融入工具栏）===== */
+/* ===== Agent/Workflow 下拉（融入工具栏）===== */
 .agent-select {
   width: min(240px, 48vw);
   min-height: 30px;

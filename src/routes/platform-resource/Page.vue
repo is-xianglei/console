@@ -8,7 +8,6 @@ import BuildResourceManager from './components/build-resource-manager/index.vue'
 import DepartmentResourceList from './organization/departments/list/index.vue'
 import GroupResourceList from './organization/groups/list/index.vue'
 import PeopleResourceList from './organization/people/list/index.vue'
-import PlanResource from './plans/list/index.vue'
 import TeamResource from './teams/list/index.vue'
 import WorkflowResource from './workflows/list/index.vue'
 import {
@@ -249,7 +248,6 @@ onBeforeUnmount(() => {
 
 <template>
   <AgentResource v-if="moduleKey === 'build' && page.key === 'agents'" />
-  <PlanResource v-else-if="moduleKey === 'build' && page.key === 'plans'" />
   <WorkflowResource v-else-if="moduleKey === 'build' && page.key === 'workflows'" />
   <TeamResource v-else-if="moduleKey === 'build' && page.key === 'teams'" />
   <BuildResourceManager v-else-if="moduleKey === 'build'" :page="page" />

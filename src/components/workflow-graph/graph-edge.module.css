@@ -12,10 +12,6 @@
 .edge-active {
   stroke: var(--status-success);
 }
-.edge-loop {
-  stroke: var(--accent-agent);
-  stroke-dasharray: 4 4;
-}
 
 /* 目标节点正在执行时，Vue Flow 给边加 .animated 驱动虚线流动。
    旧实现的虚线是静态的，这是本次唯一有意新增的视觉。 */
@@ -32,18 +28,4 @@
   :global(.vue-flow__edge.animated) .edge {
     animation: none;
   }
-}
-
-/* 分支标签：底板与画布同色，把压住的那截连线遮掉 */
-.edge-label {
-  position: absolute;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: var(--bg-elevated);
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  line-height: 14px;
-  white-space: nowrap;
-  pointer-events: none;
 }

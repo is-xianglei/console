@@ -71,7 +71,7 @@ watch(() => [route.params.sessionId, state.sessionsLoading, state.sessions.map((
   // 跟随路由会把本轮回复整个 loadMessages 冲掉。地址栏交给 App.vue 规范化。
   if (state.busy) return
   // 本地草稿会话还没有后端 id,地址栏必然滞留在上一个会话。此时跟随路由会把草稿
-  // (含编排方案选择)整个顶掉;等 SSE 返回真实 id 后由 App.vue 统一规范化地址。
+  // (含 Agent/Workflow 选择)整个顶掉;等 SSE 返回真实 id 后由 App.vue 统一规范化地址。
   if (state.activeSessionId.startsWith('sess-')) return
   if (state.sessions.some((session) => session.id === sessionId)) selectSession(sessionId)
 }, { immediate: true })

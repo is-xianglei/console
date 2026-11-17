@@ -26,7 +26,7 @@ import type {
 import type { GroupMemberResponse, GroupResponse } from '@/interfaces/group/model'
 
 /**
- * 其余 store（agents / workflows / orchestrationPlans / memories 等）在 p1 / p2 按此迁移：
+ * 其余 store（agents / workflows / memories 等）在 p1 / p2 按此迁移：
  * 增加 `pageState: { items, total, page, pageSize, keyword, isEnabled }` 与 `loadPage(params)`，
  * 请求带 generation 计数防旧响应覆盖，`upsert / remove` 维护 `pageState.total`。
  * 注：group 列表接口当前只回全量数组（无 limit/offset），故 loadPage 仍拉全量并在

@@ -37,18 +37,14 @@ const activeAgentLabel = computed(() => {
   return agentsStore.state.items.find((agent) => agent.id === agentId)?.name ?? `Agent #${agentId}`
 })
 const activeApp = computed(() => getWorkbenchApp(state.activeAppId))
-/** 当前会话绑定的编排方案 ID;本地草稿会话回退到 newSessionPlanId。 */
-const activePlanId = computed(() =>
-  activeSession.value?.orchestrationPlanId ?? state.newSessionPlanId,
-)
 /** 当前会话绑定的 Workflow ID;本地草稿会话回退到 newSessionWorkflowId。 */
 const activeWorkflowId = computed(() =>
   activeSession.value?.workflowId ?? state.newSessionWorkflowId,
 )
 const effectiveMode = computed<WorkbenchMode>(() => {
-  // 执行图不依赖应用,只要会话绑了编排(方案或 Workflow)就允许存活
+  // 执行图不依赖应用,只要会话绑定了 Workflow 就允许存活
   if (state.workbenchMode === 'graph') {
-    return activePlanId.value != null || activeWorkflowId.value != null ? 'graph' : 'chat'
+    return activeWorkflowId.value != null ? 'graph' : 'chat'
   }
   if (!activeApp.value) return 'chat'
   return !splitAvailable.value && state.workbenchMode === 'split' ? 'app' : state.workbenchMode
@@ -76,7 +72,7 @@ watch(sideBySide, (enabled) => {
       :agent-label="activeAgentLabel"
       :mode="effectiveMode"
       :split-available="splitAvailable"
-      :plan-bound="activePlanId != null || activeWorkflowId != null"
+      :plan-bound="activeWorkflowId != null"
       @select-mode="setWorkbenchMode"
     />
 
@@ -125,7 +121,7 @@ watch(sideBySide, (enabled) => {
       <!-- 执行图占右侧栏,对话区留在左边:编排跑起来时两边要能同时看。 -->
       <Transition name="workbench-pane">
         <div v-if="effectiveMode === 'graph'" :class="$style['graph-pane']">
-          <WorkflowGraph :plan-id="activePlanId" :workflow-id="activeWorkflowId" />
+          <WorkflowGraph :workflow-id="activeWorkflowId" />
         </div>
       </Transition>
     </div>

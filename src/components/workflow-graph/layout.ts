@@ -24,12 +24,12 @@ export interface LayoutOptions {
 }
 
 /**
- * dagre 的 order 阶段会把同一层的兄弟节点整体倒序：实测 parallel / routing 的成员
- * 稳定排成 m4 m3 m2 m1 m0，而旧实现是按 position 从左到右。这里不碰 dagre 算好的
+ * dagre 的 order 阶段会把同一层的兄弟节点整体倒序：实测 parallel / llm_routing 的成员
+ * 稳定排成 m4 m3 m2 m1 m0，而旧实现是按成员顺序从左到右。这里不碰 dagre 算好的
  * 间距与居中，只把同一行已占用的 x 坐标按拓扑输入顺序重新发一遍。
  *
- * 依赖 nodes 的数组顺序即 topo.nodes 的顺序，而 buildTopology 已按 position 排序，
- * 所以同一行里的先后天然就是 position 先后。
+ * 依赖 nodes 的数组顺序即 topo.nodes 的顺序，而 buildWorkflowTopology 已按 sort_order 排序，
+ * 所以同一行里的先后天然就是成员顺序。
  *
  * LR 方向下 rank 沿 x 轴展开，同一 rank 共享 x、兄弟沿 y 排列：分组键换成 x，
  * 重新分配的是 y，拓扑顺序靠前的排在上方。
@@ -73,9 +73,6 @@ export function layoutTopology(topo: Topology, options: LayoutOptions = {}): Lay
   for (const edge of topo.edges) {
     graph.setEdge(edge.source, edge.target)
   }
-  // loopback 绝对不能 setEdge 进 dagre：它把首末节点连成环，dagre 的 acyclic 模块
-  // 会为了断环把这条边反转成「首 → 末」，首末节点的 rank 关系被搅乱，整条单链随之拆散。
-  // 它只在函数末尾原样拼进返回值，交给渲染层画回环，不参与排版。
 
   dagre.layout(graph)
 
@@ -105,4 +102,4 @@ export function layoutTopology(topo: Topology, options: LayoutOptions = {}): Lay
 
   restoreSiblingOrder(nodes, direction)
 
-  return { nodes, edges: [...topo.edges, ...topo.loopbacks], bbox: { width, height } }}
+  return { nodes, edges: [...topo.edges], bbox: { width, height } }}

@@ -131,7 +131,7 @@ export interface SnapshotDirtyReturn {
 
 /**
  * 基于 JSON.stringify 的快照脏检查（R8 / useSnapshotDirty）。
- * 仅在显式 reset() 时重置，避免快照随 props 引用变化被重置的问题（plan-builder:165-167）。
+ * 仅在显式 reset() 时重置，避免快照随 props 引用变化被重置的问题。
  */
 export function useSnapshotDirty(source: () => unknown, opts?: { resetOn?: () => boolean }): SnapshotDirtyReturn {
   let initializedValue = false

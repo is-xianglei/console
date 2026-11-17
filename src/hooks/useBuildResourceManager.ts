@@ -78,7 +78,7 @@ export function useBuildResourceManager(page: Ref<ResourcePage>) {
   const allVisibleSelected = computed(() => visibleRows.value.length > 0 && visibleRows.value.every((row) => selectedIds.value.has(row.id)))
   const hasFilters = computed(() => Boolean(search.value) || statusFilter.value !== 'all' || ownerFilter.value !== 'all')
   const deleteTitle = computed(() => {
-    // 单条删除时带上对象名，与 agents/workflows/plans 的删除文案保持一致。
+    // 单条删除时带上对象名，与 agents/workflows 的删除文案保持一致。
     if (pendingDeleteIds.value.length === 1) {
       const target = rows.value.find((row) => row.id === pendingDeleteIds.value[0])
       if (target) return `删除 ${target.name}？`

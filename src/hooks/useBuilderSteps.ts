@@ -28,7 +28,7 @@ export interface BuilderStepItem<Id extends string = string> {
 export type BuilderStepIssues<Id extends string> = Partial<Record<Id, readonly string[]>>
 
 export interface UseBuilderStepsOptions<Id extends string> {
-  /** 步骤列表，可随业务动态变化（如 Plans 的 4 / 5 步）。 */
+  /** 步骤列表，可随业务动态变化。 */
   steps: MaybeRefOrGetter<readonly BuilderStepDef<Id>[]>
   /** 每步的问题文字，由各 Builder 把自己的 issue 映射到步骤后传入（可用 groupIssuesByStep）。 */
   issues: MaybeRefOrGetter<BuilderStepIssues<Id>>

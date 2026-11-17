@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { SelectItem } from '@nuxt/ui'
-import { PLAN_MODE_LABEL } from '@/hooks/useOrchestrationPlanManager'
-import type { PlanResponse } from '@/interfaces/orchestration-plan/api'
 import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
 import { useConsoleStore } from '@/stores/console'
-import { useOrchestrationPlansStore } from '@/stores/orchestrationPlans'
 import { useWorkflowsStore } from '@/stores/workflows'
 import { WORKFLOW_MODE_LABEL } from '@/constants/workflow'
 import { useSkillsStore } from '@/stores/skills'
@@ -41,31 +38,18 @@ interface AttachmentDraft {
 
 const consoleStore = useConsoleStore()
 const agentsStore = useAgentsStore()
-const plansStore = useOrchestrationPlansStore()
 const workflowsStore = useWorkflowsStore()
 const authStore = useAuthStore()
 const skillsStore = useSkillsStore()
-const { state, dispatch, stopExecution, setNewSessionAgent, setNewSessionPlan, setNewSessionWorkflow } = consoleStore
+const { state, dispatch, stopExecution, setNewSessionAgent, setNewSessionWorkflow } = consoleStore
 
 /** 单个下拉同时承载两种运行目标，用前缀区分；后端二者互斥（同时传 409）。 */
 const DEFAULT_TARGET = 'default'
 const AGENT_PREFIX = 'agent:'
-const PLAN_PREFIX = 'plan:'
 const WORKFLOW_PREFIX = 'workflow:'
 const selectedTarget = ref(DEFAULT_TARGET)
 const activeSession = computed(() => state.sessions.find((session) => session.id === state.activeSessionId))
 const persistedSession = computed(() => /^\d+$/.test(state.activeSessionId))
-
-/** 方案可运行的前提：自身启用且全部成员 Agent 未被停用。 */
-function planRunnable(plan: PlanResponse): boolean {
-  return plan.is_enabled && plan.members.every((member) => member.is_available)
-}
-
-function planLabel(plan: PlanResponse): string {
-  const base = `${plan.name} · ${PLAN_MODE_LABEL[plan.mode]}`
-  if (!plan.is_enabled) return `${base}（已停用）`
-  return planRunnable(plan) ? base : `${base}（成员失效）`
-}
 const readOnlySession = computed(() => activeSession.value?.readOnly === true)
 
 const targetItems = computed<SelectItem[]>(() => {
@@ -78,17 +62,6 @@ const targetItems = computed<SelectItem[]>(() => {
         value: `${AGENT_PREFIX}${agent.id}`,
         label: agent.is_enabled ? agent.name : `${agent.name}（已停用）`,
         disabled: !agent.is_enabled,
-      })
-    }
-  }
-  const plans = plansStore.state.items
-  if (plans.length) {
-    items.push({ type: 'separator' }, { type: 'label', label: '编排方案' })
-    for (const plan of plans) {
-      items.push({
-        value: `${PLAN_PREFIX}${plan.id}`,
-        label: planLabel(plan),
-        disabled: !planRunnable(plan),
       })
     }
   }
@@ -106,28 +79,21 @@ const targetItems = computed<SelectItem[]>(() => {
   return items
 })
 
-const planSelected = computed(() => selectedTarget.value.startsWith(PLAN_PREFIX) || selectedTarget.value.startsWith(WORKFLOW_PREFIX))
+const planSelected = computed(() => selectedTarget.value.startsWith(WORKFLOW_PREFIX))
 
 watch(
   () => [
     state.activeSessionId,
     activeSession.value?.agentId,
-    activeSession.value?.orchestrationPlanId,
     activeSession.value?.workflowId,
     state.newSessionAgentId,
-    state.newSessionPlanId,
     state.newSessionWorkflowId,
   ] as const,
   () => {
-    // Workflow / 方案优先：绑定编排的会话不再有 agentId，回显必须先看编排
+    // Workflow 优先：绑定编排的会话不再有 agentId，回显必须先看 Workflow
     const workflowId = activeSession.value?.workflowId ?? state.newSessionWorkflowId
     if (workflowId != null) {
       selectedTarget.value = `${WORKFLOW_PREFIX}${workflowId}`
-      return
-    }
-    const planId = activeSession.value?.orchestrationPlanId ?? state.newSessionPlanId
-    if (planId != null) {
-      selectedTarget.value = `${PLAN_PREFIX}${planId}`
       return
     }
     const agentId = activeSession.value?.agentId ?? state.newSessionAgentId
@@ -145,8 +111,6 @@ watch(selectedTarget, (value) => {
     setNewSessionPlan(Number(value.slice(PLAN_PREFIX.length)))
     return
   }
-  // setNewSessionAgent(null) 不会清方案绑定，从方案切回 Agent/默认时须显式解绑
-  if (state.newSessionPlanId != null) setNewSessionPlan(null)
   setNewSessionAgent(value === DEFAULT_TARGET ? null : Number(value.slice(AGENT_PREFIX.length)))
 })
 
@@ -155,7 +119,6 @@ watch(
   (workspaceId) => {
     if (!workspaceId) return
     void agentsStore.loadAgents()
-    void plansStore.loadPlans()
     void workflowsStore.loadWorkflows()
     // 斜杠命令面板依赖工作区的 skill 列表
     void skillsStore.loadSkills()
@@ -801,8 +764,8 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- 保留现有 Agent/编排方案下拉，融入工具栏左侧 -->
-          <USelect v-model="selectedTarget" :class="$style['agent-select']" :items="targetItems" :icon="planSelected ? 'i-lucide-workflow' : 'i-lucide-bot'" value-key="value" label-key="label" :disabled="persistedSession || state.busy" :loading="agentsStore.state.loading || plansStore.state.loading || workflowsStore.state.loading" aria-label="选择新会话的 Agent、编排方案或 Workflow" />
+          <!-- Agent/Workflow 下拉，融入工具栏左侧 -->
+          <USelect v-model="selectedTarget" :class="$style['agent-select']" :items="targetItems" :icon="planSelected ? 'i-lucide-workflow' : 'i-lucide-bot'" value-key="value" label-key="label" :disabled="persistedSession || state.busy || readOnlySession" :loading="agentsStore.state.loading || workflowsStore.state.loading" aria-label="选择新会话的 Agent 或 Workflow" />
 
           <div :class="$style.right">
             <span v-if="enhancing" :class="[$style['icon-btn'], $style['spinner-btn']]" aria-label="正在增强提示词">

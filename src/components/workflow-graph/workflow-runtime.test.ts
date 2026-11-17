@@ -42,7 +42,6 @@ describe('buildWorkflowTopology', () => {
     const topo = buildWorkflowTopology(workflow('sequential', [[1, '专业写作'], [2, '专业评审']]))
     expect(topo.nodes.map((node) => node.id)).toEqual(['start', 'm1', 'm2', 'end'])
     expect(topo.edges.map((edge) => edge.id)).toEqual(['e-start-m1', 'e-m1-m2', 'e-m2-end'])
-    expect(topo.loopbacks).toEqual([])
     expect(topo.nodes[1].data).toMatchObject({ kind: 'member', agentId: 1, label: '专业写作', disabled: false })
   })
 

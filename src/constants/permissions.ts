@@ -25,7 +25,6 @@ export type PermissionAction =
 export type PermissionResource =
   | 'agent'
   | 'workflow'
-  | 'plan'
   | 'department'
   | 'group'
   | 'person'
@@ -142,7 +141,6 @@ export const ALL_PERMISSION_ACTIONS: PermissionAction[] = [
 export const ALL_PERMISSION_RESOURCES: PermissionResource[] = [
   'agent',
   'workflow',
-  'plan',
   'department',
   'group',
   'person',

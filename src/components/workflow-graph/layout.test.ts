@@ -6,7 +6,7 @@ import type { LayoutResult, TopoNode } from './types'
 function member(id: string): TopoNode {
   return {
     id,
-    data: { kind: 'member', label: id, position: null, agentId: null, disabled: false, status: 'pending', runId: null },
+    data: { kind: 'member', label: id, agentId: null, disabled: false, status: 'pending', runId: null },
   }
 }
 

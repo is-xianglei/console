@@ -352,38 +352,30 @@ describe('createSseReducer', () => {
     })])
   })
 
-  it('编排叶子面板用 Agent 名作标题并按节点键归并', () => {
+  it('编排成员面板用 Agent 名作标题并按 run_id 归并', () => {
     const agents: Parameters<typeof createSseReducer>[0]['agents'] = []
-    const onNodeEvent = vi.fn()
     const reducer = createSseReducer({
       ai: { id: 'ai-7', role: 'ai', time: '10:06', blocks: [] },
       agents,
       selectAgent: vi.fn(),
-      onNodeEvent,
     })
-    const nodeKey = '335e31a7:内容生产流水线/n1_专业评审'
+    const runId = '335e31a7:内容生产流水线/n1_专业评审'
     // 顺序编排的 task 是渲染后的完整 instruction,带上游全文,不能拿来当标题:
     // 三个成员的面板会长得几乎一样,且看不出是哪个 Agent。
     const actor = {
       role: 'subagent' as const,
       name: '专业评审',
-      run_id: nodeKey,
+      run_id: runId,
       task: '任务:介绍工业物联网。\n\n上游产出:\n(此处是上游整篇初稿)',
     }
 
-    reducer.handle(createEvent('node_start', {
-      actor: { role: 'subagent' as const, name: '内容生产流水线', run_id: nodeKey },
-      node: { path: '内容生产流水线/n1_专业评审', name: '专业评审', kind: 'leaf' },
-    }))
     reducer.handle(createEvent('turn_start', { actor }))
     reducer.handle(createEvent('block_start', { actor, block: { index: 0, block_type: 'text' } }))
     reducer.handle(createEvent('text_delta', { actor, block: { index: 0 }, text: '结构清晰' }))
 
-    // node 事件只喂执行图:一旦流进右栏就会以方案名抢先建面板并占住标题
-    expect(onNodeEvent).toHaveBeenCalledTimes(1)
     expect(agents).toHaveLength(1)
     expect(agents[0]).toMatchObject({
-      id: nodeKey,
+      id: runId,
       name: '专业评审',
       stream: [{ kind: 'answer', text: '结构清晰', streaming: true }],
     })

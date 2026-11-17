@@ -8,7 +8,6 @@ import { useAgentsStore } from './stores/agents'
 import { useDepartmentsStore } from './stores/departments'
 import { useGroupsStore } from './stores/groups'
 import { useMemoriesStore } from './stores/memories'
-import { useOrchestrationPlansStore } from './stores/orchestrationPlans'
 import { useSkillsStore } from './stores/skills'
 import { useWorkspacesStore } from './stores/workspaces'
 
@@ -18,7 +17,6 @@ const agentsStore = useAgentsStore()
 const departmentsStore = useDepartmentsStore()
 const groupsStore = useGroupsStore()
 const memoriesStore = useMemoriesStore()
-const orchestrationPlansStore = useOrchestrationPlansStore()
 const skillsStore = useSkillsStore()
 const workspacesStore = useWorkspacesStore()
 const router = useRouter()
@@ -63,7 +61,6 @@ watch(
     departmentsStore.resetDepartments(workspaceId)
     groupsStore.resetGroups(workspaceId)
     memoriesStore.resetMemories()
-    orchestrationPlansStore.resetPlans()
     skillsStore.resetSkills()
     workspacesStore.resetWorkspaces(workspaceId)
   },

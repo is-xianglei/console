@@ -14,8 +14,6 @@ export interface SessionResponse {
   user_id?: number | null
   workspace_id?: number | null
   agent_id?: number | null
-  /** 会话绑定的编排方案 ID;未绑定为 null */
-  orchestration_plan_id?: number | null
   /** 会话绑定的 Workflow ID;未绑定为 null(与 agent_id 互斥) */
   workflow_id?: number | null
   visibility: string
@@ -94,23 +92,6 @@ export interface SseActor {
   team?: { id: number; is_lead: boolean }
 }
 
-/** 编排节点事件(node_start/node_end)携带的节点信息。
- *  path 是与静态拓扑对齐的裸路径;status 只在 node_end 出现。 */
-export interface SseNodeInfo {
-  path: string
-  name: string
-  kind: 'sequential' | 'parallel' | 'routing' | 'loop' | 'leaf' | string
-  status?: 'completed' | 'suspended' | 'failed' | 'escalated' | string
-  detail?: {
-    root?: boolean
-    plan_id?: number
-    mode?: string
-    route?: string
-    iteration?: number
-    max_iterations?: number
-  }
-}
-
 export type InteractionKind =
   | 'tool_approval'
   | 'user_question'
@@ -182,8 +163,6 @@ export interface SseEvent {
     | 'interaction_request'
     | 'error'
     | 'task_snapshot'
-    | 'node_start'
-    | 'node_end'
     | 'workflow_progress'
     | 'run_started'
     | 'run_snapshot'
@@ -224,8 +203,6 @@ export interface SseEvent {
     reason?: string
   }
   interaction?: SseInteraction
-  /** 编排节点事件(node_start/node_end)的节点负载 */
-  node?: SseNodeInfo
   /** Workflow 编排进度事件(workflow_progress)的进度负载 */
   progress?: SseWorkflowProgress
   stop_reason?: string
@@ -244,23 +221,6 @@ export type ApprovalDecision = 'allow_once' | 'always_allow' | 'deny'
 export type RunStatus = 'queued' | 'think' | 'run' | 'done' | 'error'
 export type TaskState = 'queued' | 'active' | 'done' | 'error'
 export type WorkbenchMode = 'chat' | 'split' | 'app' | 'graph'
-
-/** 编排执行图节点的运行时状态：node_start/node_end 按去掉 #N 轮次的裸路径归并。
- *  pending 由「表中无该键」表达，避免与事件驱动的状态混淆。 */
-export interface GraphNodeState {
-  /** 去掉 loop 轮次(#N)后的裸路径，与静态拓扑对齐 */
-  path: string
-  status: 'running' | 'completed' | 'suspended' | 'failed' | 'escalated'
-  /** 点击节点切右栏的流键(带 turn 前缀)；前端推不出来，只能取自事件 actor.run_id */
-  runId?: string
-  /** loop 当前轮次(从 1 起)与轮次上限，取自 detail，不从 path 解析 */
-  iteration?: number
-  maxIterations?: number
-  /** routing 命中的 route_key(挂在被选中叶子上) */
-  route?: string
-  /** 根节点标记(detail.root)，驱动整图总状态，不匹配任何成员节点 */
-  root?: boolean
-}
 
 /** SSE workflow_progress 事件的进度负载(编排者发出)。 */
 export interface SseWorkflowProgress {
@@ -307,8 +267,6 @@ export interface Session {
   /** 当前用户是否仅拥有读取权限。 */
   readOnly?: boolean
   agentId?: number | null
-  /** 会话绑定的编排方案 ID;与 agentId 互斥 */
-  orchestrationPlanId?: number | null
   /** 会话绑定的 Workflow ID;与 agentId 互斥 */
   workflowId?: number | null
   modelName?: string | null
