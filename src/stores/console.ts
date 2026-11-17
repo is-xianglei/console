@@ -50,16 +50,22 @@ import type {
   WorkflowProgressState,
 } from '../interfaces/console/model'
 import { mergeFaults } from '@/utils/mcp-tool'
-import { createSseReducer, toolCardFields } from '@/utils/sse-reducer'
+import { createSseReducer, replaySnapshotActors, toolCardFields } from '@/utils/sse-reducer'
 import type { ChatModelSelection, ThinkingEffort } from '../interfaces/settings/models/model'
 import { getSessionSubAgentRuns } from '../http/session-runtime'
 import { mapSubAgentRuns, mergeSubAgentRuns } from '../utils/session-runtime'
+import { parseTeamInbox } from '../utils/team-runtime'
 import { usePermissionsStore } from './permissions'
 import { useSkillsStore } from './skills'
 import { useMemoriesStore } from './memories'
 import { useAuthStore } from './auth'
+import { useTeamRuntimeStore } from './team-runtime'
 
 // ===== 工具函数 =====
+/** lead 改动团队成员或消息的工具；结果到达时刷新团队视图。 */
+const TEAM_TOOL_NAMES = new Set(['SendMessage', 'TeamSpawn', 'TeamCreate'])
+/** 抢占自动回合时后端偶尔返回 409，等这么久重试一次。 */
+const AUTO_TURN_CONFLICT_RETRY_DELAY = 1000
 const now = () => new Date().toLocaleTimeString('zh-CN', { hour12: false })
 const uid = (p: string) => `${p}-${Math.random().toString(16).slice(2, 8)}`
 
@@ -100,6 +106,7 @@ function mapSession(s: SessionResponse, currentUserId?: number | null): Session 
     readOnly: s.user_id != null && currentUserId != null && s.user_id !== currentUserId,
     agentId: s.agent_id ?? null,
     workflowId: s.workflow_id ?? null,
+    teamDefinitionId: s.team_definition_id ?? null,
     modelName: s.model_name ?? null,
     modelProviderId: s.model_provider_id ?? null,
     modelProviderOverride: metadata.model_provider_override === true,
@@ -231,15 +238,26 @@ function mapMessages(list: SessionMessageResponse[]): ChatMessage[] {
     return true
   }
 
+  // 出现过的轮次：一轮的第一条消息就是 <team-inbox> 时，这一轮是队友消息触发的自动回合。
+  const seenTurns = new Set<string>()
+
   for (const m of list) {
     // 编排节点的中间产出(branch 非空)属于各自分支,不进主时间线,
     // 否则一次三成员的编排会在主对话里多出三条重复回复。
     if (m.branch) continue
 
     const time = formatTime(m.created_at)
+    const firstOfTurn = Boolean(m.turn_id) && !seenTurns.has(m.turn_id!)
+    if (m.turn_id) seenTurns.add(m.turn_id)
 
     if (m.role === 'user') {
       const text = messageText(m.content)
+      // 队友消息合并成的 user 消息不是用户输入，显示成团队消息卡片。
+      const entries = parseTeamInbox(text)
+      if (entries) {
+        out.push({ id: 'm-' + m.id, role: 'team', time, inbox: { entries, trigger: firstOfTurn }, ...(m.turn_id ? { turnId: m.turn_id } : {}) })
+        continue
+      }
       if (text) out.push({ id: 'm-' + m.id, role: 'user', time, text, ...(m.turn_id ? { turnId: m.turn_id } : {}) })
       continue
     }
@@ -340,6 +358,8 @@ interface ConsoleState {
   newSessionAgentId: number | null
   /** 新会话草稿选中的 Workflow ID;与 newSessionAgentId 互斥 */
   newSessionWorkflowId: number | null
+  /** 新会话草稿选中的 Team；与 Agent、Workflow 互斥 */
+  newSessionTeamId: number | null
   chatSelection: ChatModelSelection
   chatSelectionSaving: boolean
   standardDraftEffort: ThinkingEffort
@@ -366,6 +386,7 @@ export const useConsoleStore = defineStore('console', () => {
   const permissionsStore = usePermissionsStore()
   const skillsStore = useSkillsStore()
   const memoriesStore = useMemoriesStore()
+  const teamRuntime = useTeamRuntimeStore()
   let activeStreamAbort: (() => void) | null = null
   let dataGeneration = 0
   let streamGeneration = 0
@@ -392,6 +413,7 @@ export const useConsoleStore = defineStore('console', () => {
     selectedAgentId: null,
     newSessionAgentId: null,
     newSessionWorkflowId: null,
+    newSessionTeamId: null,
     chatSelection: { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast' },
     chatSelectionSaving: false,
     standardDraftEffort: 'fast',
@@ -538,6 +560,8 @@ export const useConsoleStore = defineStore('console', () => {
         })
       }
     }
+    // 队友的输出走各自的激活事件流，lead 回合快照里即使带了 teammate 也不再处理。
+    replaySnapshotActors(snapshot, reducer.handle, sessionId, turnId, (role) => role !== 'teammate')
     if (selectedAgentId && state.agents.some((agent) => agent.id === selectedAgentId)) {
       state.selectedAgentId = selectedAgentId
     } else if (!state.selectedAgentId) {
@@ -589,6 +613,7 @@ export const useConsoleStore = defineStore('console', () => {
       state.selectedAgentId = null
       state.newSessionAgentId = null
       state.newSessionWorkflowId = null
+      state.newSessionTeamId = null
       // 先清空草稿选择,再按会话绑定关系计算默认视图,避免上个草稿的 Workflow 泄漏
       state.workbenchMode = defaultWorkbenchMode(state.activeSessionId)
       if (state.activeSessionId) await loadMessages(state.activeSessionId)
@@ -620,12 +645,60 @@ export const useConsoleStore = defineStore('console', () => {
   }
 
   /**
-   * 加载某会话的历史消息和待处理交互。
-   * 两个请求独立降级：交互查询失败不得清掉已经成功加载的消息历史。
+   * 队友运行时跟随当前会话：后端会话打开（已打开时只刷新一次），本地草稿断开。
+   * 队友的状态独立于 lead 回合，派发新回合不清空，只在切换会话时重置。
    */
-  async function loadMessages(id: string) {
+  function followTeamRuntime(id: string) {
+    if (!isBackendSession(id)) {
+      teamRuntime.close()
+      return
+    }
+    void teamRuntime.open(id, {
+      teamSession: sessionTeamId(id) != null,
+      onLeadTurn: (turnId) => { void followLeadTurn(id, turnId) },
+    })
+  }
+
+  /**
+   * 后端发起了 lead 自动回合：当前没在跟随执行中的回合时，重拉历史（带上开头的团队消息）并订阅它。
+   * 通知流首次订阅会重放旧通知，所以先确认这个回合仍在执行，旧回合直接忽略。
+   */
+  async function followLeadTurn(sessionId: string, turnId: string) {
+    if (sessionId !== state.activeSessionId || state.busy || activeStreamTurnId === turnId) return
+    const generation = dataGeneration
+    let active
+    try {
+      active = await getActiveTurn(sessionId)
+    } catch {
+      return
+    }
+    if (generation !== dataGeneration || sessionId !== state.activeSessionId || state.busy) return
+    if (active?.turn_id !== turnId || !active.executing) return
+    // 断开可能残留的已结束快照订阅，再由 loadMessages → recoverActiveTurn 接上自动回合。
+    streamGeneration += 1
+    activeStreamAbort?.()
+    activeStreamAbort = null
+    activeResolution = null
+    clearActiveTurn()
+    await loadMessages(sessionId)
+  }
+
+  /** 正在执行的是自动回合：收到过它的 team_lead_turn，或它的第一条消息是团队消息。 */
+  function isAutoTurnActive(): boolean {
+    if (!state.busy || !state.activeTurnId) return false
+    const turnId = state.activeTurnId
+    if (teamRuntime.isAutoTurn(turnId)) return true
+    return state.messages.some((message) => message.turnId === turnId && message.role === 'team' && message.inbox?.trigger === true)
+  }
+
+  /**
+   * 加载会话历史、待处理交互、任务和子代理运行，已结束轮次也从 REST 恢复。
+   * 各请求独立降级，辅助查询失败不阻断历史展示和执行流续订阅。
+   */
+  async function loadMessages(id: string, options: { recover?: boolean } = {}) {
     const generation = dataGeneration
     const streamId = streamGeneration
+    if (id === state.activeSessionId) followTeamRuntime(id)
     if (!isBackendSession(id)) {
       if (id === state.activeSessionId) state.messages = []
       return
@@ -687,6 +760,7 @@ export const useConsoleStore = defineStore('console', () => {
   function resetConsole() {
     dataGeneration += 1
     invalidateStream()
+    teamRuntime.close()
     toolSourceFaults.clear()
     restoredAgentSessionId = null
     restoredAgents = []
@@ -707,6 +781,7 @@ export const useConsoleStore = defineStore('console', () => {
     state.selectedAgentId = null
     state.newSessionAgentId = null
     state.newSessionWorkflowId = null
+    state.newSessionTeamId = null
     state.tasks = []
     state.workflowProgress = emptyWorkflowProgress()
     state.busy = false
@@ -742,12 +817,14 @@ export const useConsoleStore = defineStore('console', () => {
     state.selectedAgentId = null
     state.newSessionAgentId = null
     state.newSessionWorkflowId = null
+    state.newSessionTeamId = null
     state.workflowProgress = emptyWorkflowProgress()
     state.workbenchMode = defaultWorkbenchMode(id)
     loadMessages(id)
   }
   function newSession(appId?: Session['appId']) {
     invalidateStream()
+    teamRuntime.close()
     const s: Session = {
       id: uid('sess'),
       title: '新会话 ' + now().slice(0, 5),
@@ -770,6 +847,7 @@ export const useConsoleStore = defineStore('console', () => {
     state.selectedAgentId = null
     state.newSessionAgentId = null
     state.newSessionWorkflowId = null
+    state.newSessionTeamId = null
     state.workflowProgress = emptyWorkflowProgress()
   }
 
@@ -779,6 +857,7 @@ export const useConsoleStore = defineStore('console', () => {
     // 后端约束 agent 与 Workflow 互斥:Workflow 草稿无条件解绑(含回到平台默认 Agent),
     // composer 切回时自动生效
     state.newSessionWorkflowId = null
+    state.newSessionTeamId = null
     const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
     if (localSession) localSession.agentId = agentId
   }
@@ -789,13 +868,34 @@ export const useConsoleStore = defineStore('console', () => {
     if (isBackendSession(state.activeSessionId)) return
     state.newSessionWorkflowId = workflowId
     if (workflowId != null) {
+      // 选中 Workflow 即放弃 Agent、Team 草稿
       state.newSessionAgentId = null
+      state.newSessionTeamId = null
       const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
       if (localSession) localSession.agentId = null
     }
     if (!getWorkbenchApp(state.activeAppId)) {
       state.workbenchMode = workflowId != null ? 'graph' : 'chat'
     }
+  }
+
+  /** 为新会话草稿选 Team：会话的主 Agent 担任 lead，与 Agent、Workflow 互斥。 */
+  function setNewSessionTeam(teamId: number | null) {
+    if (isBackendSession(state.activeSessionId)) return
+    state.newSessionTeamId = teamId
+    if (teamId == null) return
+    state.newSessionAgentId = null
+    state.newSessionWorkflowId = null
+    const localSession = state.sessions.find((session) => session.id === state.activeSessionId)
+    if (localSession) localSession.agentId = null
+    if (!getWorkbenchApp(state.activeAppId) && state.workbenchMode === 'graph') state.workbenchMode = 'chat'
+  }
+
+  /** 会话选用的 Team；本地草稿会话回退到 newSessionTeamId。 */
+  function sessionTeamId(id: string): number | null {
+    const session = state.sessions.find((item) => item.id === id)
+    if (session?.teamDefinitionId != null) return session.teamDefinitionId
+    return isBackendSession(id) ? null : state.newSessionTeamId
   }
   function setSearch(v: string) {
     state.search = v
@@ -817,6 +917,7 @@ export const useConsoleStore = defineStore('console', () => {
       state.selectedAgentId = null
       state.newSessionAgentId = null
       state.newSessionWorkflowId = null
+      state.newSessionTeamId = null
       state.workflowProgress = emptyWorkflowProgress()
       if (appSession) void loadMessages(appSession.id)
     }
@@ -930,6 +1031,7 @@ export const useConsoleStore = defineStore('console', () => {
         state.selectedAgentId = null
         state.newSessionAgentId = null
         state.newSessionWorkflowId = null
+        state.newSessionTeamId = null
         state.workflowProgress = emptyWorkflowProgress()
       }
     }
@@ -1032,6 +1134,7 @@ export const useConsoleStore = defineStore('console', () => {
     ai: ChatMessage,
     configuredAgentId?: number,
     configuredWorkflowId?: number,
+    configuredTeamId?: number,
   ) {
     const chatSelection = activeChatSelection()
     const standardEffort = standardThinkingEffort()
@@ -1062,6 +1165,7 @@ export const useConsoleStore = defineStore('console', () => {
               appId: state.activeAppId ?? undefined,
               agentId: configuredAgentId ?? null,
               workflowId: configuredWorkflowId ?? null,
+              teamDefinitionId: configuredTeamId ?? null,
               modelProviderId: chatSelection.model_provider_id,
               modelProviderOverride: chatSelection.model_provider_id !== null,
               modeSlug: chatSelection.mode_slug,
@@ -1077,9 +1181,13 @@ export const useConsoleStore = defineStore('console', () => {
           rememberStandardEffort(authStore.state.user?.id ?? null, authStore.currentWorkspaceId, idStr, promoted.standardThinkingEffort ?? standardEffort)
           if (configuredAgentId != null) promoted.agentId = configuredAgentId
           if (configuredWorkflowId != null) promoted.workflowId = configuredWorkflowId
+          if (configuredTeamId != null) promoted.teamDefinitionId = configuredTeamId
         }
         state.newSessionAgentId = null
         state.newSessionWorkflowId = null
+        state.newSessionTeamId = null
+        // Team 会话建好时名单成员已经就位，首轮里 lead 分派的激活要能马上跟上。
+        if (state.activeSessionId === idStr) followTeamRuntime(idStr)
       },
       // 任务全量快照:随 SSE 流实时到达,直接整体替换任务面板
       onTaskSnapshot: (tasks) => {
@@ -1098,6 +1206,10 @@ export const useConsoleStore = defineStore('console', () => {
     streamId?: number
     recoveryAttempt?: number
     completedSnapshot?: boolean
+    /** 新会话选用的 Team，session_ready 时写到会话上。 */
+    configuredTeamId?: number
+    /** 建流返回 409 时调用；返回 true 表示调用方已安排重试，不再当作错误收尾。 */
+    onConflict?: () => boolean
   }
 
   function removeSyntheticMessage(id: string) {
@@ -1225,7 +1337,9 @@ export const useConsoleStore = defineStore('console', () => {
     configuredWorkflowId?: number,
     options: StreamOptions = {},
   ): SseHandlers {
-    const reducer = buildReducer(ai, configuredAgentId, configuredWorkflowId)
+    const reducer = buildReducer(ai, configuredAgentId, configuredWorkflowId, options.configuredTeamId)
+    // lead 调 SendMessage / TeamSpawn / TeamCreate 后成员和消息会变，结果到达时刷新团队视图。
+    const teamToolIds = new Set<string>()
     const generation = dataGeneration
     const streamId = options.streamId ?? streamGeneration
     let expectedSessionId = options.sessionId ?? (isBackendSession(state.activeSessionId) ? state.activeSessionId : null)
@@ -1234,6 +1348,14 @@ export const useConsoleStore = defineStore('console', () => {
     let recoveryStarted = false
     let recoveryAttempt = options.recoveryAttempt ?? 0
     const current = () => generation === dataGeneration && streamId === streamGeneration
+    const trackTeamTool = (ev: SseEvent) => {
+      if ((ev.actor?.role ?? 'orchestrator') !== 'orchestrator' || !ev.tool) return
+      if (ev.type === 'tool_use' && TEAM_TOOL_NAMES.has(ev.tool.name)) teamToolIds.add(ev.tool.id)
+      if (ev.type === 'tool_result' && (TEAM_TOOL_NAMES.has(ev.tool.name) || teamToolIds.has(ev.tool.id))) {
+        teamToolIds.delete(ev.tool.id)
+        teamRuntime.scheduleRefresh()
+      }
+    }
     const finishCompletedSnapshot = (error?: Error) => {
       terminalSeen = true
       finalizeStream(reducer, expectedSessionId ?? state.activeSessionId, error, false)
@@ -1310,9 +1432,12 @@ export const useConsoleStore = defineStore('console', () => {
         } else if (ev.type === 'run_end') {
           terminalSeen = true
           activeStreamTerminal = true
+          teamRuntime.scheduleRefresh()
           if (options.completedSnapshot) finishCompletedSnapshot()
           else finalizeStream(reducer, eventSessionId ?? expectedSessionId ?? state.activeSessionId)
-        } else {
+        } else if (ev.actor?.role !== 'teammate') {
+          // 队友的事件走各自的激活事件流，不再出现在 lead 回合里；万一出现也不在这里建面板。
+          trackTeamTool(ev)
           reducer.handle(ev)
         }
       },
@@ -1322,6 +1447,7 @@ export const useConsoleStore = defineStore('console', () => {
           finishCompletedSnapshot(error)
           return
         }
+        if (error instanceof SseOpenError && error.status === 409 && options.onConflict?.()) return
         if (error instanceof SseOpenError && error.status >= 400 && error.status < 500) {
           terminalSeen = true
           restorePendingResolution()
@@ -1339,25 +1465,48 @@ export const useConsoleStore = defineStore('console', () => {
     }
   }
 
-  /** 派发一次任务:POST /api/sessions/messages,消费 SSE 流增量更新对话与右栏 */
+  /** 被打断的回复不会再收到 block_stop，收掉它的推理计时和流式光标，等历史刷新后替换。 */
+  function settleMessage(message: ChatMessage | undefined) {
+    for (const block of message?.blocks ?? []) {
+      if (block.kind === 'think') block.done = true
+      else if (block.kind === 'answer') block.streaming = false
+    }
+  }
+
+  /**
+   * 派发一次任务:POST /api/sessions/messages,消费 SSE 流增量更新对话与右栏。
+   * 正在执行的是自动回合时也允许发送：后端先中断自动回合（已生成的回答保留）再开始用户回合；
+   * 这一步偶尔返回 409，等一秒自动重试一次。用户回合执行中仍然不能发送。
+   */
   function dispatch(
     text: string,
-    options?: { agentId?: number | null; workflowId?: number | null },
+    options?: { agentId?: number | null; workflowId?: number | null; teamId?: number | null },
   ): boolean {
     const content = text.trim()
-    if (!canWriteSession() || state.busy || state.chatSelectionSaving || !content) return false
+    if (!canWriteSession() || state.chatSelectionSaving || !content) return false
+    const preempting = state.busy && isAutoTurnActive()
+    if (state.busy && !preempting) return false
+    if (preempting) {
+      // 只断开对自动回合的跟随；中断由后端在准入时完成。
+      activeStreamAbort?.()
+      activeStreamAbort = null
+      settleMessage([...state.messages].reverse().find((message) => message.role === 'ai'))
+    }
+    const generation = dataGeneration
     const streamId = ++streamGeneration
     activeStreamSessionId = isBackendSession(state.activeSessionId) ? state.activeSessionId : null
     activeStreamTurnId = null
     activeStreamTerminal = false
     activeResolution = null
+    state.activeTurnId = null
+    state.activeTurnSessionId = null
     state.recovering = false
     state.busy = true
 
     // 用户消息上屏
     state.messages.push({ id: uid('m'), role: 'user', time: now(), text: content })
 
-    // 重置本轮舰队与任务
+    // 重置本轮子代理与任务；队友属于会话，不随回合清空。
     state.agents = []
     state.tasks = []
     // Workflow 进度图按轮重置:上一轮的节点状态不能残留到本轮
@@ -1375,37 +1524,57 @@ export const useConsoleStore = defineStore('console', () => {
     const localSession = sessionId === undefined
       ? state.sessions.find((session) => session.id === state.activeSessionId)
       : undefined
-    // 后端只支持 agent_id / workflow_id 两种新会话目标。
+    // 新会话目标三选一（后端互斥）：Team 优先，其次 Workflow，最后 Agent。
+    const requestedTeamId = options?.teamId !== undefined
+      ? options.teamId
+      : localSession?.teamDefinitionId ?? state.newSessionTeamId
+    const configuredTeamId = sessionId === undefined ? requestedTeamId ?? undefined : undefined
     const requestedWorkflowId = options?.workflowId !== undefined
       ? options.workflowId
       : localSession?.workflowId ?? state.newSessionWorkflowId
-    const configuredWorkflowId = sessionId === undefined
+    const configuredWorkflowId = sessionId === undefined && configuredTeamId == null
       ? requestedWorkflowId ?? undefined
       : undefined
     const requestedAgentId = options?.agentId !== undefined
       ? options.agentId
       : localSession?.agentId ?? state.newSessionAgentId
-    const configuredAgentId = sessionId === undefined && configuredWorkflowId == null
+    const configuredAgentId = sessionId === undefined && configuredWorkflowId == null && configuredTeamId == null
       ? requestedAgentId ?? undefined
       : undefined
     if (localSession) {
       localSession.agentId = configuredAgentId ?? null
       localSession.workflowId = configuredWorkflowId ?? null
+      localSession.teamDefinitionId = configuredTeamId ?? null
     }
 
-    activeStreamAbort = sendMessage(
-      {
-        session_id: sessionId,
-        ...(configuredAgentId == null ? {} : { agent_id: configuredAgentId }),
-        ...(configuredWorkflowId == null ? {} : { workflow_id: configuredWorkflowId }),
-        content,
-        ...activeChatSelection(),
-      },
-      streamHandlers(ai, configuredAgentId, configuredWorkflowId, {
-        sessionId: activeStreamSessionId ?? undefined,
-        streamId,
-      }),
-    )
+    const payload = {
+      session_id: sessionId,
+      ...(configuredAgentId == null ? {} : { agent_id: configuredAgentId }),
+      ...(configuredWorkflowId == null ? {} : { workflow_id: configuredWorkflowId }),
+      ...(configuredTeamId == null ? {} : { team_definition_id: configuredTeamId }),
+      content,
+      ...activeChatSelection(),
+    }
+    let conflictRetried = false
+    const start = () => {
+      activeStreamAbort = sendMessage(
+        payload,
+        streamHandlers(ai, configuredAgentId, configuredWorkflowId, {
+          sessionId: activeStreamSessionId ?? undefined,
+          streamId,
+          configuredTeamId,
+          onConflict: () => {
+            if (!preempting || conflictRetried) return false
+            conflictRetried = true
+            setTimeout(() => {
+              if (generation === dataGeneration && streamId === streamGeneration) start()
+            }, AUTO_TURN_CONFLICT_RETRY_DELAY)
+            return true
+          },
+        }),
+      )
+    }
+    start()
     return true
   }
 
@@ -1621,8 +1790,11 @@ export const useConsoleStore = defineStore('console', () => {
     openApp,
     setNewSessionAgent,
     setNewSessionWorkflow,
+    setNewSessionTeam,
     setWorkbenchMode,
     sessionWorkflowId,
+    sessionTeamId,
+    isAutoTurnActive,
     setSearch,
     renameSession: renameSessionAction,
     deleteSessions: deleteSessionsAction,

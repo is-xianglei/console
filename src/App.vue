@@ -10,6 +10,7 @@ import { useGroupsStore } from './stores/groups'
 import { useMemoriesStore } from './stores/memories'
 import { useMcpStore } from './stores/mcp'
 import { useSkillsStore } from './stores/skills'
+import { useTeamsStore } from './stores/teams'
 import { useWorkspacesStore } from './stores/workspaces'
 
 const consoleStore = useConsoleStore()
@@ -20,6 +21,7 @@ const groupsStore = useGroupsStore()
 const memoriesStore = useMemoriesStore()
 const skillsStore = useSkillsStore()
 const mcpStore = useMcpStore()
+const teamsStore = useTeamsStore()
 const workspacesStore = useWorkspacesStore()
 const router = useRouter()
 let lifecycleStarted = false
@@ -65,6 +67,7 @@ watch(
     memoriesStore.resetMemories()
     skillsStore.resetSkills()
     mcpStore.resetMcp()
+    teamsStore.resetTeams()
     workspacesStore.resetWorkspaces(workspaceId)
   },
   { immediate: true },

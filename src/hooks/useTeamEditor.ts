@@ -1,223 +1,307 @@
-import { computed, ref, watch } from 'vue'
-import type { ResourceStatus } from '@/interfaces/platform/model'
-import { useTeamsStore, validateTeam, type TeamIssue } from '@/stores/teams'
-import type { TeamFormModel } from '@/interfaces/platform-team/model'
-import { useSaveFeedback } from './useSaveFeedback'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useToast } from '@nuxt/ui/composables'
+import type {
+  TeamDefinitionCreateRequest,
+  TeamDefinitionMemberItem,
+  TeamDefinitionMemberResponse,
+  TeamDefinitionResponse,
+  TeamDefinitionUpdateRequest,
+} from '@/interfaces/team-definition/api'
+import {
+  MAX_TEAM_MEMBER_NAME_LENGTH,
+  MAX_TEAM_MEMBER_ROLE_LENGTH,
+  MAX_TEAM_NAME_LENGTH,
+  RESERVED_TEAM_MEMBER_NAMES,
+  type TeamFormModel,
+  type TeamMemberFormModel,
+  type TeamValidationIssue,
+} from '@/interfaces/team-definition/model'
+import { useAuthStore } from '@/stores/auth'
+import { useTeamsStore, type TeamSaveError } from '@/stores/teams'
 
-const DEFAULT_PAGE_SIZE = 20
-const STATUS_ORDER: Record<ResourceStatus, number> = { error: 0, warning: 1, nominal: 2, idle: 3 }
-/** 「保存并启用」写入的状态：store 里 nominal 即启用（列表 / 详情显示为正常）。 */
-const ENABLED_STATUS: TeamFormModel['status'] = 'nominal'
+let memberKeySeed = 0
+
+/** 成员行的渲染 key：增删行时保持输入框不串位。 */
+function nextMemberKey() {
+  memberKeySeed += 1
+  return `team-member-${memberKeySeed}`
+}
+
+export function emptyTeamMember(): TeamMemberFormModel {
+  return { key: nextMemberKey(), agentId: null, agentName: null, name: '', role: '' }
+}
+
+/** 新建草稿默认启用，带一行空成员方便直接填写。 */
+export function emptyTeamForm(): TeamFormModel {
+  return { id: null, name: '', description: '', isEnabled: true, members: [emptyTeamMember()] }
+}
+
+function responseMembers(team: TeamDefinitionResponse): TeamMemberFormModel[] {
+  return team.members.map((member) => ({
+    key: nextMemberKey(),
+    agentId: member.agent_id,
+    agentName: member.agent_name,
+    name: member.name,
+    role: member.role,
+  }))
+}
+
+/** 后端已按 sort_order 排好成员，表单直接沿用这个顺序。 */
+export function teamResponseToForm(team: TeamDefinitionResponse): TeamFormModel {
+  return {
+    id: team.id,
+    name: team.name,
+    description: team.description ?? '',
+    isEnabled: team.is_enabled,
+    members: responseMembers(team),
+  }
+}
+
+/** 复制已有 Team 作为新建草稿。 */
+export function duplicateTeamForm(team: TeamDefinitionResponse): TeamFormModel {
+  return {
+    id: null,
+    name: `${team.name} 副本`.slice(0, MAX_TEAM_NAME_LENGTH),
+    description: team.description ?? '',
+    isEnabled: true,
+    members: responseMembers(team),
+  }
+}
+
+/**
+ * 选 Agent 时预填的成员名：用 Agent 名，和其他成员重名或撞上保留名时加 -2、-3。
+ * taken 里是其他行已用的成员名。
+ */
+export function suggestMemberName(agentName: string, taken: string[]): string {
+  const base = agentName.trim().slice(0, MAX_TEAM_MEMBER_NAME_LENGTH) || 'member'
+  const used = new Set(taken.map((name) => name.trim()))
+  const blocked = (name: string) => used.has(name) || RESERVED_TEAM_MEMBER_NAMES.includes(name)
+  if (!blocked(base)) return base
+  for (let index = 2; ; index += 1) {
+    const suffix = `-${index}`
+    const candidate = `${base.slice(0, MAX_TEAM_MEMBER_NAME_LENGTH - suffix.length)}${suffix}`
+    if (!blocked(candidate)) return candidate
+  }
+}
+
+/** 与后端规则对齐的前端校验，最终以后端 422 为准。 */
+export function validateTeamForm(form: TeamFormModel): TeamValidationIssue[] {
+  const issues: TeamValidationIssue[] = []
+  const name = form.name.trim()
+  if (!name) issues.push({ field: 'name', message: '请输入 Team 名称' })
+  else if (name.length > MAX_TEAM_NAME_LENGTH) issues.push({ field: 'name', message: `名称不能超过 ${MAX_TEAM_NAME_LENGTH} 个字符` })
+
+  if (!form.members.length) {
+    issues.push({ field: 'members', message: '至少需要 1 个成员' })
+    return issues
+  }
+
+  const counts = new Map<string, number>()
+  for (const member of form.members) {
+    const memberName = member.name.trim()
+    if (memberName) counts.set(memberName, (counts.get(memberName) ?? 0) + 1)
+  }
+
+  form.members.forEach((member, index) => {
+    const label = `第 ${index + 1} 个成员`
+    const push = (memberField: 'agent' | 'name' | 'role', message: string) =>
+      issues.push({ field: 'members', memberIndex: index, memberField, message: `${label}${message}` })
+
+    if (member.agentId == null) push('agent', '未选择 Agent')
+    else if (member.agentName == null) push('agent', '的 Agent 已删除，请重新选择')
+
+    const memberName = member.name.trim()
+    if (!memberName) push('name', '未填写成员名')
+    else if (memberName.length > MAX_TEAM_MEMBER_NAME_LENGTH) push('name', `的成员名不能超过 ${MAX_TEAM_MEMBER_NAME_LENGTH} 个字符`)
+    else if (RESERVED_TEAM_MEMBER_NAMES.includes(memberName)) push('name', '的成员名不能是 lead 或 *')
+    else if ((counts.get(memberName) ?? 0) > 1) push('name', `的成员名「${memberName}」重复`)
+
+    const role = member.role.trim()
+    if (!role) push('role', '未填写角色')
+    else if (role.length > MAX_TEAM_MEMBER_ROLE_LENGTH) push('role', `的角色不能超过 ${MAX_TEAM_MEMBER_ROLE_LENGTH} 个字符`)
+  })
+  return issues
+}
+
+/** 成员载荷：数组下标写进 sort_order。 */
+export function teamMembersPayload(form: TeamFormModel): TeamDefinitionMemberItem[] {
+  return form.members.map((member, index) => ({
+    agent_id: member.agentId ?? 0,
+    name: member.name.trim(),
+    role: member.role.trim(),
+    sort_order: index,
+  }))
+}
+
+export function buildTeamCreatePayload(form: TeamFormModel): TeamDefinitionCreateRequest {
+  const description = form.description.trim()
+  return {
+    name: form.name.trim(),
+    description: description || null,
+    is_enabled: form.isEnabled,
+    members: teamMembersPayload(form),
+  }
+}
+
+function sameMembers(next: TeamDefinitionMemberItem[], current: TeamDefinitionMemberResponse[]): boolean {
+  return next.length === current.length && next.every((member, index) => {
+    const other = current[index]!
+    return member.agent_id === other.agent_id && member.name === other.name && member.role === other.role
+  })
+}
+
+/** PATCH 只带改动的字段：描述清空传 null，成员有变化才整体替换。没有改动时返回空对象。 */
+export function buildTeamUpdatePayload(form: TeamFormModel, original: TeamDefinitionResponse): TeamDefinitionUpdateRequest {
+  const payload: TeamDefinitionUpdateRequest = {}
+  const name = form.name.trim()
+  if (name !== original.name) payload.name = name
+  const description = form.description.trim() || null
+  if (description !== (original.description ?? null)) payload.description = description
+  if (form.isEnabled !== original.is_enabled) payload.is_enabled = form.isEnabled
+  const members = teamMembersPayload(form)
+  if (!sameMembers(members, original.members)) payload.members = members
+  return payload
+}
+
+/** 后端保存失败时要标红的成员行：按 loc 下标、成员名、Agent id 三种线索定位。 */
+export function teamSaveErrorRows(error: TeamSaveError | null, form: TeamFormModel): number[] {
+  if (!error || error.field !== 'members') return []
+  const rows = new Set(error.memberIndexes.filter((index) => index >= 0 && index < form.members.length))
+  form.members.forEach((member, index) => {
+    if (error.memberNames.includes(member.name.trim())) rows.add(index)
+    if (member.agentId != null && error.agentIds.includes(member.agentId)) rows.add(index)
+  })
+  return [...rows].sort((a, b) => a - b)
+}
+
+/** 工作区 owner / admin 才能新建、修改、删除 Team；其他成员只读。 */
+export function useTeamWriteAccess() {
+  const authStore = useAuthStore()
+  return computed(() => {
+    const role = authStore.currentWorkspace?.membership_role
+    return role === 'owner' || role === 'admin'
+  })
+}
 
 export interface TeamSaveOptions {
-  /** 保存成功、跳转之前调用；页面用它重置脏检查快照，避免离开守卫拦下保存后的跳转。 */
+  /** 保存成功、跳转之前调用；页面用它重置脏检查快照。 */
   onSaved?: () => void
 }
 
-/** 编辑页草稿的加载状态，供页面区分「加载中」与「未找到」。 */
+/** 新建 / 编辑 Team：保存成功后进入详情页。 */
 export function useTeamEditor() {
-  const store = useTeamsStore()
-  const feedback = useSaveFeedback({
-    listRoute: { name: 'platform-resource', params: { module: 'build', resource: 'teams' } },
-    detailRoute: { name: 'team-detail' },
-  })
-  const route = { module: 'build', resource: 'teams' } as const
-  const draft = ref<TeamFormModel>(store.createDraft())
-  const baseline = ref<TeamFormModel | null>(null)
+  const router = useRouter()
+  const toast = useToast()
+  const teamsStore = useTeamsStore()
+  const canManage = useTeamWriteAccess()
+
+  const draft = ref<TeamFormModel>(emptyTeamForm())
+  /** 编辑时加载到的原始数据，用来算 PATCH 的改动字段。 */
+  const original = ref<TeamDefinitionResponse | null>(null)
   const loadingDetail = ref(false)
-  const notFound = ref(false)
   const saving = ref(false)
-  const error = ref('')
-  /** 随草稿实时校验：改好问题后立即清空，保存流程不会被上一次的结果卡住。 */
-  const issues = computed<TeamIssue[]>(() => validateTeam(draft.value))
+  const notFound = ref(false)
+  const loadError = ref('')
+  /** 后端保存失败的定位信息；表单顶部显示 message，并标红对应字段或成员行。 */
+  const saveError = ref<TeamSaveError | null>(null)
 
-  const isEdit = computed(() => Boolean(baseline.value))
+  const issues = computed<TeamValidationIssue[]>(() => validateTeamForm(draft.value))
+  const error = computed(() => saveError.value?.message ?? '')
 
-  function reset(to: TeamFormModel) {
-    draft.value = to
-    error.value = ''
-  }
-
-  /** 返回草稿是否从已有 Team 复制而来（复制源不存在时回落为空草稿，返回 false）。 */
-  function openCreate(duplicateId?: string): boolean {
+  function resetStatus() {
     notFound.value = false
-    const source = duplicateId ? store.findTeam(duplicateId) : null
-    reset(source ? store.duplicateDraft(source) : store.createDraft())
-    baseline.value = null
-    return Boolean(source)
+    loadError.value = ''
+    saveError.value = null
   }
 
-  async function openEdit(id: string) {
+  function goToList() {
+    void router.push({ name: 'platform-resource', params: { module: 'build', resource: 'teams' } })
+  }
+
+  /** 返回 true 表示草稿已从复制源预填。 */
+  async function openCreate(duplicateId?: number): Promise<boolean> {
+    resetStatus()
+    original.value = null
+    draft.value = emptyTeamForm()
+    if (duplicateId == null) return false
     loadingDetail.value = true
-    notFound.value = false
-    try {
-      const found = store.findTeam(id)
-      if (!found) {
-        notFound.value = true
-        return
-      }
-      reset({ ...found, members: found.members.map((member) => ({ ...member })), tags: [...found.tags] })
-      baseline.value = found
-    } finally {
-      loadingDetail.value = false
-    }
+    const result = await teamsStore.loadTeamDetail(duplicateId)
+    loadingDetail.value = false
+    if (result?.status !== 'ok') return false
+    draft.value = duplicateTeamForm(result.item)
+    return true
   }
 
-  /**
-   * 写入 store 后：先回调 onSaved（页面在此重置脏检查快照），再 toast + 跳转。
-   * 顺序不能反：「保存并启用」改了 draft.status，若先跳转，onBeforeRouteLeave 会用旧快照判脏，
-   * 把这次跳转拦成「放弃未保存的修改？」。校验不通过时不写入、不回调，离开守卫照常生效。
-   * 去向：新建回列表并高亮，编辑去详情页。
-   */
-  async function commit(enable: boolean, verb: string, options?: TeamSaveOptions): Promise<boolean> {
+  async function openEdit(id: number): Promise<boolean> {
+    resetStatus()
+    original.value = null
+    draft.value = emptyTeamForm()
+    loadingDetail.value = true
+    const result = await teamsStore.loadTeamDetail(id)
+    loadingDetail.value = false
+    if (result === undefined) return false
+    if (result.status === 'not-found') {
+      notFound.value = true
+      return false
+    }
+    if (result.status === 'error') {
+      loadError.value = result.message
+      return false
+    }
+    original.value = result.item
+    draft.value = teamResponseToForm(result.item)
+    return true
+  }
+
+  async function save(options?: TeamSaveOptions): Promise<boolean> {
     if (saving.value || issues.value.length) return false
     saving.value = true
     try {
-      const fromEdit = isEdit.value
-      if (enable) draft.value.status = ENABLED_STATUS
-      store.upsert(draft.value)
-      baseline.value = store.findTeam(draft.value.id)
-      error.value = ''
+      const current = draft.value
+      let saved: TeamDefinitionResponse | null
+      if (current.id == null) {
+        const result = await teamsStore.saveTeam({ create: buildTeamCreatePayload(current) })
+        saveError.value = result.error
+        saved = result.item
+      } else {
+        const update = original.value ? buildTeamUpdatePayload(current, original.value) : buildTeamCreatePayload(current)
+        if (!Object.keys(update).length) {
+          // 没有改动：不发请求，直接回详情。
+          saveError.value = null
+          options?.onSaved?.()
+          await router.push({ name: 'team-detail', params: { id: String(current.id) } })
+          return true
+        }
+        const result = await teamsStore.saveTeam({ id: current.id, update })
+        saveError.value = result.error
+        saved = result.item
+      }
+      if (!saved) return false
+      original.value = saved
       options?.onSaved?.()
-      const payload = { id: draft.value.id, message: `Team「${draft.value.name}」已${verb}` }
-      if (fromEdit) await feedback.afterSaveToDetail(payload)
-      else await feedback.afterSave(payload)
+      toast.add({ title: `${saved.name} 已保存`, color: 'success' })
+      await router.push({ name: 'team-detail', params: { id: String(saved.id) } })
       return true
     } finally {
       saving.value = false
     }
   }
 
-  /** 「保存草稿」：按表单当前状态保存。 */
-  function saveDraft(options?: TeamSaveOptions): Promise<boolean> {
-    return commit(false, '保存', options)
-  }
-
-  /** 「保存并启用」：保存前把状态置为启用（nominal）。 */
-  function publish(options?: TeamSaveOptions): Promise<boolean> {
-    return commit(true, '保存并启用', options)
-  }
-
   return {
-    route, draft, baseline, isEdit, loadingDetail, notFound, saving, error, issues,
-    openCreate, openEdit, saveDraft, publish, reset,
-  }
-}
-
-/**
- * Teams 列表的视图状态。
- *
- * 与 useBuildResourceManager 的差异：行数据直接来自 teams store（编辑页写入的
- * 结果会立刻反映到列表），且 pageSize 是真正的 ref、删除文案带对象名。
- */
-export function useTeamList() {
-  const store = useTeamsStore()
-  const search = ref('')
-  const statusFilter = ref<ResourceStatus | 'all'>('all')
-  const ownerFilter = ref('all')
-  const sortBy = ref<'name' | 'status' | 'owner'>('name')
-  const selectedIds = ref<Set<string>>(new Set())
-  const pageNumber = ref(1)
-  const pageSize = ref(DEFAULT_PAGE_SIZE)
-  const pendingDeleteIds = ref<string[]>([])
-  const toast = ref('')
-  let toastTimer: ReturnType<typeof setTimeout> | undefined
-
-  const rows = computed(() => {
-    store.ensureLoaded()
-    return store.state.items
-  })
-  const owners = computed(() => [...new Set(rows.value.map((row) => row.owner))].sort((a, b) => a.localeCompare(b, 'zh-CN')))
-  const filteredRows = computed(() => {
-    const query = search.value.trim().toLowerCase()
-    return rows.value
-      .filter((row) => {
-        const matchesStatus = statusFilter.value === 'all' || row.status === statusFilter.value
-        const matchesOwner = ownerFilter.value === 'all' || row.owner === ownerFilter.value
-        const searchable = [row.id, row.name, row.description, row.owner, ...row.tags].join(' ').toLowerCase()
-        return matchesStatus && matchesOwner && (!query || searchable.includes(query))
-      })
-      .slice()
-      .sort((a, b) => {
-        if (sortBy.value === 'status') return STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
-        return a[sortBy.value].localeCompare(b[sortBy.value], 'zh-CN')
-      })
-  })
-  const totalPages = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / pageSize.value)))
-  const visibleRows = computed(() => filteredRows.value.slice((pageNumber.value - 1) * pageSize.value, pageNumber.value * pageSize.value))
-  const selectedCount = computed(() => selectedIds.value.size)
-  const hasFilters = computed(() => Boolean(search.value) || statusFilter.value !== 'all' || ownerFilter.value !== 'all')
-  const deleteTitle = computed(() => {
-    if (pendingDeleteIds.value.length === 1) {
-      const target = store.findTeam(pendingDeleteIds.value[0]!)
-      if (target) return `删除 ${target.name}？`
-    }
-    return pendingDeleteIds.value.length > 1 ? `删除 ${pendingDeleteIds.value.length} 个 Team？` : '删除 Team？'
-  })
-
-  function showToast(message: string) {
-    toast.value = message
-    if (toastTimer) clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => { toast.value = '' }, 2400)
-  }
-
-  function resetView() {
-    search.value = ''
-    statusFilter.value = 'all'
-    ownerFilter.value = 'all'
-    sortBy.value = 'name'
-    selectedIds.value = new Set()
-    pageNumber.value = 1
-  }
-
-  function requestDelete(ids: string[]) {
-    pendingDeleteIds.value = ids
-  }
-
-  function cancelDelete() {
-    pendingDeleteIds.value = []
-  }
-
-  /** 单条删除带上对象名，多条给数量，与 agents/plans 的文案一致。 */
-  function confirmDelete() {
-    const targets = pendingDeleteIds.value.slice()
-    const names = targets.map((id) => store.findTeam(id)?.name).filter((name): name is string => Boolean(name))
-    targets.forEach((id) => store.removeTeam(id))
-    selectedIds.value = new Set([...selectedIds.value].filter((id) => !targets.includes(id)))
-    pendingDeleteIds.value = []
-    showToast(names.length === 1 ? `${names[0]} 已删除` : `已删除 ${targets.length} 个 Team`)
-  }
-
-  function updateStatus(ids: string[], status: ResourceStatus) {
-    ids.forEach((id) => store.setStatus(id, status))
-    showToast(`已更新 ${ids.length} 个 Team 的状态`)
-  }
-
-  function exportCsv() {
-    const header = ['ID', '名称', '状态', '编排模式', '入口 Agent', '成员数', '负责人', '描述', '标签']
-    const lines = filteredRows.value.map((row) => [
-      row.id, row.name, row.status,
-      row.members.length ? `${row.members.length} Agents` : '0 Agents',
-      row.members[row.entryIndex]?.agentName ?? row.members[0]?.agentName ?? '未指定',
-      String(row.members.length), row.owner, row.description, row.tags.join(' | '),
-    ])
-    const csv = [header, ...lines].map((line) => line.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'teams.csv'
-    link.click()
-    URL.revokeObjectURL(url)
-    showToast(`已导出 ${filteredRows.value.length} 个 Team`)
-  }
-
-  watch([search, statusFilter, ownerFilter, sortBy], () => { pageNumber.value = 1 })
-  watch(totalPages, (total) => { if (pageNumber.value > total) pageNumber.value = total })
-
-  return {
-    search, statusFilter, ownerFilter, sortBy, selectedIds, pageNumber, pageSize,
-    pendingDeleteIds, toast, rows, owners, filteredRows, totalPages, visibleRows,
-    selectedCount, hasFilters, deleteTitle,
-    showToast, resetView, requestDelete, cancelDelete, confirmDelete, updateStatus, exportCsv,
+    draft,
+    original,
+    issues,
+    canManage,
+    loadingDetail,
+    saving,
+    error,
+    saveError,
+    notFound,
+    loadError,
+    openCreate,
+    openEdit,
+    save,
+    goToList,
   }
 }

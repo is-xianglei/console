@@ -197,13 +197,13 @@ const router = createRouter({
           meta: { requiresAuth: true, platform: true, module: 'build' },
         },
         {
-          path: 'platform/build/teams/:id',
+          path: 'platform/build/teams/:id(\\d+)',
           name: 'team-detail',
           component: TeamDetailLoader,
           meta: { requiresAuth: true, platform: true, module: 'build' },
         },
         {
-          path: 'platform/build/teams/:id/edit',
+          path: 'platform/build/teams/:id(\\d+)/edit',
           name: 'team-edit',
           component: TeamEditLoader,
           meta: { requiresAuth: true, platform: true, module: 'build' },

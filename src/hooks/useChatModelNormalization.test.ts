@@ -23,8 +23,9 @@ async function settle() {
   await nextTick()
 }
 
-function harness(initial: ChatModelSelection, workflow = false) {
+function harness(initial: ChatModelSelection, workflow = false, team = false) {
   const selection = ref(initial)
+  const teamActive = ref(team)
   const caps = ref<ChatModelCapabilities | null>(null)
   const disabled = ref(false)
   const revision = ref(0)
@@ -40,13 +41,30 @@ function harness(initial: ChatModelSelection, workflow = false) {
   scope.run(() => useChatModelNormalization({
     selection: () => selection.value, capabilities: () => caps.value,
     disabled: () => disabled.value, workflowActive: () => workflowActive.value,
+    turboBlocked: () => workflowActive.value || teamActive.value,
     sessionId: () => '42', revision: () => revision.value, error: () => '',
     standardEffort: () => 'high', save,
   }))
-  return { selection, caps, disabled, revision, workflowActive, persist, save }
+  return { selection, caps, disabled, revision, workflowActive, teamActive, persist, save }
 }
 
 describe('聊天模型能力归一监听', () => {
+  it('选了 Team 后极速模式切回标准模式，模型仍按个人默认解析', async () => {
+    const turboCaps: ChatModelCapabilities = {
+      ...capabilities,
+      models: capabilities.models.map((model) => ({ ...model, turbo_supported: true })),
+    }
+    const state = harness({ model_provider_id: null, mode_slug: 'turbo', thinking_effort: 'fast' })
+    state.caps.value = turboCaps
+    await settle()
+    expect(state.save).not.toHaveBeenCalled()
+
+    state.teamActive.value = true
+    await settle()
+    expect(state.save).toHaveBeenCalledTimes(1)
+    expect(state.selection.value).toEqual({ model_provider_id: null, mode_slug: 'standard', thinking_effort: 'high' })
+  })
+
   it('归一失败不因 saving 恢复而循环，能力成功重载相同内容后可重试', async () => {
     const state = harness({ model_provider_id: null, mode_slug: 'turbo', thinking_effort: 'fast' })
     state.persist.mockRejectedValueOnce(new Error('暂时失败'))

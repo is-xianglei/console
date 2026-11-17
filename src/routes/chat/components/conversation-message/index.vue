@@ -3,6 +3,7 @@ import { StreamingText, ThinkingReasoning } from '@/components'
 import type { ChatMessage } from '@/interfaces'
 import ApprovalCard from '../approval-card/index.vue'
 import InteractionCard from '../interaction-card/index.vue'
+import TeamInboxCard from '../team-inbox-card/index.vue'
 import ToolCallCard from '../tool-call-card/index.vue'
 import ToolSourcesNotice from '../tool-sources-notice/index.vue'
 
@@ -17,6 +18,8 @@ defineProps<{ message: ChatMessage; busy: boolean }>()
       <div :class="$style['bubble-user']">{{ message.text }}</div>
       <div :class="$style['msg-byline']"><span :class="[$style['byline-time'], 'mono']">{{ message.time }}</span></div>
     </template>
+
+    <TeamInboxCard v-else-if="message.role === 'team' && message.inbox" :inbox="message.inbox" />
 
     <template v-else-if="message.blocks?.length || busy">
       <div :class="$style['msg-byline']">

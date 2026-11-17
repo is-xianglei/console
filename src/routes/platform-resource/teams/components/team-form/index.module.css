@@ -1,0 +1,71 @@
+/* 页面骨架、分组、两列表单与智能体表单一致，这里只补 Team 名单的部分。 */
+@import '@/routes/platform-resource/agents/components/agent-form/index.module.css';
+
+.inner {
+  max-width: 860px;
+}
+
+/* 智能体表单给 [data-slot='base'] 设了输入框高度和内边距，开关要还原。 */
+.switch :global([data-slot='base']) {
+  min-height: 0;
+  padding: 0;
+}
+
+/* 名单：成员名 / 角色 / Agent / 移除 四列，表头与每行共用同一网格。 */
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.memberRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.2fr) 32px;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.memberHead {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.issues {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  color: var(--status-error);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  list-style: none;
+}
+
+.addMember {
+  align-self: flex-start;
+}
+
+@media (max-width: 640px) {
+  .memberHead {
+    display: none;
+  }
+
+  .memberRow {
+    grid-template-columns: minmax(0, 1fr) 32px;
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* 窄屏每个输入占一整行，移除按钮跟在成员名后面。 */
+  .memberRow > :nth-child(2),
+  .memberRow > :nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .memberRow > :nth-child(4) {
+    grid-row: 1;
+    grid-column: 2;
+  }
+}

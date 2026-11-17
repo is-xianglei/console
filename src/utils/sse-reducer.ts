@@ -438,3 +438,110 @@ export function createSseReducer(target: SseTarget) {
 
   return { handle, settleStreams }
 }
+
+function snapshotRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+}
+
+/** 快照里各 actor 的角色；按 actor 过滤时用（lead 回合不再接收队友）。 */
+export function snapshotActorRole(raw: unknown): string {
+  const actor = snapshotRecord(snapshotRecord(raw)?.actor)
+  return typeof actor?.role === 'string' ? actor.role : 'orchestrator'
+}
+
+/**
+ * 把快照里各 actor 的块折叠成 reducer 能理解的事件（turn_start → 块 → turn_end），
+ * 再补上快照记录的错误。lead 回合和队友激活的快照共用这一套。
+ */
+export function replaySnapshotActors(
+  snapshot: Record<string, unknown>,
+  handle: (event: SseEvent) => void,
+  sessionId: number,
+  turnId: string,
+  include: (role: string) => boolean = () => true,
+) {
+  const actors = Array.isArray(snapshot.actors) ? snapshot.actors : []
+  for (const raw of actors) {
+    const actorState = snapshotRecord(raw)
+    const actor = snapshotRecord(actorState?.actor)
+    if (!actor) continue
+    const actorEvent = {
+      role: typeof actor.role === 'string' ? actor.role : 'orchestrator',
+      name: typeof actor.name === 'string' ? actor.name : 'Agent',
+      ...(typeof actor.run_id === 'string' ? { run_id: actor.run_id } : {}),
+      ...(typeof actor.agent_id === 'number' ? { agent_id: actor.agent_id } : {}),
+    }
+    if (!include(actorEvent.role)) continue
+    const blocks = Array.isArray(actorState?.blocks) ? actorState.blocks : []
+    handle({ type: 'turn_start', sequence: 0, session_id: sessionId, turn_id: turnId, actor: actorEvent })
+    for (const rawBlock of blocks) {
+      const block = snapshotRecord(rawBlock)
+      if (!block) continue
+      const index = Number(block.index ?? 0)
+      const kind = block.kind
+      if (kind === 'thinking' || kind === 'text') {
+        handle({
+          type: 'block_start', sequence: Number(block.sequence ?? 0), session_id: sessionId, turn_id: turnId,
+          actor: actorEvent, block: { index, block_type: kind },
+        })
+        if (typeof block.text === 'string' && block.text) {
+          handle({
+            type: kind === 'thinking' ? 'thinking_delta' : 'text_delta', sequence: Number(block.sequence ?? 0),
+            session_id: sessionId, turn_id: turnId, actor: actorEvent, block: { index }, text: block.text,
+          })
+        }
+        if (block.closed !== false) {
+          handle({ type: 'block_stop', sequence: Number(block.sequence ?? 0), session_id: sessionId, turn_id: turnId, actor: actorEvent, block: { index } })
+        }
+      } else if (kind === 'tool_use') {
+        const tool = snapshotRecord(block.tool)
+        if (!tool) continue
+        handle({
+          type: 'tool_use', sequence: Number(block.sequence ?? 0), session_id: sessionId, turn_id: turnId,
+          actor: actorEvent,
+          tool: {
+            id: typeof tool.id === 'string' ? tool.id : `snapshot-tool-${index}`,
+            name: typeof tool.name === 'string' ? tool.name : 'tool',
+            input: snapshotRecord(tool.input) ?? {},
+            ...(typeof tool.source === 'string' ? { source: tool.source } : {}),
+          },
+        })
+        const result = snapshotRecord(block.result)
+        if (result) {
+          handle({
+            type: 'tool_result', sequence: Number(block.result_sequence ?? block.sequence ?? 0), session_id: sessionId,
+            turn_id: turnId, actor: actorEvent,
+            tool: {
+              id: typeof result.id === 'string' ? result.id : typeof tool.id === 'string' ? tool.id : `snapshot-tool-${index}`,
+              name: typeof result.name === 'string' ? result.name : typeof tool.name === 'string' ? tool.name : 'tool',
+              output: typeof result.output === 'string' ? result.output : '',
+              is_error: result.is_error === true,
+            },
+          })
+        }
+      }
+    }
+    if (actorState?.in_turn !== true) {
+      handle({ type: 'turn_end', sequence: 0, session_id: sessionId, turn_id: turnId, actor: actorEvent })
+    }
+  }
+  if (!Array.isArray(snapshot.errors)) return
+  for (const raw of snapshot.errors) {
+    const item = snapshotRecord(raw)
+    const error = snapshotRecord(item?.error)
+    if (!error) continue
+    const actor = item?.actor as SseEvent['actor']
+    if (!include(actor?.role ?? 'orchestrator')) continue
+    handle({
+      type: 'error', sequence: Number(item?.sequence ?? 0), session_id: sessionId,
+      turn_id: turnId, actor,
+      error: {
+        code: typeof error.code === 'string' ? error.code : 'ERROR',
+        message: typeof error.message === 'string' ? error.message : '执行失败',
+        retriable: error.retriable === true, fatal: error.fatal === true,
+      },
+    })
+  }
+}

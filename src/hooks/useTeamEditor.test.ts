@@ -1,7 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { useTeamsStore } from '@/stores/teams'
-import { useTeamEditor } from './useTeamEditor'
+import { ApiError } from '@/http'
+import { createTeamDefinition, getTeamDefinitionDetail, updateTeamDefinition } from '@/http/team-definition'
+import type { TeamDefinitionResponse } from '@/interfaces/team-definition/api'
+import type { TeamFormModel } from '@/interfaces/team-definition/model'
+import { teamSaveError } from '@/stores/teams'
+import {
+  buildTeamCreatePayload,
+  buildTeamUpdatePayload,
+  emptyTeamForm,
+  suggestMemberName,
+  teamResponseToForm,
+  teamSaveErrorRows,
+  useTeamEditor,
+  validateTeamForm,
+} from './useTeamEditor'
 
 const routerPush = vi.fn()
 vi.mock('vue-router', () => ({
@@ -11,115 +24,211 @@ const toastAdd = vi.fn()
 vi.mock('@nuxt/ui/composables', () => ({
   useToast: () => ({ add: toastAdd }),
 }))
+const auth = { currentWorkspaceId: 1, currentWorkspace: { membership_role: 'owner' as string } }
+vi.mock('@/stores/auth', () => ({ useAuthStore: () => auth }))
+vi.mock('@/http/team-definition', () => ({
+  createTeamDefinition: vi.fn(),
+  deleteTeamDefinition: vi.fn(),
+  getTeamDefinitionDetail: vi.fn(),
+  getTeamDefinitionList: vi.fn(),
+  updateTeamDefinition: vi.fn(),
+}))
 
-/** 把空白草稿补到可以通过校验：名称 + 两个成员 + 入口。 */
-function fillValid(editor: ReturnType<typeof useTeamEditor>) {
-  editor.draft.value.name = '回归测试 Team'
-  editor.draft.value.members.push(
-    { agentId: '1', agentName: '甲 Agent', duty: '', isEntry: false },
-    { agentId: '2', agentName: '乙 Agent', duty: '', isEntry: false },
-  )
-  editor.draft.value.entryIndex = 0
+const team: TeamDefinitionResponse = {
+  id: 7,
+  workspace_id: 1,
+  name: '内容评审组',
+  description: '评审稿件',
+  is_enabled: true,
+  created_by_user_id: 1,
+  members: [
+    { agent_id: 3, agent_name: '写手', name: 'writer-a', role: '撰写初稿', sort_order: 0 },
+    { agent_id: 4, agent_name: '审校', name: 'reviewer', role: '审校', sort_order: 1 },
+  ],
+  created_at: '2026-11-15T00:00:00Z',
+  updated_at: '2026-11-15T00:00:00Z',
 }
+
+/** 名称 + 一个填好的成员，能通过校验。 */
+function validForm(): TeamFormModel {
+  const form = emptyTeamForm()
+  form.name = ' 内容评审组 '
+  Object.assign(form.members[0]!, { agentId: 3, agentName: '写手', name: ' writer ', role: ' 撰写初稿 ' })
+  return form
+}
+
+describe('Team 表单校验', () => {
+  it('新建草稿默认启用，带一行空成员', () => {
+    const form = emptyTeamForm()
+    expect(form).toMatchObject({ id: null, name: '', isEnabled: true })
+    expect(form.members).toHaveLength(1)
+    expect(validateTeamForm(validForm())).toEqual([])
+  })
+
+  it('名称必填、至少一个成员', () => {
+    const form = validForm()
+    form.name = '  '
+    form.members = []
+    expect(validateTeamForm(form).map((issue) => issue.message)).toEqual(['请输入 Team 名称', '至少需要 1 个成员'])
+  })
+
+  it('成员行：Agent、成员名、角色必填，Agent 已删除要重选', () => {
+    const form = validForm()
+    form.members.push({ key: 'x', agentId: null, agentName: null, name: '', role: '' })
+    form.members.push({ key: 'y', agentId: 9, agentName: null, name: 'old', role: '旧成员' })
+    const issues = validateTeamForm(form)
+    expect(issues.map((issue) => [issue.memberIndex, issue.memberField])).toEqual([
+      [1, 'agent'], [1, 'name'], [1, 'role'], [2, 'agent'],
+    ])
+    expect(issues[3]?.message).toBe('第 3 个成员的 Agent 已删除，请重新选择')
+  })
+
+  it('成员名不能重复，也不能是 lead 或 *；同一个 Agent 可以出现多次', () => {
+    const form = validForm()
+    form.members.push({ key: 'b', agentId: 3, agentName: '写手', name: 'writer', role: '另一位写手' })
+    form.members.push({ key: 'c', agentId: 3, agentName: '写手', name: 'lead', role: '冒充 lead' })
+    form.members.push({ key: 'd', agentId: 3, agentName: '写手', name: '*', role: '广播' })
+    const issues = validateTeamForm(form)
+    expect(issues.map((issue) => issue.memberIndex)).toEqual([0, 1, 2, 3])
+    expect(issues[0]?.message).toBe('第 1 个成员的成员名「writer」重复')
+    expect(issues[2]?.message).toBe('第 3 个成员的成员名不能是 lead 或 *')
+  })
+
+  it('长度上限：名称 128，成员名、角色 120', () => {
+    const form = validForm()
+    form.name = 'a'.repeat(129)
+    form.members[0]!.name = 'n'.repeat(121)
+    form.members[0]!.role = 'r'.repeat(121)
+    expect(validateTeamForm(form).map((issue) => issue.memberField ?? issue.field)).toEqual(['name', 'name', 'role'])
+  })
+})
+
+describe('成员名预填', () => {
+  it('用 Agent 名，重名或撞保留名时加 -2、-3', () => {
+    expect(suggestMemberName(' 写手 ', [])).toBe('写手')
+    expect(suggestMemberName('写手', ['写手'])).toBe('写手-2')
+    expect(suggestMemberName('写手', ['写手', '写手-2'])).toBe('写手-3')
+    expect(suggestMemberName('lead', [])).toBe('lead-2')
+    expect(suggestMemberName('x'.repeat(130), ['x'.repeat(120)])).toBe(`${'x'.repeat(118)}-2`)
+  })
+})
+
+describe('载荷', () => {
+  it('新建：去首尾空格，数组下标写进 sort_order，空描述传 null', () => {
+    const form = validForm()
+    form.members.push({ key: 'b', agentId: 4, agentName: '审校', name: 'reviewer', role: '审校' })
+    expect(buildTeamCreatePayload(form)).toEqual({
+      name: '内容评审组',
+      description: null,
+      is_enabled: true,
+      members: [
+        { agent_id: 3, name: 'writer', role: '撰写初稿', sort_order: 0 },
+        { agent_id: 4, name: 'reviewer', role: '审校', sort_order: 1 },
+      ],
+    })
+  })
+
+  it('更新只带改动的字段；描述清空传 null，成员有变化才整体替换', () => {
+    const form = teamResponseToForm(team)
+    expect(buildTeamUpdatePayload(form, team)).toEqual({})
+
+    form.description = ''
+    form.isEnabled = false
+    expect(buildTeamUpdatePayload(form, team)).toEqual({ description: null, is_enabled: false })
+
+    form.members.reverse()
+    expect(buildTeamUpdatePayload(form, team).members).toEqual([
+      { agent_id: 4, name: 'reviewer', role: '审校', sort_order: 0 },
+      { agent_id: 3, name: 'writer-a', role: '撰写初稿', sort_order: 1 },
+    ])
+  })
+
+  it('后端错误定位到成员行：loc 下标、成员名、Agent id', () => {
+    const form = teamResponseToForm(team)
+    const byIndex = teamSaveError(new ApiError('参数校验失败', 'HTTP_ERROR', 422, { errors: [{ loc: ['body', 'members', 1, 'role'], msg: 'x' }] }), '失败')
+    expect(teamSaveErrorRows(byIndex, form)).toEqual([1])
+    const byName = teamSaveError(new ApiError('成员名在Team内必须唯一', 'HTTP_ERROR', 422, { names: ['writer-a'] }), '失败')
+    expect(teamSaveErrorRows(byName, form)).toEqual([0])
+    const byAgent = teamSaveError(new ApiError('绑定的Agent不存在', 'NOT_FOUND', 404, { agent_ids: [4] }), '失败')
+    expect(teamSaveErrorRows(byAgent, form)).toEqual([1])
+    expect(teamSaveErrorRows(teamSaveError(new ApiError('Team名称已存在', 'CONFLICT', 409), '失败'), form)).toEqual([])
+  })
+})
 
 describe('useTeamEditor', () => {
   beforeEach(() => {
-    // routerPush / toastAdd 是模块级 mock，逐例清空调用记录，避免断言串到上一个用例。
     vi.clearAllMocks()
     setActivePinia(createPinia())
+    auth.currentWorkspace.membership_role = 'owner'
   })
 
-  it('issues 随草稿实时计算，改好后立即清空', () => {
-    const editor = useTeamEditor()
-    editor.openCreate()
-    expect(editor.issues.value.map((issue) => issue.section)).toEqual(expect.arrayContaining(['basic', 'members']))
-    fillValid(editor)
-    expect(editor.issues.value).toEqual([])
+  it('只有 owner / admin 能写', () => {
+    expect(useTeamEditor().canManage.value).toBe(true)
+    auth.currentWorkspace.membership_role = 'member'
+    expect(useTeamEditor().canManage.value).toBe(false)
   })
 
-  it('Bug 1 回归：校验失败一次后修好问题，可以再次保存', async () => {
-    const store = useTeamsStore()
+  it('有校验问题时不提交', async () => {
     const editor = useTeamEditor()
-    editor.openCreate()
+    await editor.openCreate()
+    expect(await editor.save()).toBe(false)
+    expect(createTeamDefinition).not.toHaveBeenCalled()
+  })
+
+  it('新建成功后进详情', async () => {
+    vi.mocked(createTeamDefinition).mockResolvedValueOnce(team)
+    const editor = useTeamEditor()
+    await editor.openCreate()
+    editor.draft.value = validForm()
     const onSaved = vi.fn()
-
-    expect(await editor.saveDraft({ onSaved })).toBe(false)
-    expect(onSaved).not.toHaveBeenCalled()
-    expect(routerPush).not.toHaveBeenCalled()
-    expect(store.findTeam(editor.draft.value.id)).toBeNull()
-
-    fillValid(editor)
-    expect(await editor.saveDraft({ onSaved })).toBe(true)
+    expect(await editor.save({ onSaved })).toBe(true)
     expect(onSaved).toHaveBeenCalledOnce()
-    expect(store.findTeam(editor.draft.value.id)?.name).toBe('回归测试 Team')
-    expect(editor.error.value).toBe('')
+    expect(routerPush).toHaveBeenCalledWith({ name: 'team-detail', params: { id: '7' } })
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ title: '内容评审组 已保存' }))
   })
 
-  it('Bug 2 回归：保存草稿保留当前状态，publish 提交启用状态（nominal）', async () => {
-    const store = useTeamsStore()
-    const draftEditor = useTeamEditor()
-    draftEditor.openCreate()
-    fillValid(draftEditor)
-    expect(await draftEditor.saveDraft()).toBe(true)
-    expect(store.findTeam(draftEditor.draft.value.id)?.status).toBe('idle')
-
-    const publishEditor = useTeamEditor()
-    publishEditor.openCreate()
-    fillValid(publishEditor)
-    expect(await publishEditor.publish()).toBe(true)
-    expect(store.findTeam(publishEditor.draft.value.id)?.status).toBe('nominal')
-    expect(publishEditor.draft.value.status).toBe('nominal')
-    expect(toastAdd).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Team「回归测试 Team」已保存并启用' }))
-  })
-
-  it('publish 校验不通过时不改状态、不写入 store', async () => {
-    const store = useTeamsStore()
+  it('复制已有 Team 作为草稿', async () => {
+    vi.mocked(getTeamDefinitionDetail).mockResolvedValueOnce(team)
     const editor = useTeamEditor()
-    editor.openCreate()
-    expect(await editor.publish()).toBe(false)
-    expect(editor.draft.value.status).toBe('idle')
-    expect(store.findTeam(editor.draft.value.id)).toBeNull()
+    expect(await editor.openCreate(7)).toBe(true)
+    expect(editor.draft.value).toMatchObject({ id: null, name: '内容评审组 副本' })
+    expect(editor.draft.value.members.map((member) => member.name)).toEqual(['writer-a', 'reviewer'])
   })
 
-  it('新建：onSaved 在跳转之前调用，保存后回列表并高亮', async () => {
-    const calls: string[] = []
-    routerPush.mockImplementation(() => { calls.push('push') })
+  it('编辑：没有改动不发请求，有改动只 PATCH 改动字段', async () => {
+    vi.mocked(getTeamDefinitionDetail).mockResolvedValue(team)
     const editor = useTeamEditor()
-    editor.openCreate()
-    fillValid(editor)
-    // onSaved 被调用时已经是启用状态：页面在此重置的快照与随后跳转时的草稿一致。
-    await editor.publish({ onSaved: () => { calls.push(`onSaved:${editor.draft.value.status}`) } })
-    expect(calls).toEqual(['onSaved:nominal', 'push'])
-    expect(routerPush).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'platform-resource',
-      params: { module: 'build', resource: 'teams' },
-      query: { highlight: editor.draft.value.id },
-    }))
+    expect(await editor.openEdit(7)).toBe(true)
+    expect(await editor.save()).toBe(true)
+    expect(updateTeamDefinition).not.toHaveBeenCalled()
+    expect(routerPush).toHaveBeenLastCalledWith({ name: 'team-detail', params: { id: '7' } })
+
+    editor.draft.value.name = '改名后'
+    vi.mocked(updateTeamDefinition).mockResolvedValueOnce({ ...team, name: '改名后' })
+    expect(await editor.save()).toBe(true)
+    expect(updateTeamDefinition).toHaveBeenCalledWith(7, { name: '改名后' })
   })
 
-  it('编辑：onSaved 在跳转之前调用，保存后去详情页', async () => {
-    const store = useTeamsStore()
-    store.ensureLoaded()
-    const target = store.state.items[0]!
-    const calls: string[] = []
-    routerPush.mockImplementation(() => { calls.push('push') })
+  it('保存失败保留后端定位信息', async () => {
+    vi.mocked(getTeamDefinitionDetail).mockResolvedValueOnce(team)
+    vi.mocked(updateTeamDefinition).mockRejectedValueOnce(new ApiError('Team名称已存在', 'CONFLICT', 409))
     const editor = useTeamEditor()
-    await editor.openEdit(target.id)
-    // 目录播种的成员行没有 Agent 名，先补齐才能通过校验。
-    editor.draft.value.members.forEach((member, index) => { member.agentName = `Agent ${index + 1}` })
-    expect(editor.issues.value).toEqual([])
-
-    expect(await editor.saveDraft({ onSaved: () => { calls.push('onSaved') } })).toBe(true)
-    expect(calls).toEqual(['onSaved', 'push'])
-    expect(routerPush).toHaveBeenCalledWith({ name: 'team-detail', params: { id: target.id } })
+    await editor.openEdit(7)
+    editor.draft.value.name = '重名'
+    expect(await editor.save()).toBe(false)
+    expect(editor.error.value).toBe('Team名称已存在')
+    expect(editor.saveError.value?.field).toBe('name')
+    expect(routerPush).not.toHaveBeenCalled()
   })
 
-  it('openCreate 返回是否从已有 Team 复制', () => {
-    const store = useTeamsStore()
-    store.ensureLoaded()
+  it('详情 404 标记不存在，其他错误给出原因', async () => {
     const editor = useTeamEditor()
-    expect(editor.openCreate(store.state.items[0]!.id)).toBe(true)
-    expect(editor.openCreate('TEAM-不存在')).toBe(false)
-    expect(editor.openCreate()).toBe(false)
+    vi.mocked(getTeamDefinitionDetail).mockRejectedValueOnce(new ApiError('Team不存在', 'NOT_FOUND', 404))
+    expect(await editor.openEdit(8)).toBe(false)
+    expect(editor.notFound.value).toBe(true)
+    vi.mocked(getTeamDefinitionDetail).mockRejectedValueOnce(new ApiError('内部错误', 'ERROR', 500))
+    await editor.openEdit(8)
+    expect(editor.notFound.value).toBe(false)
+    expect(editor.loadError.value).toBe('内部错误')
   })
 })

@@ -1,204 +1,212 @@
 <script setup lang="ts">
-import { computed, ref, useCssModule, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { RelativeTime } from '@/components'
-import { useSaveFeedback } from '@/hooks/useSaveFeedback'
-import {
-  TEAM_MODE_LABEL,
-  type TeamFormModel,
-  type TeamMember,
-  teamCode,
-} from '@/interfaces/platform-team/model'
+import { useTeamWriteAccess } from '@/hooks/useTeamEditor'
+import { hasDeletedTeamAgent, useTeamActions } from '@/hooks/useTeamManager'
+import type { TeamDefinitionMemberResponse, TeamDefinitionResponse } from '@/interfaces/team-definition/api'
 import { useAgentsStore } from '@/stores/agents'
 import { useTeamsStore } from '@/stores/teams'
 
 defineOptions({ name: 'TeamResourceDetail' })
 
-const styles = useCssModule()
 const route = useRoute()
 const router = useRouter()
 const teamsStore = useTeamsStore()
 const agentsStore = useAgentsStore()
-const pendingDelete = ref(false)
-const deleting = ref(false)
+const actions = useTeamActions()
+const canManage = useTeamWriteAccess()
 
-const listRoute = { name: 'platform-resource', params: { module: 'build', resource: 'teams' } } as const
-const saveFeedback = useSaveFeedback({ listRoute })
+const loading = ref(false)
+const notFound = ref(false)
+const loadError = ref('')
+const detail = ref<TeamDefinitionResponse | null>(null)
 
-const TAB_KEYS = ['basic', 'members', 'runtime'] as const
-type TabKey = (typeof TAB_KEYS)[number]
-
-const tabItems = [
-  { value: 'basic', label: '基础信息' },
-  { value: 'members', label: '成员' },
-  { value: 'runtime', label: '运行策略' },
-]
-
-function isTabKey(value: unknown): value is TabKey {
-  return typeof value === 'string' && (TAB_KEYS as readonly string[]).includes(value)
-}
-
-const activeTab = computed<TabKey>({
-  get() {
-    const raw = route.query.tab
-    const value = Array.isArray(raw) ? raw[0] : raw
-    return isTabKey(value) ? value : 'basic'
-  },
-  set(tab) {
-    if (tab === activeTab.value) return
-    void router.replace({ query: { ...route.query, tab } })
-  },
-})
-
-/** Teams 的 id 是「TEAM-0001」形态的目录编号，直接按字符串查找。 */
 const teamId = computed(() => {
-  const raw = route.params.id
-  const value = Array.isArray(raw) ? raw[0] : raw
-  return typeof value === 'string' ? value.trim() : ''
+  const value = route.params.id
+  return Number(Array.isArray(value) ? value[0] : value)
+})
+/** 优先读 store：启停后的新状态会写回 store。 */
+const team = computed<TeamDefinitionResponse | null>(
+  () => teamsStore.state.items.find((item) => item.id === teamId.value) ?? detail.value,
+)
+const deletedAgent = computed(() => Boolean(team.value && hasDeletedTeamAgent(team.value)))
+
+const menuItems = computed<DropdownMenuItem[][]>(() => {
+  const current = team.value
+  if (!current) return []
+  return [[
+    { label: '复制', icon: 'i-lucide-copy', onSelect: goToDuplicate },
+    { label: '删除', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => actions.requestDelete(current) },
+  ]]
 })
 
-const detail = computed<TeamFormModel | null>(() => (teamId.value ? teamsStore.findTeam(teamId.value) : null))
-
-const STATUS_LABEL: Record<TeamFormModel['status'], string> = {
-  nominal: '正常',
-  warning: '需关注',
-  error: '异常',
-  idle: '未启用',
+/** 成员 Agent 的状态：已删除看 agent_name，已停用用 Agent 列表反查。 */
+function agentState(member: TeamDefinitionMemberResponse): 'deleted' | 'disabled' | 'ok' {
+  if (member.agent_name == null) return 'deleted'
+  const agent = agentsStore.state.items.find((item) => item.id === member.agent_id)
+  return agent && !agent.is_enabled ? 'disabled' : 'ok'
 }
 
-const entryIndex = computed(() => {
-  const team = detail.value
-  if (!team || !team.members.length) return -1
-  return team.entryIndex >= 0 && team.entryIndex < team.members.length ? team.entryIndex : 0
-})
-
-/** 已停用且不是入口的成员会让 Team 无法完整运行，详情页标红提示。 */
-const stoppedMembers = computed(() => {
-  const team = detail.value
-  if (!team) return []
-  return team.members.filter((member, index) => index !== entryIndex.value && !isAvailable(member))
-})
-
-/** 只在 Agent 目录里查得到且被停用时才算不可用，查不到视为未知而非异常。 */
-function isAvailable(member: TeamMember) {
-  if (!member.agentId) return false
-  const agent = agentsStore.state.items.find((item) => String(item.id) === member.agentId)
-  return agent ? agent.is_enabled : true
+async function load() {
+  notFound.value = false
+  loadError.value = ''
+  detail.value = null
+  if (!Number.isInteger(teamId.value) || teamId.value <= 0) {
+    notFound.value = true
+    return
+  }
+  loading.value = true
+  if (!agentsStore.state.items.length && !agentsStore.state.loading) void agentsStore.loadAgents()
+  const result = await teamsStore.loadTeamDetail(teamId.value)
+  loading.value = false
+  if (result === undefined) return
+  if (result.status === 'not-found') {
+    notFound.value = true
+    return
+  }
+  if (result.status === 'error') {
+    loadError.value = result.message
+    return
+  }
+  detail.value = result.item
 }
 
-function memberCode(member: TeamMember) {
-  return member.agentId ? `AGT-${member.agentId}` : '未指派'
-}
+watch(teamId, () => { void load() }, { immediate: true })
 
 function goToList() {
-  void router.push(listRoute)
+  void router.push({ name: 'platform-resource', params: { module: 'build', resource: 'teams' } })
 }
 
 function goToEdit() {
-  void router.push({ name: 'team-edit', params: { id: teamId.value } })
+  void router.push({ name: 'team-edit', params: { id: String(teamId.value) } })
 }
 
 function goToDuplicate() {
-  void router.push({ name: 'team-create', params: { module: 'build', resource: 'teams' }, query: { duplicate: teamId.value } })
+  void router.push({ name: 'team-create', query: { duplicate: String(teamId.value) } })
 }
 
-function requestDelete() {
-  if (!detail.value) return
-  pendingDelete.value = true
+function onToggle(value: boolean) {
+  if (team.value) void actions.toggleEnabled(team.value, value)
 }
 
-async function confirmDelete() {
-  const team = detail.value
-  if (!team || deleting.value) return
-  deleting.value = true
-  try {
-    const name = team.name
-    teamsStore.removeTeam(team.id)
-    pendingDelete.value = false
-    await saveFeedback.afterDelete({ message: `Team「${name}」已删除` })
-  } finally {
-    deleting.value = false
-  }
+async function onDeleteConfirm() {
+  if (await actions.confirmDelete()) goToList()
 }
-
-watch(
-  () => teamId.value,
-  () => {
-    pendingDelete.value = false
-    if (!teamId.value) return
-    teamsStore.ensureLoaded()
-    if (!agentsStore.state.items.length) void agentsStore.loadAgents()
-  },
-  { immediate: true },
-)
 </script>
 
 <template>
-  <main :class="styles['tm-page']">
-    <header :class="styles['tm-page-head']">
-      <div :class="styles['tm-heading']"><nav aria-label="面包屑"><span>构建资源</span><i class="icon icon-chevron-right"></i><strong>智能体编排</strong><i class="icon icon-chevron-right"></i><strong>详情</strong></nav><div><span :class="styles['tm-page-icon']"><i class="icon icon-users-round"></i></span><span><h1>{{ detail?.name ?? 'Team 详情' }}</h1><p v-if="detail">{{ teamCode(detail.id) }} · 由本地草稿维护，刷新页面后重置。</p><p v-else>查看 Team 的成员组成、编排模式与运行策略。</p></span></div></div>
-      <div :class="styles['tm-page-actions']"><span :class="[styles['tm-local-badge'], 'mono']"><i class="icon icon-database"></i>LOCAL DRAFT</span><UButton :class="styles['tm-secondary-button']" icon="i-lucide-arrow-left" label="返回列表" @click="goToList" /></div>
-    </header>
+  <main :class="$style.page">
+    <div :class="$style.inner">
+      <header :class="$style.toolbar">
+        <UButton icon="i-lucide-arrow-left" label="Teams" color="neutral" variant="ghost" @click="goToList" />
+        <div v-if="team && canManage && !notFound && !loadError" :class="$style.actions">
+          <USwitch
+            :model-value="team.is_enabled"
+            :disabled="actions.isToggling(team.id)"
+            :loading="actions.isToggling(team.id)"
+            :aria-label="`${team.is_enabled ? '停用' : '启用'} ${team.name}`"
+            @update:model-value="onToggle"
+          />
+          <UButton icon="i-lucide-pencil" label="编辑" color="primary" @click="goToEdit" />
+          <UDropdownMenu :items="menuItems">
+            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square aria-label="更多操作" />
+          </UDropdownMenu>
+        </div>
+      </header>
 
-    <UAlert v-if="!detail" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Team 详情加载失败" description="未找到该 Team，可能已被删除或工作区已切换。" :actions="[{ label: '返回列表', color: 'neutral', variant: 'outline', onClick: goToList }]" />
-
-    <section v-if="detail" :class="styles['tm-detail-shell']" aria-label="Team 详情">
-      <div :class="styles['tm-detail-top']">
-        <UBadge color="neutral" variant="subtle" :class="[styles['tm-lifecycle'], detail.status === 'nominal' ? 'published' : 'disabled']"><span class="dot" :class="detail.status"></span>{{ STATUS_LABEL[detail.status] }}</UBadge>
-        <span :class="styles['tm-detail-mode']">{{ TEAM_MODE_LABEL[detail.mode] }} <small class="mono">{{ detail.mode.toUpperCase() }}</small></span>
-        <span :class="styles['tm-detail-mode']">入口 Agent <small class="mono">{{ detail.members[entryIndex]?.agentName || '未指定' }}</small></span>
-        <UAlert v-if="stoppedMembers.length" color="error" variant="subtle" icon="i-lucide-triangle-alert" :title="`${stoppedMembers.length} 个成员 Agent 已停用，Team 将无法完整运行。`" />
+      <div v-if="loading && !team" :class="$style.skeletons" aria-busy="true">
+        <USkeleton :class="$style.skeletonHero" />
+        <USkeleton :class="$style.skeleton" />
+        <USkeleton :class="$style.skeleton" />
       </div>
 
-      <UTabs v-model="activeTab" :items="tabItems" :content="false" variant="link" size="sm" :class="styles['tm-detail-tabs']" />
+      <UEmpty v-else-if="notFound" :class="$style.empty" variant="naked" icon="i-lucide-users-round" title="Team 不存在">
+        <template #actions>
+          <UButton icon="i-lucide-arrow-left" label="返回列表" color="neutral" variant="outline" @click="goToList" />
+        </template>
+      </UEmpty>
 
-      <div v-if="activeTab === 'basic'" :class="styles['tm-detail-pane']">
-        <dl :class="styles['tm-detail-list']">
-          <div><dt>描述</dt><dd>{{ detail.description || '未填写用途描述' }}</dd></div>
-          <div><dt>模式</dt><dd>{{ TEAM_MODE_LABEL[detail.mode] }} <small class="mono">{{ detail.mode.toUpperCase() }}</small></dd></div>
-          <div><dt>状态</dt><dd>{{ STATUS_LABEL[detail.status] }}</dd></div>
-          <div><dt>负责人</dt><dd>{{ detail.owner || '未指定' }}</dd></div>
-          <div><dt>标签</dt><dd>{{ detail.tags.length ? detail.tags.join('、') : '无标签' }}</dd></div>
-        </dl>
-      </div>
+      <UEmpty v-else-if="loadError" :class="$style.empty" variant="naked" icon="i-lucide-cloud-off" title="Team 加载失败" :description="loadError">
+        <template #actions>
+          <UButton icon="i-lucide-refresh-cw" label="重试" color="neutral" variant="outline" @click="load" />
+        </template>
+      </UEmpty>
 
-      <div v-else-if="activeTab === 'members'" :class="styles['tm-detail-pane']">
-        <ol :class="styles['tm-detail-members']">
-          <li v-for="(member, index) in detail.members" :key="member.agentId + index" :class="{ [styles.unavailable]: index !== entryIndex && !isAvailable(member) }">
-            <span class="mono">{{ String(index + 1).padStart(2, '0') }}</span>
-            <span :class="styles['tm-detail-member-main']">
-              <strong>{{ member.agentName || '未指定 Agent' }}</strong>
-              <small class="mono">{{ member.duty || '未填写职责' }}</small>
-            </span>
-            <em v-if="index === entryIndex" :class="styles.success"><i class="icon icon-circle-check-big"></i>入口 Agent</em>
-            <em v-else-if="!isAvailable(member)"><i class="icon icon-triangle-alert"></i>已停用</em>
-            <small class="mono">{{ memberCode(member) }}</small>
-          </li>
-        </ol>
-        <p v-if="!detail.members.length" :class="styles['tm-detail-empty']">尚未添加任何成员。</p>
-      </div>
+      <template v-else-if="team">
+        <section :class="$style.hero">
+          <UAvatar :class="$style.avatar" icon="i-lucide-users-round" size="xl" />
+          <div :class="$style.heroText">
+            <h1 :class="$style.name">{{ team.name }}</h1>
+            <p v-if="team.description" :class="$style.description">{{ team.description }}</p>
+          </div>
+        </section>
 
-      <div v-else :class="styles['tm-detail-pane']">
-        <dl :class="styles['tm-detail-list']">
-          <div><dt>共享上下文</dt><dd>{{ detail.sharedContext ? '已开启' : '各自独立' }}</dd></div>
-          <div><dt>人工审批</dt><dd>{{ detail.requiresApproval ? '需要审批' : '无需审批' }}</dd></div>
-          <div><dt>并发上限</dt><dd class="mono">{{ detail.concurrency }}</dd></div>
-          <div><dt>超时时间</dt><dd class="mono">{{ detail.timeoutSeconds }} 秒</dd></div>
-          <div><dt>创建时间</dt><dd><RelativeTime :value="detail.createdAt" /></dd></div>
-          <div><dt>更新时间</dt><dd><RelativeTime :value="detail.updatedAt" /></dd></div>
-        </dl>
-      </div>
+        <section :class="$style.group">
+          <h2 :class="$style.groupTitle">成员<span :class="$style.count">{{ team.members.length }}</span></h2>
+          <UAlert
+            v-if="deletedAgent"
+            color="error"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            title="有成员的 Agent 已删除，重新选择后才能用这个 Team 新建会话"
+            :actions="canManage ? [{ label: '去编辑', color: 'neutral', variant: 'outline', onClick: goToEdit }] : undefined"
+          />
+          <div :class="$style.card">
+            <ul :class="$style.rows">
+              <li v-for="member in team.members" :key="member.name" :class="$style.row">
+                <div :class="$style.rowMain">
+                  <span :class="[$style.memberName, 'mono']">{{ member.name }}</span>
+                  <span :class="$style.rowMeta">{{ member.role }}</span>
+                </div>
+                <span v-if="agentState(member) === 'deleted'" :class="$style.agent" data-tone="error">
+                  <UIcon name="i-lucide-triangle-alert" :class="$style.status" data-tone="error" />Agent 已删除
+                </span>
+                <span v-else :class="$style.agent">
+                  <UIcon name="i-lucide-bot" :class="$style.status" />{{ member.agent_name }}
+                  <UTooltip v-if="agentState(member) === 'disabled'" text="Agent 已停用">
+                    <UIcon name="i-lucide-circle-pause" :class="$style.status" data-tone="warning" />
+                    <span class="sr-only">Agent 已停用</span>
+                  </UTooltip>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </section>
 
-      <footer :class="styles['tm-detail-actions']">
-        <UButton :class="styles['tm-icon-button']" icon="i-lucide-trash-2" color="error" variant="ghost" square aria-label="删除当前 Team" @click="requestDelete" />
-        <UButton :class="styles['tm-secondary-button']" icon="i-lucide-copy" color="neutral" variant="outline" label="复制" @click="goToDuplicate" />
-        <UButton :class="styles['tm-primary-button']" icon="i-lucide-sliders-horizontal" label="配置" @click="goToEdit" />
-      </footer>
-    </section>
+        <section :class="$style.group">
+          <h2 :class="$style.groupTitle">设置</h2>
+          <div :class="$style.card">
+            <dl :class="$style.rows">
+              <div :class="$style.row">
+                <dt :class="$style.rowLabel">状态</dt>
+                <dd :class="$style.value">{{ team.is_enabled ? '已启用' : '已停用' }}</dd>
+              </div>
+              <div :class="$style.row">
+                <dt :class="$style.rowLabel">创建</dt>
+                <dd :class="$style.value"><RelativeTime :value="team.created_at" mode="absolute" /></dd>
+              </div>
+              <div :class="$style.row">
+                <dt :class="$style.rowLabel">更新</dt>
+                <dd :class="$style.value"><RelativeTime :value="team.updated_at" /></dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+      </template>
+    </div>
 
-    <UModal :open="pendingDelete" class="ag-confirm-modal" :title="`删除 ${detail?.name ?? 'Team'}？`" description="删除后该 Team 将从内存草稿中移除，刷新页面会重新载入目录数据。" @update:open="(open) => { if (!open) pendingDelete = false }">
-      <template #body><p class="modal-copy">删除只影响当前会话的内存草稿，不会调用任何后端接口。</p></template>
-      <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="deleting" @click="pendingDelete = false" /><UButton label="确认删除" color="error" :loading="deleting" :disabled="deleting" @click="confirmDelete" /></template>
+    <UModal
+      :open="actions.pendingDelete.value !== null"
+      :title="actions.pendingDelete.value ? `删除 ${actions.pendingDelete.value.name}？` : '删除 Team？'"
+      description="删除后无法恢复，已经用它建好的会话不受影响。"
+      @update:open="(open: boolean) => { if (!open) actions.cancelDelete() }"
+    >
+      <template #footer>
+        <UButton label="取消" color="neutral" variant="outline" :disabled="actions.deleting.value" @click="actions.cancelDelete" />
+        <UButton label="删除" color="error" :loading="actions.deleting.value" :disabled="actions.deleting.value" @click="onDeleteConfirm" />
+      </template>
     </UModal>
   </main>
 </template>

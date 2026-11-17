@@ -16,6 +16,8 @@ export interface SessionResponse {
   agent_id?: number | null
   /** 会话绑定的 Workflow ID;未绑定为 null(与 agent_id 互斥) */
   workflow_id?: number | null
+  /** 建会话时选用的 Team；会话建好后不能切换。 */
+  team_definition_id?: number | null
   visibility: string
   shared_with?: number[]
   shared_with_departments?: number[]
@@ -285,6 +287,8 @@ export interface Session {
   agentId?: number | null
   /** 会话绑定的 Workflow ID;与 agentId 互斥 */
   workflowId?: number | null
+  /** 建会话时选用的 Team；与 agentId、workflowId 互斥。 */
+  teamDefinitionId?: number | null
   modelName?: string | null
   modelProviderId?: string | null
   /** 仅 metadata.model_provider_override=true 表示用户显式选模型。 */
@@ -366,15 +370,30 @@ export type ChatBlock =
       responseLabel?: string
     }
 
+/** <team-inbox> 里的一条队友消息：heading 是方括号里的来源说明，例如「writer 已转为空闲」。 */
+export interface TeamInboxEntry {
+  heading: string
+  body: string
+}
+
+/** 队友消息合并成的 user 消息，在聊天区显示成可折叠的「团队消息」卡片，不是用户气泡。 */
+export interface TeamInbox {
+  entries: TeamInboxEntry[]
+  /** 是自动回合的第一条消息：这一轮由队友消息触发，没有用户输入。 */
+  trigger: boolean
+}
+
 /** 控制台对话消息。 */
 export interface ChatMessage {
   id: string
-  role: 'user' | 'ai'
   /** 后端轮次 ID，用于完整快照覆盖同轮次的助手历史。 */
   turnId?: string | null
+  role: 'user' | 'ai' | 'team'
   time: string
   text?: string
   blocks?: ChatBlock[]
+  /** role 为 team 时的消息内容。 */
+  inbox?: TeamInbox
 }
 
 /** 派发子代理时使用的模板。 */

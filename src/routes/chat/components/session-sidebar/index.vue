@@ -7,6 +7,7 @@ import WorkspaceSelector from '@/components/workspace-selector/index.vue'
 import { WORKBENCH_APPS } from '@/constants'
 import type { Session, SessionAppId } from '@/interfaces'
 import { useConsoleStore } from '@/stores/console'
+import { useTeamsStore } from '@/stores/teams'
 import { parseShareIdList } from '@/utils/session-share'
 
 defineOptions({ name: 'SessionSidebar' })
@@ -16,6 +17,7 @@ const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 const consoleStore = useConsoleStore()
+const teamsStore = useTeamsStore()
 const { state, selectSession, newSession, openApp, renameSession, deleteSessions } = consoleStore
 
 const selectMode = ref(false)
@@ -42,6 +44,16 @@ const visibilityItems = [
 ]
 
 const generalSessions = computed(() => state.sessions.filter((session) => !session.appId))
+
+/** Team 会话的标识名：取不到列表时单独查详情，后端没有了显示「Team 已删除」。 */
+watch(() => [...new Set(state.sessions.map((session) => session.teamDefinitionId).filter((id): id is number => id != null))], (ids) => {
+  for (const id of ids) void teamsStore.resolveTeamName(id)
+}, { immediate: true })
+
+function teamLabel(teamId: number) {
+  const name = teamsStore.teamName(teamId)
+  return name === null ? 'Team 已删除' : `Team · ${name ?? teamId}`
+}
 const knownAppIds = new Set<string>(WORKBENCH_APPS.map((app) => app.id))
 const appGroups = computed(() => {
   const groups: Array<{
@@ -414,6 +426,9 @@ async function confirmDelete() {
             @click="onItemClick(session)"
           >
             <i v-if="selectMode" :class="`icon icon-${selected.has(session.id) ? 'square-check-big' : 'square'}`"></i>
+            <UTooltip v-else-if="session.teamDefinitionId != null" :text="teamLabel(session.teamDefinitionId)">
+              <i class="icon icon-users-round" :aria-label="teamLabel(session.teamDefinitionId)"></i>
+            </UTooltip>
             <i v-else class="icon icon-message-square"></i>
             <span :class="$style['item-text']" :title="session.title">{{ session.title }}</span>
           </UButton>

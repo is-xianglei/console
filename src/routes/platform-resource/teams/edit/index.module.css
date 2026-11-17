@@ -1,46 +1,11 @@
-@import '../../plans/shared/index.module.css';
-
-.tm-loading {
+/* 新建 / 编辑页的空态：不存在、加载失败、没有权限。 */
+.notice {
+  display: flex;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  color: var(--text-primary);
-  background: var(--bg-deep);
-  display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.tm-not-found {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
   padding: 0 var(--page-gutter);
-  color: var(--text-primary);
   background: var(--bg-deep);
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-
-.tm-not-found > :global(.alert) {
-  max-width: 560px;
-  width: 100%;
-}
-
-.tm-loading-inner {
-  color: var(--text-dim);
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-size: var(--fs-sm);
-}
-
-.tm-loading-back {
-  position: fixed;
-  top: 12px;
-  left: var(--page-gutter);
-}
-
-/* 离开确认弹窗的说明文字只走 UModal 的 description（同时作为对话框的 aria-describedby），
-   不要再在 #body 里写一遍，否则同一句会显示两次。 */

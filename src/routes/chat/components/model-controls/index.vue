@@ -28,9 +28,14 @@ const activeSession = computed(() => consoleStore.state.sessions.find((item) => 
 const disabled = computed(() => saving.value || consoleStore.state.chatSelectionSaving || consoleStore.state.busy || activeSession.value?.readOnly === true)
 const caps = computed(() => models.capabilities)
 const workflowActive = computed(() => consoleStore.sessionWorkflowId(consoleStore.state.activeSessionId) != null)
+/** Team 会话包含多智能体协作，后端拒绝极速模式。 */
+const teamActive = computed(() => consoleStore.sessionTeamId(consoleStore.state.activeSessionId) != null)
+const turboBlocked = computed(() => workflowActive.value || teamActive.value)
 const policy = computed(() => resolveChatPolicy(caps.value, selection.value.model_provider_id, workflowActive.value))
-const turboAvailable = computed(() => canUseTurbo(policy.value, workflowActive.value))
-const modeHint = computed(() => workflowActive.value
+const turboAvailable = computed(() => canUseTurbo(policy.value, turboBlocked.value))
+const modeHint = computed(() => teamActive.value
+  ? 'Team 会话包含多智能体协作，请使用标准模式'
+  : workflowActive.value
   ? '工作流按编排执行，使用标准模式；模型与思考强度仍可调整'
   : !turboAvailable.value ? '当前模型未配置可验证的关闭思考能力，极速模式不可用' : currentMode.value?.description)
 const modes = computed(() => caps.value?.modes.map((mode) => ({ label: mode.name, value: mode.slug, description: mode.description, disabled: mode.slug === 'turbo' && !turboAvailable.value })) ?? [])
@@ -121,7 +126,7 @@ async function changeModel(value: string): Promise<void> {
     return
   }
   const nextPolicy = resolveChatPolicy(caps.value, providerId, workflowActive.value)
-  const mode = normalizeChatMode(selection.value.mode_slug, nextPolicy, workflowActive.value)
+  const mode = normalizeChatMode(selection.value.mode_slug, nextPolicy, turboBlocked.value)
   const candidate = mode !== selection.value.mode_slug ? consoleStore.standardThinkingEffort() : selection.value.thinking_effort
   const effort = mode === 'turbo' ? 'fast' : nextPolicy ? normalizeChatEffort(candidate, nextPolicy) : candidate
   // 工作流的 null 表示跟随 workflow 角色；不应改写 Agent 对话的个人默认偏好。
@@ -142,6 +147,7 @@ const resetNormalization = useChatModelNormalization({
   capabilities: () => caps.value,
   disabled: () => disabled.value,
   workflowActive: () => workflowActive.value,
+  turboBlocked: () => turboBlocked.value,
   sessionId: () => consoleStore.state.activeSessionId,
   revision: () => models.revision,
   error: () => models.error,

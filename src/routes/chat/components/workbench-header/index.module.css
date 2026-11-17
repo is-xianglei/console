@@ -19,4 +19,5 @@
 .conv-model { margin-left: auto; padding: 3px 9px; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--bg-surface); color: var(--text-muted); display: flex; align-items: center; gap: 6px; font-family: var(--font-data); font-size: var(--fs-xs); }
 /* Orb 调用处适配:负外边距把布局占位压回原 6px 圆点,胶囊高度不因换指示器而变。 */
 .orb-fit { margin: -4px; }
+.team-icon { width: 13px; height: 13px; color: var(--accent-agent); }
 .mode-announcer { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

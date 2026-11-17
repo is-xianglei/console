@@ -1,0 +1,74 @@
+.timeline {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 4px 14px 14px;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 0;
+}
+
+.item + .item {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--fs-xs);
+}
+
+.route {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.type {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.type.conclusion {
+  color: var(--accent-agent);
+  font-weight: 600;
+}
+
+.time {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--text-dim);
+}
+
+.content {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 队友转空闲时发来的结论：左侧强调线，和普通消息区分开。 */
+.conclusionBody {
+  padding-left: 10px;
+  border-left: 2px solid var(--accent-agent);
+  color: var(--text-primary);
+}
+
+.empty {
+  padding: 24px 14px;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  text-align: center;
+}

@@ -1,215 +1,321 @@
 import { defineStore } from 'pinia'
 import { computed, reactive } from 'vue'
-import { RESOURCE_PAGES } from '../constants/platform-catalog'
-import type { ResourceRow, ResourceStatus } from '../interfaces/platform/model'
+import { ApiError } from '@/http'
 import {
-  MAX_CONCURRENCY,
-  MAX_TEAM_MEMBERS,
-  MIN_CONCURRENCY,
-  MIN_TEAM_MEMBERS,
-  type TeamFormModel,
-  type TeamMember,
-  type TeamMode,
-  type TeamValidationIssue,
-} from '../interfaces/platform-team/model'
+  createTeamDefinition,
+  deleteTeamDefinition,
+  getTeamDefinitionDetail,
+  getTeamDefinitionList,
+  updateTeamDefinition,
+} from '@/http/team-definition'
+import type {
+  TeamDefinitionCreateRequest,
+  TeamDefinitionResponse,
+  TeamDefinitionUpdateRequest,
+} from '@/interfaces/team-definition/api'
+import { useAuthStore } from './auth'
 
 interface TeamsState {
-  items: TeamFormModel[]
-  loaded: boolean
+  items: TeamDefinitionResponse[]
+  total: number
+  loading: boolean
+  saving: boolean
+  deleting: boolean
+  /** 正在切换启停的 Team id。 */
+  togglingIds: number[]
+  /**
+   * 会话头部、会话列表按 id 取名：列表里查不到时单独拉详情的结果。
+   * null 表示后端已经没有这个 Team（已删除），界面显示「Team 已删除」。
+   */
+  names: Record<number, string | null>
 }
+
+export type TeamDetailResult =
+  | { status: 'ok'; item: TeamDefinitionResponse }
+  | { status: 'not-found' }
+  | { status: 'error'; message: string }
+
+export type SaveTeamInput =
+  | { id?: undefined; create: TeamDefinitionCreateRequest }
+  | { id: number; update: TeamDefinitionUpdateRequest }
 
 /**
- * Teams 的内存数据源。
- *
- * 列表页（useBuildResourceManager）和编辑页共用同一份 `items`，
- * 但各自的行形态不同：列表用 ResourceRow.values 承载四列展示值，
- * 编辑页用结构化字段。这里提供双向转换，避免两套数据各改各的。
+ * 保存失败的定位信息：表单据此标红字段或成员行，文案以后端为准。
+ * memberIndexes 来自 422 的 loc，memberNames 来自重名 / 保留名，agentIds 来自 404「绑定的Agent不存在」。
  */
-/**
- * 由列表行转换成编辑草稿。
- *
- * 目录行只记录了「5 Agents」这样的数量，没有真实成员名单，所以这里只把入口
- * Agent 落成一条实名成员，其余留空（agentName 为 ''）交给使用者在编辑器里补全，
- * 不会编造「待指派 Agent 2」这种假名字。
- */
-function fromRow(row: ResourceRow): TeamFormModel {
-  const [modeLabel, entryName, memberText] = row.values
-  const mode: TeamMode = modeLabel === '主管式' ? 'supervisor' : modeLabel === '并行协作' ? 'parallel' : 'pipeline'
-  const memberCount = Number(memberText?.match(/\d+/)?.[0] ?? 0)
-  const members: TeamMember[] = []
-  if (memberCount > 0) {
-    members.push({ agentId: '', agentName: entryName ?? '', duty: '', isEntry: true })
-  }
-  for (let index = 1; index < memberCount; index += 1) {
-    members.push({ agentId: '', agentName: '', duty: '', isEntry: false })
-  }
-  return {
-    id: row.id,
-    name: row.name,
-    mode,
-    status: row.status,
-    entryIndex: members.length ? 0 : -1,
-    members,
-    description: row.description,
-    owner: row.owner,
-    tags: [...row.tags],
-    sharedContext: row.tags.includes('共享上下文'),
-    requiresApproval: row.tags.some((tag) => tag.includes('审批')),
-    concurrency: 4,
-    timeoutSeconds: 90,
-    createdAt: '',
-    updatedAt: '',
-  }
+export interface TeamSaveError {
+  message: string
+  field: 'name' | 'members' | null
+  memberIndexes: number[]
+  memberNames: string[]
+  agentIds: number[]
 }
 
-/** 编辑结果回写成列表页的 ResourceRow 形态，保证两处展示一致。 */
-export function toRow(team: TeamFormModel): ResourceRow {
-  const memberCount = `${team.members.length} Agents`
-  const entryName = team.members[team.entryIndex]?.agentName ?? team.members[0]?.agentName ?? '未指定'
-  return {
-    id: team.id,
-    name: team.name,
-    status: team.status,
-    values: [MODE_LABEL[team.mode], entryName, memberCount],
-    description: team.description,
-    tags: [...team.tags],
-    owner: team.owner,
-  }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-const MODE_LABEL: Record<TeamMode, string> = {
-  supervisor: '主管式',
-  parallel: '并行协作',
-  pipeline: '流水线',
+function numberList(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((item): item is number => typeof item === 'number') : []
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiError && error.message ? error.message : fallback
+}
+
+/** pydantic 的自定义校验错误带「Value error, 」前缀，展示时去掉。 */
+function validationText(message: string) {
+  return message.replace(/^Value error,\s*/, '')
+}
+
+/** 把后端错误映射成表单可用的定位信息；422 取第一条校验错误，成员错误前面加「第 N 个成员」。 */
+export function teamSaveError(error: unknown, fallback: string): TeamSaveError {
+  const result: TeamSaveError = { message: errorMessage(error, fallback), field: null, memberIndexes: [], memberNames: [], agentIds: [] }
+  if (!(error instanceof ApiError)) return result
+  const details = error.details ?? {}
+
+  if (error.status === 409) {
+    result.field = 'name'
+    return result
+  }
+  if (error.status === 404 && Array.isArray(details.agent_ids)) {
+    result.field = 'members'
+    result.agentIds = numberList(details.agent_ids)
+    return result
+  }
+  if (error.status !== 422) return result
+
+  // 服务层的 422：保留名带 details.name，重名带 details.names。
+  if (typeof details.name === 'string' || Array.isArray(details.names)) {
+    result.field = 'members'
+    result.memberNames = typeof details.name === 'string' ? [details.name] : stringList(details.names)
+    return result
+  }
+
+  // 请求层的 422：details.errors 是 pydantic 错误列表，loc 形如 ['body', 'members', 1, 'name']。
+  const first = Array.isArray(details.errors) ? details.errors.find(isRecord) : undefined
+  if (!first) return result
+  const loc = Array.isArray(first.loc) ? first.loc : []
+  const text = typeof first.msg === 'string' ? validationText(first.msg) : result.message
+  const fieldIndex = loc.indexOf('members')
+  if (fieldIndex >= 0) {
+    result.field = 'members'
+    const index = loc[fieldIndex + 1]
+    if (typeof index === 'number') {
+      result.memberIndexes = [index]
+      result.message = `第 ${index + 1} 个成员：${text}`
+      return result
+    }
+    result.message = text
+    return result
+  }
+  if (loc.includes('name')) result.field = 'name'
+  result.message = text
+  return result
+}
+
+async function getAllTeamPages() {
+  const items: TeamDefinitionResponse[] = []
+  let total: number
+  do {
+    const response = await getTeamDefinitionList({ limit: 100, offset: items.length })
+    items.push(...response.items)
+    total = response.total
+    if (!response.items.length) break
+  } while (items.length < total)
+  return { items, total }
 }
 
 export const useTeamsStore = defineStore('teams', () => {
-  const state = reactive<TeamsState>({ items: [], loaded: false })
+  const authStore = useAuthStore()
+  let dataGeneration = 0
+  let listGeneration = 0
+  /** 正在拉详情取名的 id，避免会话列表同一 Team 并发请求多次。 */
+  const resolvingNames = new Set<number>()
+  const state = reactive<TeamsState>({
+    items: [],
+    total: 0,
+    loading: false,
+    saving: false,
+    deleting: false,
+    togglingIds: [],
+    names: {},
+  })
 
-  const teamCount = computed(() => state.items.length)
+  /** 新建会话只能选启用的 Team。 */
+  const enabledTeams = computed(() => state.items.filter((item) => item.is_enabled))
 
-  /** 首次访问时用目录数据播种，之后以内存中的编辑结果为准。 */
-  function ensureLoaded() {
-    if (state.loaded) return
-    state.items = (RESOURCE_PAGES.teams?.rows ?? []).map(fromRow)
-    state.loaded = true
+  /** 工作区切换或 reset 后，仍在途的请求结果一律丢弃。 */
+  function contextChanged(generation: number, workspaceId: number | null) {
+    return generation !== dataGeneration || workspaceId !== authStore.currentWorkspaceId
   }
 
-  function findTeam(id: string) {
-    ensureLoaded()
-    return state.items.find((item) => item.id === id) ?? null
+  function invalidateListRequests() {
+    listGeneration += 1
+    state.loading = false
   }
 
-  function nextId() {
-    ensureLoaded()
-    const max = state.items.reduce((acc, item) => Math.max(acc, Number(item.id.match(/\d+/)?.[0] ?? 0)), 0)
-    return `TEAM-${String(max + 1).padStart(4, '0')}`
-  }
-
-  /** 新建的空草稿；id 由 store 生成，保证不与已有编号冲突。 */
-  function createDraft(): TeamFormModel {
-    return {
-      id: nextId(),
-      name: '',
-      mode: 'supervisor',
-      status: 'idle',
-      entryIndex: -1,
-      members: [],
-      description: '',
-      owner: 'AI 平台组',
-      tags: [],
-      sharedContext: true,
-      requiresApproval: false,
-      concurrency: 4,
-      timeoutSeconds: 90,
-      createdAt: '',
-      updatedAt: '',
-    }
-  }
-
-  /** 复制一份草稿，清掉编号与运行状态。 */
-  function duplicateDraft(source: TeamFormModel): TeamFormModel {
-    return {
-      ...source,
-      id: nextId(),
-      name: `${source.name} 副本`,
-      status: 'idle',
-      members: source.members.map((member) => ({ ...member })),
-      tags: [...source.tags],
-    }
-  }
-
-  function upsert(team: TeamFormModel) {
-    ensureLoaded()
+  function upsertTeam(team: TeamDefinitionResponse) {
+    invalidateListRequests()
     const index = state.items.findIndex((item) => item.id === team.id)
-    const snapshot: TeamFormModel = {
-      ...team,
-      members: team.members.map((member) => ({ ...member })),
-      tags: [...team.tags],
-      updatedAt: new Date().toISOString(),
-      createdAt: index >= 0 ? state.items[index]!.createdAt : new Date().toISOString(),
+    if (index >= 0) state.items[index] = team
+    else state.items.unshift(team)
+    state.total = Math.max(state.total, state.items.length)
+    state.names[team.id] = team.name
+  }
+
+  function resetTeams() {
+    dataGeneration += 1
+    listGeneration += 1
+    resolvingNames.clear()
+    state.items = []
+    state.total = 0
+    state.loading = false
+    state.saving = false
+    state.deleting = false
+    state.togglingIds = []
+    state.names = {}
+  }
+
+  async function loadTeams(): Promise<string | null> {
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    const requestGeneration = ++listGeneration
+    state.loading = true
+    try {
+      const response = await getAllTeamPages()
+      if (contextChanged(generation, workspaceId) || requestGeneration !== listGeneration) return null
+      state.items = response.items
+      state.total = response.total
+      for (const item of response.items) state.names[item.id] = item.name
+      return null
+    } catch (error) {
+      if (contextChanged(generation, workspaceId) || requestGeneration !== listGeneration) return null
+      return errorMessage(error, 'Team 列表加载失败')
+    } finally {
+      if (!contextChanged(generation, workspaceId) && requestGeneration === listGeneration) state.loading = false
     }
-    if (index >= 0) state.items[index] = snapshot
-    else state.items.unshift(snapshot)
   }
 
-  function removeTeam(id: string) {
-    ensureLoaded()
-    const index = state.items.findIndex((item) => item.id === id)
-    if (index >= 0) state.items.splice(index, 1)
+  /** 返回 undefined 表示上下文已切换，调用方直接放弃。 */
+  async function loadTeamDetail(definitionId: number): Promise<TeamDetailResult | undefined> {
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    try {
+      const detail = await getTeamDefinitionDetail(definitionId)
+      if (contextChanged(generation, workspaceId)) return undefined
+      upsertTeam(detail)
+      return { status: 'ok', item: detail }
+    } catch (error) {
+      if (contextChanged(generation, workspaceId)) return undefined
+      if (error instanceof ApiError && error.status === 404) {
+        state.names[definitionId] = null
+        return { status: 'not-found' }
+      }
+      return { status: 'error', message: errorMessage(error, 'Team 详情加载失败') }
+    }
   }
 
-  function setStatus(id: string, status: ResourceStatus) {
-    ensureLoaded()
-    const target = state.items.find((item) => item.id === id)
-    if (target) target.status = status as TeamFormModel['status']
+  /**
+   * 会话标识用的名称：string 是名称，null 是已删除，undefined 是还不知道。
+   * 列表里有就直接用；没有时由 resolveTeamName 拉一次详情补上。
+   */
+  function teamName(definitionId: number): string | null | undefined {
+    const listed = state.items.find((item) => item.id === definitionId)
+    if (listed) return listed.name
+    return state.names[definitionId]
   }
 
-  return { state, teamCount, ensureLoaded, findTeam, nextId, createDraft, duplicateDraft, upsert, removeTeam, setStatus }
+  async function resolveTeamName(definitionId: number): Promise<void> {
+    if (teamName(definitionId) !== undefined || resolvingNames.has(definitionId)) return
+    resolvingNames.add(definitionId)
+    try {
+      // 网络等临时错误不记成「已删除」，下次再取。
+      await loadTeamDetail(definitionId)
+    } finally {
+      resolvingNames.delete(definitionId)
+    }
+  }
+
+  async function saveTeam(input: SaveTeamInput): Promise<{ item: TeamDefinitionResponse | null; error: TeamSaveError | null }> {
+    const fallback = input.id == null ? 'Team 创建失败' : 'Team 更新失败'
+    if (state.saving) return { item: null, error: teamSaveError(null, 'Team 正在保存，请稍候') }
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    invalidateListRequests()
+    state.saving = true
+    try {
+      const saved = input.id == null
+        ? await createTeamDefinition(input.create)
+        : await updateTeamDefinition(input.id, input.update)
+      if (contextChanged(generation, workspaceId)) return { item: null, error: null }
+      upsertTeam(saved)
+      return { item: saved, error: null }
+    } catch (error) {
+      if (contextChanged(generation, workspaceId)) return { item: null, error: null }
+      return { item: null, error: teamSaveError(error, fallback) }
+    } finally {
+      if (!contextChanged(generation, workspaceId)) state.saving = false
+    }
+  }
+
+  /** 启停只改 is_enabled；停用后不能用来新建会话，已有会话不受影响。 */
+  async function setTeamEnabled(definitionId: number, enabled: boolean): Promise<string | null> {
+    if (state.togglingIds.includes(definitionId)) return null
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    state.togglingIds.push(definitionId)
+    try {
+      const saved = await updateTeamDefinition(definitionId, { is_enabled: enabled })
+      if (contextChanged(generation, workspaceId)) return null
+      upsertTeam(saved)
+      return null
+    } catch (error) {
+      if (contextChanged(generation, workspaceId)) return null
+      return errorMessage(error, enabled ? 'Team 启用失败' : 'Team 停用失败')
+    } finally {
+      if (!contextChanged(generation, workspaceId)) {
+        state.togglingIds = state.togglingIds.filter((id) => id !== definitionId)
+      }
+    }
+  }
+
+  /** 返回 undefined 表示上下文已切换。 */
+  async function removeTeam(definitionId: number): Promise<string | null | undefined> {
+    if (state.deleting) return 'Team 正在删除，请稍候'
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    invalidateListRequests()
+    state.deleting = true
+    try {
+      await deleteTeamDefinition(definitionId)
+      if (contextChanged(generation, workspaceId)) return undefined
+      state.items = state.items.filter((item) => item.id !== definitionId)
+      state.total = Math.max(0, state.total - 1)
+      state.names[definitionId] = null
+      return null
+    } catch (error) {
+      if (contextChanged(generation, workspaceId)) return undefined
+      return errorMessage(error, 'Team 删除失败')
+    } finally {
+      if (!contextChanged(generation, workspaceId)) state.deleting = false
+    }
+  }
+
+  return {
+    state,
+    enabledTeams,
+    resetTeams,
+    loadTeams,
+    loadTeamDetail,
+    teamName,
+    resolveTeamName,
+    saveTeam,
+    setTeamEnabled,
+    removeTeam,
+  }
 })
-
-/** Team 名称最长字符数：校验与 Builder 输入框的 maxlength 共用。 */
-export const MAX_TEAM_NAME_LENGTH = 40
-/** 单次运行超时秒数的范围：校验与 Builder 数字输入的 min / max 共用。 */
-export const MIN_TEAM_TIMEOUT_SECONDS = 10
-export const MAX_TEAM_TIMEOUT_SECONDS = 600
-
-/** 校验问题落到的表单字段，与 TeamBuilder 里 UFormField 的 name 一一对应。 */
-export type TeamIssueField = 'name' | 'members' | 'concurrency' | 'timeoutSeconds'
-
-/** 在 TeamValidationIssue 上追加 field（不改原有字段），Builder 据此标记出错字段，不再匹配消息文本。 */
-export interface TeamIssue extends TeamValidationIssue {
-  field: TeamIssueField
-}
-
-/** 与 PlanValidationIssue 同构的校验，供编辑页与详情页共用。 */
-export function validateTeam(team: TeamFormModel): TeamIssue[] {
-  const issues: TeamIssue[] = []
-  if (!team.name.trim()) issues.push({ section: 'basic', field: 'name', message: '请输入 Team 名称' })
-  if (team.name.trim().length > MAX_TEAM_NAME_LENGTH) {
-    issues.push({ section: 'basic', field: 'name', message: `Team 名称不能超过 ${MAX_TEAM_NAME_LENGTH} 个字符` })
-  }
-  if (team.members.length < MIN_TEAM_MEMBERS) {
-    issues.push({ section: 'members', field: 'members', message: `至少需要 ${MIN_TEAM_MEMBERS} 个成员 Agent` })
-  }
-  if (team.members.length > MAX_TEAM_MEMBERS) {
-    issues.push({ section: 'members', field: 'members', message: `成员 Agent 不能超过 ${MAX_TEAM_MEMBERS} 个` })
-  }
-  if (team.members.some((member) => !member.agentName.trim())) {
-    issues.push({ section: 'members', field: 'members', message: '存在未指定 Agent 的成员行' })
-  }
-  const names = team.members.map((member) => member.agentName.trim()).filter(Boolean)
-  if (new Set(names).size !== names.length) {
-    issues.push({ section: 'members', field: 'members', message: '同一个 Agent 不能重复加入 Team' })
-  }
-  if (team.members.length && (team.entryIndex < 0 || team.entryIndex >= team.members.length)) {
-    issues.push({ section: 'members', field: 'members', message: '请指定入口 Agent' })
-  }
-  if (team.concurrency < MIN_CONCURRENCY || team.concurrency > MAX_CONCURRENCY) {
-    issues.push({ section: 'runtime', field: 'concurrency', message: `并发上限需要在 ${MIN_CONCURRENCY} 到 ${MAX_CONCURRENCY} 之间` })
-  }
-  if (team.timeoutSeconds < MIN_TEAM_TIMEOUT_SECONDS || team.timeoutSeconds > MAX_TEAM_TIMEOUT_SECONDS) {
-    issues.push({ section: 'runtime', field: 'timeoutSeconds', message: `超时时间需要在 ${MIN_TEAM_TIMEOUT_SECONDS} 到 ${MAX_TEAM_TIMEOUT_SECONDS} 秒之间` })
-  }
-  return issues
-}

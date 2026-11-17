@@ -44,6 +44,47 @@
   flex-direction: column;
   gap: 5px;
 }
+/* 有队友时的标题行：Team 名在左，「成员 | 消息」标签在右。 */
+.team-icon {
+  flex-shrink: 0;
+  color: var(--accent-agent);
+  font-size: 14px;
+}
+.team-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tabs {
+  flex-shrink: 0;
+}
+.group-label {
+  padding: 6px 4px 2px;
+  color: var(--text-dim);
+  font-family: var(--font-data);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.roster-hint {
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.message-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
 .roster-empty {
   padding: 16px 10px;
   font-size: var(--fs-xs);

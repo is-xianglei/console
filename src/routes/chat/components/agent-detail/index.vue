@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { StreamingText, ThinkingReasoning } from '@/components'
 import { useStickToBottom } from '@/hooks'
 import type { SubAgent } from '@/interfaces'
@@ -7,7 +7,19 @@ import ToolCallCard from '../tool-call-card/index.vue'
 
 defineOptions({ name: 'AgentDetail' })
 
-const props = defineProps<{ agent: SubAgent | null }>()
+/** 队友传自己的信息块（状态、角色、Agent）和最近一次激活的失败原因；子代理用默认的 PID / 状态 / 进度 / 事件。 */
+interface DetailTile {
+  label: string
+  value: string
+  accent?: boolean
+}
+
+const props = defineProps<{
+  agent: SubAgent | null
+  tiles?: DetailTile[]
+  notice?: string | null
+  emptyText?: string
+}>()
 
 const scroller = ref<HTMLElement | null>(null)
 const stream = ref<HTMLElement | null>(null)
@@ -28,6 +40,18 @@ const statusLabel: Record<string, string> = {
   done: '已完成',
   error: '失败',
 }
+
+const detailTiles = computed<DetailTile[]>(() => {
+  if (props.tiles) return props.tiles
+  const agent = props.agent
+  if (!agent) return []
+  return [
+    { label: 'PID', value: agent.pid },
+    { label: '状态', value: statusLabel[agent.status] ?? agent.status, accent: true },
+    { label: '进度', value: `${agent.progress}%` },
+    { label: '事件', value: String(agent.stream.length) },
+  ]
+})
 </script>
 
 <template>
@@ -37,7 +61,7 @@ const statusLabel: Record<string, string> = {
       <svg :class="$style['hx']" viewBox="0 0 20 22" fill="none">
         <path d="M10 0L19.66 5.5V16.5L10 22L0.34 16.5V5.5L10 0Z" fill="currentColor" />
       </svg>
-      <p>选中一个子代理以查看它的推理、回答与工具调用</p>
+      <p>{{ emptyText ?? '选中一个子代理以查看它的推理、回答与工具调用' }}</p>
     </div>
 
     <template v-else>
@@ -47,23 +71,12 @@ const statusLabel: Record<string, string> = {
           <span :class="$style['detail-title']">{{ agent.name }}</span>
         </div>
         <div :class="$style['detail-meta']">
-          <div :class="$style['detail-tile']">
-            <div :class="$style['detail-tile-l']">PID</div>
-            <div :class="$style['detail-tile-v']">{{ agent.pid }}</div>
-          </div>
-          <div :class="$style['detail-tile']">
-            <div :class="$style['detail-tile-l']">状态</div>
-            <div :class="[$style['detail-tile-v'], $style['accent']]">{{ statusLabel[agent.status] }}</div>
-          </div>
-          <div :class="$style['detail-tile']">
-            <div :class="$style['detail-tile-l']">进度</div>
-            <div :class="$style['detail-tile-v']">{{ agent.progress }}%</div>
-          </div>
-          <div :class="$style['detail-tile']">
-            <div :class="$style['detail-tile-l']">事件</div>
-            <div :class="$style['detail-tile-v']">{{ agent.stream.length }}</div>
+          <div v-for="tile in detailTiles" :key="tile.label" :class="$style['detail-tile']">
+            <div :class="$style['detail-tile-l']">{{ tile.label }}</div>
+            <div :class="[$style['detail-tile-v'], { [$style['accent']]: tile.accent }]" :title="tile.value">{{ tile.value }}</div>
           </div>
         </div>
+        <UAlert v-if="notice" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="notice" />
       </div>
 
       <div ref="stream" :class="$style['detail-stream']">

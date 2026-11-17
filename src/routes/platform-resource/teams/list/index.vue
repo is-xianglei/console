@@ -1,175 +1,147 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import { computed, useCssModule } from 'vue'
+import { computed, useCssModule, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { FilterPanel, ListCard, ResourcePagination, ResourceTable, RelativeTime } from '@/components'
-import { useTeamList } from '@/hooks/useTeamEditor'
+import { FilterPanel, ListCard, RelativeTime, ResourcePagination, ResourceTable } from '@/components'
 import { useHighlightFromQuery } from '@/hooks/useSaveFeedback'
-import type { ResourceStatus } from '@/interfaces/platform/model'
-import {
-  MIN_TEAM_MEMBERS,
-  TEAM_MODE_LABEL,
-  type TeamFormModel,
-} from '@/interfaces/platform-team/model'
+import { useTeamWriteAccess } from '@/hooks/useTeamEditor'
+import { hasDeletedTeamAgent, useTeamActions, useTeamManager, type TeamEnabledFilter } from '@/hooks/useTeamManager'
+import type { TeamDefinitionResponse } from '@/interfaces/team-definition/api'
+import { useAuthStore } from '@/stores/auth'
 
 defineOptions({ name: 'TeamResourceList' })
 
 const styles = useCssModule()
-const manager = useTeamList()
+const manager = useTeamManager()
+const actions = useTeamActions()
+const canManage = useTeamWriteAccess()
+const authStore = useAuthStore()
 const router = useRouter()
 const highlight = useHighlightFromQuery()
 
-/** 列表页只读展示：成员数、入口 Agent 都从结构化成员推导，不再依赖目录里的展示串。
- *
- * 列宽由 table-baseline.module.css 的语义列类给出（col-name / col-time / col-status /
- * col-actions），同类列全站同宽；页面不再自己写 px，也就不再有 220/230/260/290 的分叉。 */
-const columns: TableColumn<TeamFormModel>[] = [
+const enabledOptions = [
+  { value: 'all', label: '全部' },
+  { value: 'enabled', label: '已启用' },
+  { value: 'disabled', label: '已停用' },
+] as { value: TeamEnabledFilter; label: string }[]
+
+const columns: TableColumn<TeamDefinitionResponse>[] = [
   { id: 'name', header: '名称', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
-  { id: 'status', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
-  { id: 'mode', header: '编排模式', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
-  { id: 'entry', header: '入口 Agent' },
-  { id: 'members', header: '成员数' },
-  { id: 'owner', header: '负责人' },
-  { id: 'updatedAt', header: '最近变更', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
+  { id: 'state', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
+  { id: 'members', header: '成员' },
+  { id: 'updatedAt', header: '更新时间', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
   { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
 ]
 
-const statusOptions = [
-  { value: 'all', label: '全部状态' },
-  { value: 'nominal', label: '正常' },
-  { value: 'warning', label: '需关注' },
-  { value: 'idle', label: '未启用' },
-  { value: 'error', label: '异常' },
-] as { value: ResourceStatus | 'all'; label: string }[]
+const deleteTitle = computed(() => actions.pendingDelete.value ? `删除 ${actions.pendingDelete.value.name}？` : '删除 Team？')
 
-const sortOptions = [
-  { value: 'name', label: '按名称' },
-  { value: 'status', label: '按状态' },
-  { value: 'owner', label: '按负责人' },
-] as { value: 'name' | 'status' | 'owner'; label: string }[]
-
-const ownerOptions = computed(() => [
-  { value: 'all', label: '全部负责人' },
-  ...manager.owners.value.map((owner) => ({ value: owner, label: owner })),
-])
-
-/** ResourceTable 的选中列要数组形态，manager 内部用 Set 去重。 */
-const selectedTeamIds = computed({
-  get: () => [...manager.selectedIds.value],
-  set: (ids: string[]) => { manager.selectedIds.value = new Set(ids) },
-})
-
-/** 四种运行状态各自映射到徽章颜色与中文标签（旧实现把 error 误归为 neutral，这里修正）。 */
-const STATUS_BADGE: Record<ResourceStatus, { color: 'success' | 'warning' | 'neutral' | 'error'; label: string }> = {
-  nominal: { color: 'success', label: '正常' },
-  warning: { color: 'warning', label: '需关注' },
-  idle: { color: 'neutral', label: '未启用' },
-  error: { color: 'error', label: '异常' },
+/** 成员列副标题：前三个成员名。 */
+function memberPreview(team: TeamDefinitionResponse) {
+  const names = team.members.slice(0, 3).map((member) => member.name)
+  return team.members.length > 3 ? `${names.join('、')} 等` : names.join('、')
 }
 
-function entryName(team: TeamFormModel) {
-  return team.members[team.entryIndex]?.agentName ?? team.members[0]?.agentName ?? '未指定'
+function rowMenu(team: TeamDefinitionResponse) {
+  const items: { label: string; icon: string; color?: 'error'; disabled?: boolean; onSelect: () => void }[] = [
+    { label: '查看详情', icon: 'i-lucide-eye', onSelect: () => goToDetail(team) },
+  ]
+  if (canManage.value) {
+    items.push(
+      { label: '复制', icon: 'i-lucide-copy', onSelect: () => goToDuplicate(team) },
+      team.is_enabled
+        ? { label: '停用', icon: 'i-lucide-power-off', disabled: actions.isToggling(team.id), onSelect: () => { void actions.toggleEnabled(team, false) } }
+        : { label: '启用', icon: 'i-lucide-power', disabled: actions.isToggling(team.id), onSelect: () => { void actions.toggleEnabled(team, true) } },
+      { label: '删除', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => actions.requestDelete(team) },
+    )
+  }
+  return [items]
 }
 
 function goToCreate() {
-  void router.push({ name: 'team-create', params: { module: 'build', resource: 'teams' } })
+  void router.push({ name: 'team-create' })
 }
 
-function goToDetail(team: TeamFormModel) {
-  void router.push({ name: 'team-detail', params: { id: team.id } })
+function goToDetail(team: TeamDefinitionResponse) {
+  void router.push({ name: 'team-detail', params: { id: String(team.id) } })
 }
 
-function goToEdit(team: TeamFormModel) {
-  void router.push({ name: 'team-edit', params: { id: team.id } })
+function goToEdit(team: TeamDefinitionResponse) {
+  void router.push({ name: 'team-edit', params: { id: String(team.id) } })
 }
 
-function goToDuplicate(team: TeamFormModel) {
-  void router.push({ name: 'team-create', params: { module: 'build', resource: 'teams' }, query: { duplicate: team.id } })
+function goToDuplicate(team: TeamDefinitionResponse) {
+  void router.push({ name: 'team-create', query: { duplicate: String(team.id) } })
 }
 
-function onSearch() {
-  manager.pageNumber.value = 1
+function onApplyFilters() {
+  void manager.loadAll()
 }
 
-function onPage(number: number) {
-  manager.pageNumber.value = number
+function onResetFilters() {
+  manager.resetView()
+  void manager.loadAll()
 }
 
-function onPageSize(size: number) {
-  manager.pageSize.value = size
-  manager.pageNumber.value = 1
-}
+watch(
+  () => authStore.currentWorkspaceId,
+  (workspaceId) => {
+    if (workspaceId) void manager.loadAll()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <main :class="styles.page">
-    <FilterPanel title="筛选条件" :collapsible="true" storage-key="teams" @search="onSearch" @reset="manager.resetView">
-      <UFormField label="关键字"><UInput v-model="manager.search.value" icon="i-lucide-search" placeholder="搜索名称、ID、负责人或标签" aria-label="搜索 Team" /></UFormField>
-      <UFormField label="状态"><USelect v-model="manager.statusFilter.value" :items="statusOptions" aria-label="Team 状态筛选" /></UFormField>
-      <UFormField label="负责人"><USelect v-model="manager.ownerFilter.value" :items="ownerOptions" aria-label="Team 负责人筛选" /></UFormField>
-      <UFormField label="排序"><USelect v-model="manager.sortBy.value" :items="sortOptions" aria-label="Team 排序方式" /></UFormField>
+    <FilterPanel title="筛选条件" :collapsible="true" storage-key="teams" @search="onApplyFilters" @reset="onResetFilters">
+      <UFormField label="关键字"><UInput v-model="manager.state.keyword" icon="i-lucide-search" placeholder="搜索名称、描述、成员或角色" aria-label="搜索 Team" /></UFormField>
+      <UFormField label="启用状态"><USelect :model-value="manager.state.enabled" :items="enabledOptions" aria-label="启用状态筛选" @update:model-value="(value: unknown) => { manager.state.enabled = String(value ?? 'all') as TeamEnabledFilter }" /></UFormField>
     </FilterPanel>
 
-    <ListCard title="Teams" description="编排多个 Agent 的职责、交接关系、共享上下文与审批节点。">
+    <ListCard title="Teams">
       <template #toolbar>
-        <UButton label="创建 Team" icon="i-lucide-plus" color="primary" @click="goToCreate" />
-        <UTooltip text="刷新"><UButton icon="i-lucide-refresh-cw" color="neutral" variant="outline" square aria-label="刷新 Teams" @click="manager.resetView" /></UTooltip>
-        <UTooltip text="导出 CSV"><UButton icon="i-lucide-download" color="neutral" variant="outline" square aria-label="导出 Teams" @click="manager.exportCsv" /></UTooltip>
-        <UDropdownMenu :items="[[
-          { label: '批量删除', icon: 'i-lucide-trash-2', color: 'error' as const, disabled: !manager.selectedCount.value, onSelect: () => manager.requestDelete([...manager.selectedIds.value]) },
-        ]]">
-          <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square aria-label="更多操作" />
-        </UDropdownMenu>
+        <UButton v-if="canManage" label="新建 Team" icon="i-lucide-plus" color="primary" @click="goToCreate" />
+        <UTooltip text="刷新"><UButton icon="i-lucide-refresh-cw" color="neutral" variant="outline" square aria-label="刷新 Teams" :loading="manager.loading.value" @click="manager.loadAll" /></UTooltip>
       </template>
+
+      <UAlert v-if="manager.loadingError.value" :class="styles.alert" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="manager.loadingError.value" :actions="[{ label: '重试', color: 'neutral', variant: 'outline', onClick: manager.loadAll }]" />
 
       <ResourceTable
         :columns="columns"
-        :data="manager.visibleRows.value"
-        :loading="false"
-        :row-key="(team: TeamFormModel) => team.id"
+        :data="manager.pagedItems.value"
+        :loading="manager.loading.value"
+        :row-key="(team: TeamDefinitionResponse) => String(team.id)"
         :table-class="styles.table"
-        :selectable="true"
-        :selected="selectedTeamIds"
         :pin-actions="true"
         :highlight-id="highlight"
-        :empty-mode="manager.hasFilters.value ? 'filtered' : 'never'"
-        :resource-name="'Team'"
-        @update:selected="(ids: string[]) => { manager.selectedIds.value = new Set(ids) }"
+        :empty-mode="manager.isDefault.value ? 'never' : 'filtered'"
+        resource-name="Team"
         @select="goToDetail"
-        @clear-filters="manager.resetView"
+        @clear-filters="onResetFilters"
       >
         <template #name-cell="{ row }">
           <div :class="styles['primary-cell']">
-            <span :class="styles['entity-icon']"><UIcon name="i-lucide-network" /></span>
+            <span :class="styles['entity-icon']"><UIcon name="i-lucide-users-round" /></span>
             <span>
               <strong>{{ row.original.name }}</strong>
-              <small class="mono">{{ row.original.id }}</small>
+              <small v-if="row.original.description" :class="styles.primaryDesc">{{ row.original.description }}</small>
             </span>
           </div>
         </template>
-        <template #status-cell="{ row }">
-          <UBadge :color="STATUS_BADGE[row.original.status].color" variant="subtle" size="xs" :class="styles.statusBadge">{{ STATUS_BADGE[row.original.status].label }}</UBadge>
+        <template #state-cell="{ row }">
+          <UBadge :color="row.original.is_enabled ? 'success' : 'neutral'" variant="subtle" size="xs" :class="styles.statusBadge">{{ row.original.is_enabled ? '已启用' : '已停用' }}</UBadge>
         </template>
-        <template #mode-cell="{ row }"><span :class="styles.cellText">{{ TEAM_MODE_LABEL[row.original.mode] }}</span></template>
-        <template #entry-cell="{ row }"><span :class="styles.cellText">{{ entryName(row.original) }}</span></template>
         <template #members-cell="{ row }">
-          <span :class="styles.cellText">{{ row.original.members.length }} Agents</span>
-          <small v-if="row.original.members.length < MIN_TEAM_MEMBERS" :class="styles.memberAlert"><UIcon name="i-lucide-triangle-alert" />成员不足</small>
+          <span :class="styles.memberText">{{ row.original.members.length }} 个成员</span>
+          <small v-if="hasDeletedTeamAgent(row.original)" :class="styles.memberAlert"><UIcon name="i-lucide-triangle-alert" />Agent 已删除</small>
+          <small v-else>{{ memberPreview(row.original) }}</small>
         </template>
-        <template #owner-cell="{ row }"><span :class="styles.cellText">{{ row.original.owner }}</span></template>
-        <template #updatedAt-cell="{ row }"><RelativeTime :value="row.original.updatedAt || row.original.createdAt" /></template>
+        <template #updatedAt-cell="{ row }"><RelativeTime :value="row.original.updated_at" /></template>
         <template #actions-cell="{ row }">
           <div :class="styles.rowActions">
-            <UTooltip text="编辑"><UButton icon="i-lucide-pencil" color="neutral" variant="ghost" square :aria-label="`编辑 ${row.original.name}`" @click.stop="goToEdit(row.original)" /></UTooltip>
-            <UDropdownMenu :items="[[
-              { label: '查看详情', icon: 'i-lucide-eye', onSelect: () => goToDetail(row.original) },
-              { label: '复制', icon: 'i-lucide-copy', onSelect: () => goToDuplicate(row.original) },
-              row.original.status === 'idle'
-                ? { label: '启用', icon: 'i-lucide-power', onSelect: () => manager.updateStatus([row.original.id], 'nominal') }
-                : { label: '停用', icon: 'i-lucide-power-off', onSelect: () => manager.updateStatus([row.original.id], 'idle') },
-              { label: '删除', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => manager.requestDelete([row.original.id]) },
-            ]]">
-              <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square :aria-label="`${row.original.name} 更多操作`" />
+            <UTooltip v-if="canManage" text="编辑"><UButton icon="i-lucide-pencil" color="neutral" variant="ghost" square :aria-label="`编辑 ${row.original.name}`" @click.stop="goToEdit(row.original)" /></UTooltip>
+            <UDropdownMenu :items="rowMenu(row.original)">
+              <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square :aria-label="`${row.original.name} 更多操作`" @click.stop />
             </UDropdownMenu>
           </div>
         </template>
@@ -177,30 +149,28 @@ function onPageSize(size: number) {
 
       <template #footer>
         <ResourcePagination
-          :shown="manager.visibleRows.value.length"
-          :total="manager.filteredRows.value.length"
-          :page="manager.pageNumber.value"
-          :items-per-page="manager.pageSize.value"
-          @update:page="onPage"
-          @update:items-per-page="onPageSize"
+          :shown="manager.pagedItems.value.length"
+          :total="manager.total.value"
+          :page="manager.clampedPage.value"
+          :items-per-page="manager.state.pageSize"
+          @update:page="(page: number) => { manager.state.page = page }"
+          @update:items-per-page="(size: number) => { manager.state.pageSize = size }"
         />
       </template>
     </ListCard>
 
     <UModal
-      :open="manager.pendingDeleteIds.value.length > 0"
-      :title="manager.deleteTitle.value"
-      description="删除后该 Team 将从当前工作区移除，已绑定的会话需要重新选择编排。"
-      @update:open="(open: boolean) => { if (!open) manager.cancelDelete() }"
+      :open="actions.pendingDelete.value !== null"
+      :title="deleteTitle"
+      description="删除后无法恢复，已经用它建好的会话不受影响。"
+      @update:open="(open: boolean) => { if (!open) actions.cancelDelete() }"
     >
-      <template #body><p :class="styles.modalCopy">此操作会移除所选 Team，无法在前端撤销。</p></template>
       <template #footer>
-        <UButton label="取消" color="neutral" variant="outline" @click="manager.cancelDelete" />
-        <UButton label="确认删除" color="error" @click="manager.confirmDelete" />
+        <UButton label="取消" color="neutral" variant="outline" :disabled="actions.deleting.value" @click="actions.cancelDelete" />
+        <UButton label="删除" color="error" :loading="actions.deleting.value" :disabled="actions.deleting.value" @click="actions.confirmDelete" />
       </template>
     </UModal>
   </main>
-  <Transition name="tm-toast"><div v-if="manager.toast.value" :class="styles.toast" role="status"><UIcon name="i-lucide-circle-check-big" />{{ manager.toast.value }}</div></Transition>
 </template>
 
 <style module src="./index.module.css"></style>

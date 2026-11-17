@@ -68,8 +68,11 @@ function streamPost(path: string, body: unknown, handlers: SseHandlers): () => v
   return () => controller.abort()
 }
 
-/** 以 GET 建立轮次订阅 SSE。订阅与执行解耦，断开连接不会取消后端执行。 */
-function streamGet(path: string, handlers: SseHandlers): () => void {
+/**
+ * 以 GET 建立订阅 SSE（轮次、队友激活、会话团队通知流）。订阅与执行解耦，断开连接不会取消后端执行。
+ * 帧体按 T 解析，默认是轮次事件信封。
+ */
+export function streamGet<T = SseEvent>(path: string, handlers: SseHandlers<T>): () => void {
   const controller = new AbortController()
   const token = localStorage.getItem('auth_token')
   const headers: Record<string, string> = {}
@@ -84,7 +87,7 @@ function streamGet(path: string, handlers: SseHandlers): () => void {
     onmessage(message) {
       if (!message.data || message.data === '[DONE]') return
       try {
-        handlers.onEvent(JSON.parse(message.data) as SseEvent)
+        handlers.onEvent(JSON.parse(message.data) as T)
       } catch {
         // 心跳、注释或损坏帧不会中断仍然有效的事件流。
       }

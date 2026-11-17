@@ -5,6 +5,7 @@ import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
 import { useConsoleStore } from '@/stores/console'
 import { useWorkflowsStore } from '@/stores/workflows'
+import { useTeamsStore } from '@/stores/teams'
 import { WORKFLOW_MODE_LABEL } from '@/constants/workflow'
 import { useSkillsStore } from '@/stores/skills'
 import ChatModelControls from '../model-controls/index.vue'
@@ -39,14 +40,23 @@ interface AttachmentDraft {
 const consoleStore = useConsoleStore()
 const agentsStore = useAgentsStore()
 const workflowsStore = useWorkflowsStore()
+const teamsStore = useTeamsStore()
 const authStore = useAuthStore()
 const skillsStore = useSkillsStore()
-const { state, dispatch, stopExecution, setNewSessionAgent, setNewSessionWorkflow } = consoleStore
+const {
+  state,
+  dispatch,
+  stopExecution,
+  setNewSessionAgent,
+  setNewSessionWorkflow,
+  setNewSessionTeam,
+} = consoleStore
 
-/** 单个下拉同时承载两种运行目标，用前缀区分；后端二者互斥（同时传 409）。 */
+/** 单个下拉同时承载 Agent、Workflow、Team 三种运行目标，用前缀区分；后端三者互斥。 */
 const DEFAULT_TARGET = 'default'
 const AGENT_PREFIX = 'agent:'
 const WORKFLOW_PREFIX = 'workflow:'
+const TEAM_PREFIX = 'team:'
 const selectedTarget = ref(DEFAULT_TARGET)
 const activeSession = computed(() => state.sessions.find((session) => session.id === state.activeSessionId))
 const persistedSession = computed(() => /^\d+$/.test(state.activeSessionId))
@@ -76,21 +86,45 @@ const targetItems = computed<SelectItem[]>(() => {
       })
     }
   }
+  // 新建会话只列启用的 Team；已有会话绑定的 Team 停用或删除后仍要能回显名称。
+  const teams = teamsStore.enabledTeams
+  const boundTeamId = activeSession.value?.teamDefinitionId ?? null
+  const boundMissing = boundTeamId != null && !teams.some((team) => team.id === boundTeamId)
+  if (teams.length || boundMissing) {
+    items.push({ type: 'separator' }, { type: 'label', label: 'Team' })
+    for (const team of teams) {
+      items.push({ value: `${TEAM_PREFIX}${team.id}`, label: `${team.name} · ${team.members.length} 名成员` })
+    }
+    if (boundMissing) {
+      items.push({ value: `${TEAM_PREFIX}${boundTeamId}`, label: teamsStore.teamName(boundTeamId) ?? 'Team 已删除', disabled: true })
+    }
+  }
   return items
 })
 
-const planSelected = computed(() => selectedTarget.value.startsWith(WORKFLOW_PREFIX))
+const targetIcon = computed(() => {
+  if (selectedTarget.value.startsWith(WORKFLOW_PREFIX)) return 'i-lucide-workflow'
+  if (selectedTarget.value.startsWith(TEAM_PREFIX)) return 'i-lucide-users-round'
+  return 'i-lucide-bot'
+})
 
 watch(
   () => [
     state.activeSessionId,
     activeSession.value?.agentId,
     activeSession.value?.workflowId,
+    activeSession.value?.teamDefinitionId,
     state.newSessionAgentId,
     state.newSessionWorkflowId,
+    state.newSessionTeamId,
   ] as const,
   () => {
-    // Workflow 优先：绑定编排的会话不再有 agentId，回显必须先看 Workflow
+    // Team、Workflow 优先：这两类会话不再有 agentId，回显必须先看它们
+    const teamId = activeSession.value?.teamDefinitionId ?? state.newSessionTeamId
+    if (teamId != null) {
+      selectedTarget.value = `${TEAM_PREFIX}${teamId}`
+      return
+    }
     const workflowId = activeSession.value?.workflowId ?? state.newSessionWorkflowId
     if (workflowId != null) {
       selectedTarget.value = `${WORKFLOW_PREFIX}${workflowId}`
@@ -103,12 +137,12 @@ watch(
 )
 
 watch(selectedTarget, (value) => {
-  if (value.startsWith(WORKFLOW_PREFIX)) {
-    setNewSessionWorkflow(Number(value.slice(WORKFLOW_PREFIX.length)))
+  if (value.startsWith(TEAM_PREFIX)) {
+    setNewSessionTeam(Number(value.slice(TEAM_PREFIX.length)))
     return
   }
-  if (value.startsWith(PLAN_PREFIX)) {
-    setNewSessionPlan(Number(value.slice(PLAN_PREFIX.length)))
+  if (value.startsWith(WORKFLOW_PREFIX)) {
+    setNewSessionWorkflow(Number(value.slice(WORKFLOW_PREFIX.length)))
     return
   }
   setNewSessionAgent(value === DEFAULT_TARGET ? null : Number(value.slice(AGENT_PREFIX.length)))
@@ -120,6 +154,7 @@ watch(
     if (!workspaceId) return
     void agentsStore.loadAgents()
     void workflowsStore.loadWorkflows()
+    void teamsStore.loadTeams()
     // 斜杠命令面板依赖工作区的 skill 列表
     void skillsStore.loadSkills()
   },
@@ -161,7 +196,11 @@ let nextAttachmentId = 1
 
 const hasText = computed(() => value.value.trim().length > 0)
 const enhancing = computed(() => phase.value === 'enhancing')
-const sendActive = computed(() => hasText.value && !enhancing.value && !state.busy && !state.chatSelectionSaving && !readOnlySession.value)
+/** 正在执行的是队友消息触发的自动回合：允许发送，发送会先中断它。 */
+const autoTurnActive = computed(() => consoleStore.isAutoTurnActive())
+const sendActive = computed(() => hasText.value && !enhancing.value && (!state.busy || autoTurnActive.value) && !state.chatSelectionSaving && !readOnlySession.value)
+/** 执行中且不能发送时按钮是「停止」；自动回合里有文字时是「发送」。 */
+const showStop = computed(() => state.busy && !(autoTurnActive.value && hasText.value))
 const showPill = computed(() => hasText.value && !enhancing.value)
 /** 技能菜单与斜杠命令只列出已启用的 skill（停用的 agent 运行时不可用）。 */
 const enabledSkills = computed(() => skillsStore.state.skills.filter((sk) => sk.is_enabled))
@@ -665,7 +704,7 @@ onBeforeUnmount(() => {
             aria-multiline="true"
             aria-label="描述任务或提出问题"
             :data-empty="!hasText || undefined"
-            data-placeholder="描述任务或提出问题…"
+            :data-placeholder="autoTurnActive ? '发送会中断当前自动回合' : '描述任务或提出问题…'"
             @input="onEditorInput"
             @keydown="onEditorKeydown"
             @keyup="saveSelection"
@@ -765,7 +804,7 @@ onBeforeUnmount(() => {
           </div>
 
           <!-- Agent/Workflow 下拉，融入工具栏左侧 -->
-          <USelect v-model="selectedTarget" :class="$style['agent-select']" :items="targetItems" :icon="planSelected ? 'i-lucide-workflow' : 'i-lucide-bot'" value-key="value" label-key="label" :disabled="persistedSession || state.busy || readOnlySession" :loading="agentsStore.state.loading || workflowsStore.state.loading" aria-label="选择新会话的 Agent 或 Workflow" />
+          <USelect v-model="selectedTarget" :class="$style['agent-select']" :items="targetItems" :icon="targetIcon" value-key="value" label-key="label" :disabled="persistedSession || state.busy || readOnlySession" :loading="agentsStore.state.loading || workflowsStore.state.loading || teamsStore.state.loading" aria-label="选择新会话的 Agent、Workflow 或 Team" />
 
           <div :class="$style.right">
             <span v-if="enhancing" :class="[$style['icon-btn'], $style['spinner-btn']]" aria-label="正在增强提示词">
@@ -785,11 +824,11 @@ onBeforeUnmount(() => {
             <button
               type="button"
               :class="[$style['icon-btn'], $style.send, sendActive ? $style['send-active'] : '']"
-              :aria-label="state.busy ? '停止执行' : '发送消息'"
-              :disabled="state.busy ? readOnlySession : !sendActive"
-              @click="state.busy ? stopExecution() : send()"
+              :aria-label="showStop ? '停止执行' : '发送消息'"
+              :disabled="showStop ? readOnlySession : !sendActive"
+              @click="showStop ? stopExecution() : send()"
             >
-              <UIcon v-if="state.busy" name="i-lucide-square" />
+              <UIcon v-if="showStop" name="i-lucide-square" />
               <UIcon v-else name="i-lucide-arrow-up" />
             </button>
           </div>

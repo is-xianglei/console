@@ -11,11 +11,8 @@ const buildRows: Record<string, ResourceRow[]> = {
     { id: 'AGT-0021', name: '质量根因 Agent', status: 'nominal', values: ['GPT-5 Enterprise', '质量管控 Team', '97.8%', '8 min ago'], description: '关联视觉、工艺与来料数据定位缺陷根因。', tags: ['7 Skills', '4 MCP', 'v1.8.0'], owner: '质量工程部' },
     { id: 'AGT-0032', name: '排程约束 Agent', status: 'warning', values: ['Qwen3-32B', '智能排程 Team', '94.2%', '36 min ago'], description: '计算订单、物料和设备约束并生成排产方案。', tags: ['4 Skills', '2 MCP', 'DRAFT'], owner: '计划运营部' },
   ],
-  teams: [
-    { id: 'TEAM-0003', name: '设备可靠性 Team', status: 'nominal', values: ['主管式', '诊断协调 Agent', '5 Agents', '98.8%'], description: '负责诊断、工单检索、风险判断和维修建议。', tags: ['共享上下文', '双人审批', 'v2.2'], owner: '设备工程部' },
-    { id: 'TEAM-0007', name: '质量管控 Team', status: 'nominal', values: ['流水线', '质量受理 Agent', '4 Agents', '97.1%'], description: '完成缺陷识别、工艺关联、根因验证和处置建议。', tags: ['顺序交接', '6 Skills', 'v1.9'], owner: '质量工程部' },
-    { id: 'TEAM-0011', name: '生产排程 Team', status: 'warning', values: ['并行协作', '排程协调 Agent', '6 Agents', '93.5%'], description: '并行评估设备、物料、人员和订单优先级约束。', tags: ['并发 4', '超时 90s', 'DRAFT'], owner: '计划运营部' },
-  ],
+  // Teams 已对接后端 Team 定义接口（routes/platform-resource/teams），不再使用模拟行。
+  teams: [],
   models: [
     { id: 'MODEL-Q3F', name: 'Qwen3-32B-Factory', status: 'nominal', values: ['私有集群', '128K', '612 ms', 'PRIMARY'], description: '制造业中文任务主模型，数据保留在华东私有集群。', tags: ['CN-EAST', '¥0.018/1K', 'Priority 1'], owner: 'AI 平台组' },
     { id: 'MODEL-GPT5', name: 'GPT-5 Enterprise', status: 'nominal', values: ['OpenAI', '256K', '1.2 s', 'FALLBACK'], description: '复杂规划与治理审查回退模型。', tags: ['AP-SG', '¥0.092/1K', 'Priority 2'], owner: 'AI 平台组' },
@@ -121,7 +118,7 @@ export const PLATFORM_MODULES: Record<PlatformModuleKey, PlatformModule> = {
 
 export const RESOURCE_PAGES: Record<string, ResourcePage> = {
   agents: page('agents', 'build', 'Agents', '智能体编排', 'bot', '创建 Agent', '配置模型、Team、Skills、MCP、护栏与运行配额，并管理发布版本。', [['12', '全部'], ['9', '在线'], ['2', '草稿'], ['98.7%', '成功率']], ['基础模型', '所属 Team', '成功率', '最近运行'], buildRows.agents, 'orchestration', 'Agent 运行编排', '拖动节点规划能力链，配置变更将进入草稿。'),
-  teams: page('teams', 'build', 'Teams', '智能体编排', 'network', '创建 Team', '编排多个 Agent 的职责、交接关系、共享上下文、并发与审批节点。', [['5', '全部'], ['4', '运行中'], ['18', '成员 Agent'], ['96.4%', '成功率']], ['编排模式', '入口 Agent', '成员数', '成功率'], buildRows.teams, 'orchestration', 'Team 交接拓扑', '检查入口、并行分支和人工审批节点。', false),
+  teams: page('teams', 'build', 'Teams', '智能体编排', 'network', '创建 Team', '可复用的队友名单：新建会话时选 Team，主 Agent 担任 lead 给成员分派任务。', [['0', '全部'], ['0', '已启用'], ['0', '已停用'], ['0', '成员失效']], ['成员', '状态', '更新时间', ''], buildRows.teams, 'orchestration', 'Team 名单', 'Team 数据由后端接口实时管理。', false),
   workflows: page('workflows', 'build', 'Workflows', '智能体编排', 'workflow', '创建 Workflow', '把多个 Agent 组合成顺序、并行或智能路由的 Workflow，会话绑定后由后端编排执行。', [['0', '全部'], ['0', '已启用'], ['0', '已停用'], ['0', '成员失效']], ['编排模式', '成员数', '状态', '更新时间'], [], 'orchestration', 'Workflow 预览', 'Workflow 数据由后端接口实时管理。'),
   models: page('models', 'build', 'Models', '能力与连接', 'cpu', '添加模型', '管理模型提供方、路由顺序、健康状态、延迟、成本与数据驻留策略。', [['8', '模型'], ['7', '健康'], ['1', '降级中'], ['842 ms', 'P95 延迟']], ['提供方', '上下文', 'P95 延迟', '路由'], buildRows.models, 'connection', '模型路由测试', '输入制造任务，预览模型选择和回退路径。'),
   skills: page('skills', 'build', 'Skills', '能力与连接', 'wrench', '创建 Skill', '管理 Skill 版本、来源、依赖、权限、安全校验以及 Agent 引用关系。', [['34', 'Skills'], ['29', '启用'], ['3', '待校验'], ['0', '高危']], ['版本', '来源', '引用数', '校验'], buildRows.skills, 'connection', '依赖与权限检查', 'Skill 实际上传与详情继续由真实 Skill 页面管理。'),

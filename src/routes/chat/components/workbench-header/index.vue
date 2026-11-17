@@ -9,6 +9,8 @@ const props = defineProps<{
   activeApp?: WorkbenchApp
   activeSession?: Session
   agentLabel: string
+  /** Team 会话的 Team 名；不是 Team 会话时为 null。 */
+  teamLabel?: string | null
   mode: WorkbenchMode
   splitAvailable: boolean
   /** 当前会话是否绑定了 Workflow(执行图视图的可用条件) */
@@ -66,6 +68,7 @@ function selectMode(value: string | number) {
       aria-label="工作台视图"
       @update:model-value="selectMode"
     />
+    <div v-else-if="teamLabel" :class="$style['conv-model']"><UIcon name="i-lucide-users-round" :class="$style['team-icon']" />{{ teamLabel }}</div>
     <div v-else :class="$style['conv-model']"><AiOrb :class="$style['orb-fit']" :size="14" label="运行中" />{{ activeSession?.agentId ? agentLabel : activeSession?.modelName || agentLabel }}</div>
     <span :class="$style['mode-announcer']" aria-live="polite">{{ modeDescriptions[mode] }}</span>
   </header>

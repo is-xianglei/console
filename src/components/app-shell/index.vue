@@ -7,6 +7,7 @@ import AgentSidebar from '@/routes/chat/components/agent-sidebar/index.vue'
 import SessionSidebar from '@/routes/chat/components/session-sidebar/index.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useConsoleStore } from '@/stores/console'
+import { useTeamRuntimeStore } from '@/stores/team-runtime'
 import ActivityRail from '../activity-rail/index.vue'
 import ModuleSidebar from '../module-sidebar/index.vue'
 
@@ -15,6 +16,7 @@ defineOptions({ name: 'AppShell' })
 const router = useRouter()
 const route = useRoute()
 const consoleStore = useConsoleStore()
+const teamRuntime = useTeamRuntimeStore()
 const { state, toggleTheme, toggleLeft, toggleRight, selectSession, resetConsole } = consoleStore
 const authStore = useAuthStore()
 const paletteOpen = ref(false)
@@ -41,8 +43,16 @@ const commandItems = [
   { label: '设置', meta: 'SETTINGS', icon: 'settings', to: '/settings' },
 ]
 
-const agentCount = computed(() => state.agents.length)
-const rightAvailable = computed(() => route.name === 'chat' && state.workbenchMode === 'chat' && state.agents.length > 0)
+/** 运行中的子代理加上有运行中激活的队友。 */
+const agentCount = computed(() =>
+  state.agents.filter((agent) => agent.status === 'think' || agent.status === 'run').length
+  + teamRuntime.state.members.filter((member) => member.status === 'working'
+    && teamRuntime.state.activations.some((activation) => activation.id === member.activation_id && activation.status === 'running')).length,
+)
+/** 有子代理、有队友，或已发出第一条消息的 Team 会话时右栏可用；草稿的名单显示在对话区。 */
+const rightAvailable = computed(() => route.name === 'chat' && state.workbenchMode === 'chat'
+  && (state.agents.length > 0 || teamRuntime.hasTeam
+    || state.sessions.find((session) => session.id === state.activeSessionId)?.teamDefinitionId != null))
 const showRight = computed(() => rightAvailable.value && (isMobile.value ? mobileRightOpen.value : !state.rightCollapsed))
 const hasContextSidebar = computed(() => route.name === 'chat' || route.path.startsWith('/skills') || route.name === 'platform-resource' || route.meta.platform === true)
 const showContextSidebar = computed(() => hasContextSidebar.value && (isMobile.value ? mobileContextOpen.value : !state.leftCollapsed))

@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick, watchEffect } from 'vue'
+import type { SseHandlers } from '../interfaces/console/api'
 import type { SseEvent } from '../interfaces/console/model'
+import type { TeamMemberResponse, TeamNotification } from '../interfaces/console/runtime'
 import {
   getActiveTurn,
   getPendingInteraction,
@@ -15,9 +17,18 @@ import {
   SseOpenError,
 } from '../http/console'
 import { useConsoleStore } from './console'
-import { getSessionSubAgentRuns } from '../http/session-runtime'
+import { useTeamRuntimeStore } from './team-runtime'
+import { getSessionSubAgentRuns, getSessionTeamMemberList, subscribeTeamStream } from '../http/session-runtime'
 
-vi.mock('../http/session-runtime', () => ({ getSessionSubAgentRuns: vi.fn() }))
+// 团队接口默认返回空，普通会话的用例不受影响；mockReset 后仍回到这些默认实现。
+vi.mock('../http/session-runtime', () => ({
+  getSessionSubAgentRuns: vi.fn(),
+  getSessionTeamMemberList: vi.fn(async () => []),
+  getSessionTeamMessageList: vi.fn(async () => []),
+  getSessionTeamActivationList: vi.fn(async () => []),
+  subscribeTeamActivation: vi.fn(() => () => {}),
+  subscribeTeamStream: vi.fn(() => () => {}),
+}))
 
 vi.mock('../http/console', async (importOriginal) => ({
   ...await importOriginal<typeof import('../http/console')>(),
@@ -915,5 +926,178 @@ describe('聊天模型与模式状态', () => {
     store.state.busy = true
     expect(await store.setChatSelection({ model_provider_id: null, mode_slug: 'turbo', thinking_effort: 'fast' })).toBe(false)
     expect(updateSessionChatSelection).not.toHaveBeenCalled()
+  })
+})
+
+describe('console store Team 会话', () => {
+  const teamStreams: SseHandlers<TeamNotification>[] = []
+  const teamSession = { ...session, agent_id: null, team_definition_id: 3 }
+  const writer: TeamMemberResponse = {
+    id: 1, session_id: 42, team_id: 3, name: 'writer', role: '撰写初稿', status: 'idle',
+    agent_type: null, agent_id: 9, prompt: null, activation_id: null,
+    created_at: '2026-11-15T00:00:00Z', updated_at: '2026-11-15T00:00:00Z',
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.resetAllMocks()
+    vi.mocked(getSessionList).mockResolvedValue([teamSession])
+    vi.mocked(getSessionMessageList).mockResolvedValue([])
+    vi.mocked(getPendingInteraction).mockResolvedValue(null)
+    vi.mocked(getSessionTasks).mockResolvedValue([])
+    vi.mocked(getSessionSubAgentRuns).mockResolvedValue([])
+    vi.mocked(getActiveTurn).mockResolvedValue(null)
+    vi.mocked(sendMessage).mockReturnValue(() => {})
+    vi.mocked(subscribeTurn).mockReturnValue(() => {})
+    vi.mocked(getSessionTeamMemberList).mockResolvedValue([writer])
+    teamStreams.length = 0
+    vi.mocked(subscribeTeamStream).mockImplementation((_sessionId, _after, handlers) => {
+      teamStreams.push(handlers)
+      return () => {}
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /** 打开 Team 会话 42，等通知流订阅上。 */
+  async function openTeamSession() {
+    const store = useConsoleStore()
+    expect(await store.reloadConsole()).toBe(true)
+    await vi.waitFor(() => expect(teamStreams).toHaveLength(1))
+    return store
+  }
+
+  /** 收到自动回合通知并接上它的订阅，返回对自动回合跟随的断开函数。 */
+  async function followAutoTurn(store: ReturnType<typeof useConsoleStore>) {
+    const abortAuto = vi.fn()
+    vi.mocked(subscribeTurn).mockReturnValue(abortAuto)
+    vi.mocked(getActiveTurn).mockResolvedValue({ turn_id: 'turn-auto', status: 'running', executing: true, last_event_offset: 1 })
+    teamStreams[0]!.onEvent({ type: 'team_lead_turn', session_id: 42, turn_id: 'turn-auto', cursor: '1-0' })
+    await vi.waitFor(() => expect(subscribeTurn).toHaveBeenCalledWith(42, 'turn-auto', expect.any(Object)))
+    expect(store.state.busy).toBe(true)
+    return abortAuto
+  }
+
+  it('新会话选 Team 时只携带 team_definition_id，与 Agent、Workflow 互斥', () => {
+    const store = useConsoleStore()
+    store.resetConsole()
+    store.setNewSessionAgent(9)
+    store.setNewSessionWorkflow(5)
+    store.setNewSessionTeam(3)
+
+    expect(store.state.newSessionAgentId).toBeNull()
+    expect(store.state.newSessionWorkflowId).toBeNull()
+    expect(store.sessionTeamId(store.state.activeSessionId)).toBe(3)
+    expect(store.dispatch('写一份周报')).toBe(true)
+    expect(sendMessage).toHaveBeenCalledWith(
+      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, team_definition_id: 3, content: '写一份周报' },
+      expect.any(Object),
+    )
+
+    store.newSession()
+    store.setNewSessionTeam(3)
+    store.setNewSessionAgent(9)
+    expect(store.state.newSessionTeamId).toBeNull()
+  })
+
+  it('session_ready 后会话锁定 teamDefinitionId 并接上队友运行时，续聊不再携带', async () => {
+    const store = useConsoleStore()
+    store.resetConsole()
+    store.setNewSessionTeam(3)
+    store.dispatch('写一份周报')
+    vi.mocked(sendMessage).mock.calls.at(-1)![1].onEvent({
+      type: 'session_ready', sequence: 1, session_id: 42, data: { session_id: 42, title: '写一份周报' },
+    })
+    expect(store.state.sessions.find((item) => item.id === '42')?.teamDefinitionId).toBe(3)
+    expect(store.state.newSessionTeamId).toBeNull()
+    await vi.waitFor(() => expect(teamStreams).toHaveLength(1))
+    expect(useTeamRuntimeStore().state.members.map((member) => member.name)).toEqual(['writer'])
+  })
+
+  it('历史里的 <team-inbox> 显示成团队消息，自动回合的第一条标为由队友消息触发', async () => {
+    const inbox = (body: string) => `<team-inbox>\n${body}\n</team-inbox>\n以上是队友发来的消息。`
+    vi.mocked(getSessionMessageList).mockResolvedValue([
+      { ...message, id: 1, role: 'user', turn_id: 't1', content: '写一份周报' },
+      { ...message, id: 2, role: 'user', turn_id: 't1', content: inbox('[消息来自 writer] 收到，开始写') },
+      { ...message, id: 3, turn_id: 't1', content: [{ type: 'text', text: '已分派' }] },
+      { ...message, id: 4, role: 'user', turn_id: 't2', content: inbox('[writer 已转为空闲] 初稿完成') },
+      { ...message, id: 5, turn_id: 't2', content: [{ type: 'text', text: '汇总如下' }] },
+    ])
+    const store = await openTeamSession()
+
+    expect(store.state.messages.map((item) => item.role)).toEqual(['user', 'team', 'ai', 'team', 'ai'])
+    expect(store.state.messages[1]?.inbox).toEqual({ trigger: false, entries: [{ heading: '消息来自 writer', body: '收到，开始写' }] })
+    expect(store.state.messages[3]?.inbox).toEqual({ trigger: true, entries: [{ heading: 'writer 已转为空闲', body: '初稿完成' }] })
+  })
+
+  it('派发新回合不清空队友，lead 回合里的 teammate 事件不再建子代理面板', async () => {
+    const store = await openTeamSession()
+    const teamRuntime = useTeamRuntimeStore()
+    expect(teamRuntime.state.panels.map((panel) => panel.id)).toEqual(['writer'])
+
+    expect(store.dispatch('继续')).toBe(true)
+    const handlers = vi.mocked(sendMessage).mock.calls.at(-1)![1]
+    handlers.onEvent({ type: 'turn_start', sequence: 1, session_id: 42, turn_id: 'turn-2', actor: { role: 'teammate', name: 'writer' } })
+    expect(store.state.agents).toEqual([])
+    expect(teamRuntime.state.members.map((member) => member.name)).toEqual(['writer'])
+    expect(teamRuntime.state.panels.map((panel) => panel.id)).toEqual(['writer'])
+  })
+
+  it('lead 调 SendMessage 的结果到达时刷新团队视图', async () => {
+    const store = await openTeamSession()
+    vi.useFakeTimers()
+    store.dispatch('分派任务')
+    const handlers = vi.mocked(sendMessage).mock.calls.at(-1)![1]
+    const actor = { role: 'orchestrator', name: 'lead' }
+    handlers.onEvent({ type: 'tool_use', sequence: 1, session_id: 42, turn_id: 'turn-2', actor, tool: { id: 'c-1', name: 'SendMessage', input: { recipient: 'writer' } } })
+    const before = vi.mocked(getSessionTeamMemberList).mock.calls.length
+    handlers.onEvent({ type: 'tool_result', sequence: 2, session_id: 42, turn_id: 'turn-2', actor, tool: { id: 'c-1', name: 'SendMessage', output: '已投递' } })
+    await vi.advanceTimersByTimeAsync(300)
+    expect(vi.mocked(getSessionTeamMemberList).mock.calls.length).toBe(before + 1)
+  })
+
+  it('team_lead_turn 在空闲时订阅这个自动回合；已结束的旧通知不重拉历史', async () => {
+    const store = await openTeamSession()
+    vi.mocked(getActiveTurn).mockResolvedValue({ turn_id: 'turn-old', status: 'completed', executing: false, last_event_offset: 9 })
+    const historyCalls = vi.mocked(getSessionMessageList).mock.calls.length
+    teamStreams[0]!.onEvent({ type: 'team_lead_turn', session_id: 42, turn_id: 'turn-old', cursor: '0-1' })
+    await vi.waitFor(() => expect(getActiveTurn).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(getSessionMessageList).mock.calls.length).toBe(historyCalls)
+
+    await followAutoTurn(store)
+    expect(store.isAutoTurnActive()).toBe(true)
+  })
+
+  it('自动回合执行中允许发送：先断开跟随，409 时等一秒自动重试一次', async () => {
+    const store = await openTeamSession()
+    const abortAuto = await followAutoTurn(store)
+    vi.useFakeTimers()
+
+    expect(store.dispatch('先停一下，改成写月报')).toBe(true)
+    expect(abortAuto).toHaveBeenCalled()
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+    vi.mocked(sendMessage).mock.calls.at(-1)![1].onError?.(new SseOpenError('会话正在执行', 'HTTP_ERROR', 409))
+    expect(store.state.busy).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(sendMessage).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(sendMessage).mock.calls.at(-1)![0]).toMatchObject({ session_id: 42, content: '先停一下，改成写月报' })
+
+    // 只重试一次：第二次 409 照常收尾并展示原因。
+    vi.mocked(sendMessage).mock.calls.at(-1)![1].onError?.(new SseOpenError('会话正在执行', 'HTTP_ERROR', 409))
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(sendMessage).toHaveBeenCalledTimes(2)
+    expect(store.state.busy).toBe(false)
+    expect(store.state.messages.at(-1)?.blocks).toContainEqual(expect.objectContaining({ tag: 'ERROR', body: '会话正在执行' }))
+  })
+
+  it('用户回合执行中仍然不能发送', async () => {
+    const store = await openTeamSession()
+    expect(store.dispatch('第一条')).toBe(true)
+    expect(store.isAutoTurnActive()).toBe(false)
+    expect(store.dispatch('第二条')).toBe(false)
+    expect(sendMessage).toHaveBeenCalledTimes(1)
   })
 })

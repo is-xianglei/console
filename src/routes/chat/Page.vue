@@ -5,6 +5,7 @@ import { useRuntimePaneResize } from '@/hooks'
 import type { WorkbenchMode } from '@/interfaces'
 import { useAgentsStore } from '@/stores/agents'
 import { useConsoleStore } from '@/stores/console'
+import { useTeamsStore } from '@/stores/teams'
 import AppRuntimePanel from './components/app-runtime-panel/index.vue'
 import ConversationPane from './components/conversation-pane/index.vue'
 import WorkbenchHeader from './components/workbench-header/index.vue'
@@ -12,8 +13,9 @@ import WorkflowGraph from './components/workflow-graph/index.vue'
 
 defineOptions({ name: 'ChatPage' })
 
-const { state, setWorkbenchMode } = useConsoleStore()
+const { state, setWorkbenchMode, sessionTeamId } = useConsoleStore()
 const agentsStore = useAgentsStore()
+const teamsStore = useTeamsStore()
 const {
   workArea,
   resizing,
@@ -35,6 +37,15 @@ const activeAgentLabel = computed(() => {
   const agentId = activeSession.value?.agentId ?? state.newSessionAgentId
   if (!agentId) return '平台默认 Agent'
   return agentsStore.state.items.find((agent) => agent.id === agentId)?.name ?? `Agent #${agentId}`
+})
+/** Team 会话的标识：名称经 Team 详情取，取不到时显示「Team 已删除」。 */
+const activeTeamId = computed(() => sessionTeamId(state.activeSessionId))
+watch(activeTeamId, (id) => { if (id != null) void teamsStore.resolveTeamName(id) }, { immediate: true })
+const activeTeamLabel = computed(() => {
+  const id = activeTeamId.value
+  if (id == null) return null
+  const name = teamsStore.teamName(id)
+  return name === null ? 'Team 已删除' : name ?? 'Team'
 })
 const activeApp = computed(() => getWorkbenchApp(state.activeAppId))
 /** 当前会话绑定的 Workflow ID;本地草稿会话回退到 newSessionWorkflowId。 */
@@ -70,6 +81,7 @@ watch(sideBySide, (enabled) => {
       :active-app="activeApp"
       :active-session="activeSession"
       :agent-label="activeAgentLabel"
+      :team-label="activeTeamLabel"
       :mode="effectiveMode"
       :split-available="splitAvailable"
       :plan-bound="activeWorkflowId != null"

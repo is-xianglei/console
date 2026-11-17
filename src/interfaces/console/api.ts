@@ -23,6 +23,8 @@ export interface SendMessageRequest extends Partial<ChatModelSelection> {
   agent_id?: number | null
   /** 新会话绑定的 Workflow ID，与 agent_id 互斥。 */
   workflow_id?: number | null
+  /** 新会话选用的 Team，只在建会话的第一条消息里带；与 agent_id、workflow_id 互斥。 */
+  team_definition_id?: number | null
   /** 用户消息正文。 */
   content: string
 }
@@ -158,8 +160,8 @@ export interface TurnCancelResponse {
 }
 
 /** 控制台 SSE 生命周期回调。 */
-export interface SseHandlers {
-  onEvent: (event: SseEvent) => void
+export interface SseHandlers<T = SseEvent> {
+  onEvent: (event: T) => void
   onError?: (error: Error) => void
   onDone?: () => void
 }
