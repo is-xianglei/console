@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { PlatformModuleKey } from '@/interfaces/platform/model'
@@ -16,7 +17,6 @@ const route = useRoute()
 const consoleStore = useConsoleStore()
 const { state, toggleTheme, toggleLeft, toggleRight, selectSession, resetConsole } = consoleStore
 const authStore = useAuthStore()
-const settingsReturnTo = ref('/chat')
 const paletteOpen = ref(false)
 const commandQuery = ref('')
 const isMobile = ref(false)
@@ -38,7 +38,7 @@ const commandItems = [
   { label: '角色', meta: 'ACCESS CONTROL', icon: 'badge-check', to: '/platform/organization/roles' },
   { label: '访问申请', meta: 'ACCESS CONTROL', icon: 'inbox', to: '/platform/organization/requests' },
   { label: '应用市场', meta: 'MARKET', icon: 'store', to: '/apps' },
-  { label: '平台设置', meta: 'SETTINGS', icon: 'settings', to: '/settings' },
+  { label: '设置', meta: 'SETTINGS', icon: 'settings', to: '/settings' },
 ]
 
 const agentCount = computed(() => state.agents.length)
@@ -87,13 +87,10 @@ async function onLogout() {
   await router.replace({ name: 'login' })
 }
 
-function toggleSettings() {
-  if (route.name === 'settings') void router.push(settingsReturnTo.value)
-  else {
-    settingsReturnTo.value = route.fullPath
-    void router.push({ name: 'settings' })
-  }
-}
+const userMenuItems: DropdownMenuItem[][] = [
+  [{ label: '设置', icon: 'i-lucide-settings', onSelect: () => { void router.push('/settings/profile') } }],
+  [{ label: '退出登录', icon: 'i-lucide-log-out', onSelect: () => { void onLogout() } }],
+]
 
 function openCommand(item: typeof commandItems[number]) {
   paletteOpen.value = false
@@ -169,14 +166,14 @@ onBeforeUnmount(() => {
       <div :class="$style['cmd-spacer']"></div>
       <div :class="[$style['cmd-stat'], 'mono']"><span class="dot" :class="healthDot"></span>{{ healthText }}</div>
       <div :class="[$style['cmd-stat'], 'mono']">◇ {{ agentCount }} RUNNING</div>
-      <UButton v-if="authStore.state.user" color="neutral" variant="outline" :class="$style['cmd-user']" title="打开用户资料" aria-label="打开用户资料" @click="router.push('/profile')">
-        <span :class="$style['user-avatar']">{{ authStore.state.user.username.slice(0, 1).toUpperCase() }}</span>
-        <span :class="$style['cmd-user-name']">{{ authStore.state.user.username }}</span>
-      </UButton>
+      <UDropdownMenu v-if="authStore.state.user" :items="userMenuItems" :content="{ align: 'end', sideOffset: 6 }">
+        <UButton color="neutral" variant="outline" :class="$style['cmd-user']" aria-label="用户菜单">
+          <span :class="$style['user-avatar']">{{ authStore.state.user.username.slice(0, 1).toUpperCase() }}</span>
+          <span :class="$style['cmd-user-name']">{{ authStore.state.user.username }}</span>
+        </UButton>
+      </UDropdownMenu>
       <UButton color="neutral" variant="ghost" square :class="$style['cmd-btn']" :title="state.theme === 'dark' ? '切到亮色' : '切到暗色'" :aria-label="state.theme === 'dark' ? '切到亮色' : '切到暗色'" @click="toggleTheme"><i :class="`icon icon-${state.theme === 'dark' ? 'sun' : 'moon'}`"></i></UButton>
       <UButton v-if="rightAvailable" color="neutral" variant="ghost" square :class="[$style['cmd-btn'], { [$style.active]: isMobile ? mobileRightOpen : !state.rightCollapsed }]" :title="showRight ? '收起运行 Agent' : '展开运行 Agent'" :aria-label="showRight ? '收起运行 Agent' : '展开运行 Agent'" @click="toggleRuntimePanel"><i class="icon icon-panel-right"></i></UButton>
-      <UButton color="neutral" variant="ghost" square :class="[$style['cmd-btn'], $style['desktop-settings-button'], { [$style.active]: route.name === 'settings' }]" title="平台设置" aria-label="平台设置" @click="toggleSettings"><i class="icon icon-settings"></i></UButton>
-      <UButton color="neutral" variant="ghost" square :class="$style['cmd-btn']" title="退出登录" aria-label="退出登录" @click="onLogout"><i class="icon icon-log-out"></i></UButton>
     </header>
 
     <div :class="$style['workspace-shell']">
@@ -193,10 +190,12 @@ onBeforeUnmount(() => {
       <div :class="$style['page-stage']">
         <router-view v-slot="{ Component, route: currentRoute }">
           <Transition name="page-fade">
-            <component
-              :is="Component"
+            <div
               :key="currentRoute.name === 'platform-resource' ? `${String(currentRoute.name)}-${String(currentRoute.params.module)}-${String(currentRoute.params.resource)}` : String(currentRoute.name)"
-            />
+              :class="$style['route-page']"
+            >
+              <component :is="Component" />
+            </div>
           </Transition>
         </router-view>
       </div>

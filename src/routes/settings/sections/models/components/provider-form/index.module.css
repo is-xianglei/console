@@ -1,0 +1,70 @@
+.form {
+  display: grid;
+  gap: var(--space-md);
+}
+
+/* 与设置页共享的 .formGrid 标签一致，开关行的 strong 同款。 */
+.form :global([data-slot='label']) {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: var(--space-md);
+}
+
+.field {
+  width: 100%;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.inline > .field {
+  flex: 1;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 44px;
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.toggle > strong,
+.toggle > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.toggle strong {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.toggle small {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* 表单只在弹窗（约 640px）里使用：窄屏 ≤520px 时两列改单列。 */
+@media (max-width: 520px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

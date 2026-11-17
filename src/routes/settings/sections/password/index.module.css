@@ -1,0 +1,27 @@
+@import '@/routes/settings/shared.module.css';
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-width: 360px;
+}
+
+.form :global([data-slot='label']) {
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+}
+
+.feedback {
+  border-radius: var(--radius-control);
+}
+
+.submit {
+  align-self: flex-start;
+}

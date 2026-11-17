@@ -1,0 +1,34 @@
+@import '@/routes/settings/shared.module.css';
+
+/* 分组标题下、卡片上方的一行提示：风险说明（warning 图标）或加载失败（error 色）。 */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* 高度与一行文字相同，图标和首行文字居中对齐。 */
+.noticeIcon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 1.5em;
+}
+
+.noticeWarning {
+  color: var(--status-warning);
+}
+
+.noticeError {
+  color: var(--status-error);
+}
+
+.empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+}

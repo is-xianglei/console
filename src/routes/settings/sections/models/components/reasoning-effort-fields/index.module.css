@@ -1,0 +1,21 @@
+/* 平铺在供应商表单里，不再单独套框。 */
+.fields {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.field {
+  width: 100%;
+}
+
+@media (max-width: 520px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

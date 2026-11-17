@@ -1,0 +1,24 @@
+@import '@/routes/settings/shared.module.css';
+
+.hint {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  cursor: help;
+}
+
+/* 说明行里的文字链接：去掉按钮内边距，字号行高跟随 .rowMeta。 */
+.metaLink {
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
+.loadError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  color: var(--status-error);
+  font-size: var(--fs-base);
+}

@@ -1,0 +1,178 @@
+/* 设置页各模块共用的分组、卡片与设置行。
+ *
+ * 用法：在模块自己的 index.module.css **第一行** @import，之后通过 $style 直接使用这些类名，
+ * 需要差异时在本模块里写同名选择器覆盖（导入内容前置，后写的规则胜出）：
+ *     @import '@/routes/settings/shared.module.css';
+ *
+ * 结构（分组标题在卡片外，卡片里只放行，不再嵌套带边框的子框）：
+ *   .stack                      模块根节点，纵向排列多个分组
+ *     .group                    一个分组
+ *       .groupHeader            分组标题 + 右侧操作（在卡片外）
+ *         .groupTitle / .count
+ *       .card                   卡片，只放 .rows 或 .cardBody
+ *         .rows > .row          设置行：左 .rowMain（.rowTitle + .rowMeta），右 .rowActions
+ *         .cardBody             非行内容（表单、表格）时用，带上下内边距
+ *   .status[data-tone]          状态图标，tone = success | warning | error | muted
+ *   .control                    行右侧输入框/下拉的统一宽度
+ *   .formGrid                   两列表单（≤640px 单列）
+ *
+ * 间距只用 --space-* 刻度：分组之间 32，标题到卡片 8，卡片左右 24，行上下 16。
+ * 一屏最多一个实心主按钮；状态用 .status 图标，不用文字 badge。
+ */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: 32px;
+}
+
+.groupTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.count {
+  color: var(--text-dim);
+  font-family: var(--font-data);
+  font-size: var(--fs-base);
+  font-weight: 400;
+}
+
+.groupActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.card {
+  padding: 0 var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+}
+
+.cardBody {
+  padding: var(--space-lg) 0;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 56px;
+  padding: var(--space-md) 0;
+}
+
+.row + .row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rowMain {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.rowTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.rowMeta {
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.rowActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.control {
+  width: 240px;
+}
+
+.status {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--text-dim);
+}
+
+.status[data-tone='success'] { color: var(--status-success); }
+.status[data-tone='warning'] { color: var(--status-warning); }
+.status[data-tone='error'] { color: var(--status-error); }
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.formGrid :global([data-slot='label']) {
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 0 var(--space-md);
+  }
+
+  .row {
+    flex-wrap: wrap;
+  }
+
+  .control {
+    width: 100%;
+  }
+
+  .formGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

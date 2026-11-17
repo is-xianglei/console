@@ -1,0 +1,53 @@
+@import '@/routes/settings/shared.module.css';
+
+/* 渠道 · 接入方式 · App ID · 群聊旁听：一行，窄屏自然换行。 */
+.metaLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-sm);
+  row-gap: var(--space-xs);
+}
+
+.sep {
+  color: var(--text-dim);
+}
+
+.observe {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* 复选框标签与 meta 行同字号同色，不比渠道信息更抢眼。 */
+.observeCheckbox :global([data-slot='wrapper']),
+.observeCheckbox :global([data-slot='label']) {
+  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: inherit;
+}
+
+.hint {
+  display: inline-flex;
+  color: var(--text-dim);
+  cursor: help;
+}
+
+.hint:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--accent-agent);
+  outline-offset: 2px;
+}
+
+.hintIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.error {
+  color: var(--status-error);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}

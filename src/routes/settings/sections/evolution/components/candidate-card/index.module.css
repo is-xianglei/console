@@ -1,0 +1,98 @@
+@import '@/routes/settings/shared.module.css';
+
+/* 候选是卡片里的一行；内容多行，按钮靠上对齐。 */
+.item {
+  align-items: flex-start;
+}
+
+.kind {
+  flex-shrink: 0;
+}
+
+/* 「查看详情」是行内文字触发器，去掉按钮内边距与说明文字左对齐。 */
+.toggle {
+  align-self: flex-start;
+  padding: 0;
+  font-size: var(--fs-base);
+  line-height: 1.5;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  color: var(--text-secondary);
+  font-size: var(--fs-base);
+  line-height: 1.6;
+}
+
+.detail > p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chain li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.chain code {
+  color: var(--text-primary);
+  font-family: var(--font-code);
+  font-size: var(--fs-sm);
+}
+
+.arrow {
+  color: var(--text-dim);
+}
+
+.doc {
+  max-height: 320px;
+  overflow: auto;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.ops {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ops li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-sm);
+}
+
+.opName {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.opText {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.opReason,
+.source {
+  color: var(--text-muted);
+}

@@ -26,9 +26,9 @@ import TeamEditLoader from './platform-resource/teams/edit/Loader.vue'
 import WorkflowCreateLoader from './platform-resource/workflows/create/Loader.vue'
 import WorkflowDetailLoader from './platform-resource/workflows/detail/Loader.vue'
 import WorkflowEditLoader from './platform-resource/workflows/edit/Loader.vue'
-import ProfileLoader from './profile/Loader.vue'
 import RegisterLoader from './register/Loader.vue'
 import SettingsLoader from './settings/Loader.vue'
+import { legacyProfileSection, resolveSettingsSection } from './settings/sections'
 import SkillCreateLoader from './skills/create/Loader.vue'
 import SkillDetailLoader from './skills/detail/Loader.vue'
 import SkillEditLoader from './skills/edit/Loader.vue'
@@ -219,16 +219,16 @@ const router = createRouter({
           meta: { requiresAuth: true, platform: true, module: 'organization' },
         },
         {
-          path: 'settings',
+          // 缺省、未知或当前角色不可见的模块由下方守卫统一重定向到个人信息
+          path: 'settings/:section?',
           name: 'settings',
           component: SettingsLoader,
           meta: { requiresAuth: true },
         },
         {
+          // 旧个人资料页：?tab= 映射到对应设置模块
           path: 'profile',
-          name: 'profile',
-          component: ProfileLoader,
-          meta: { requiresAuth: true },
+          redirect: (to) => ({ name: 'settings', params: { section: legacyProfileSection(to.query.tab) }, query: {} }),
         },
       ],
     },
@@ -261,6 +261,12 @@ router.beforeEach(async (to) => {
 
   if ((to.name === 'login' || to.name === 'register') && authStore.isAuthenticated) {
     return safeRedirect(to.query.redirect) ?? { name: 'chat' }
+  }
+
+  // 设置模块可见性依赖当前工作区角色，模块间切换不会重新进入路由，放在全局守卫里校验
+  if (to.name === 'settings') {
+    const section = resolveSettingsSection(to.params.section, authStore.currentWorkspace?.membership_role).key
+    if (to.params.section !== section) return { name: 'settings', params: { section }, query: to.query, hash: to.hash, replace: true }
   }
 
   // 市场模块可见性：「我的上架」看当前工作区角色，「审核队列」只对平台管理员开放。

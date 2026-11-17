@@ -1,0 +1,53 @@
+@import '@/routes/settings/shared.module.css';
+
+/* 添加规则：工具名 + 行为分段 + 添加，一行排开 */
+.addForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.toolField {
+  flex: 1;
+  min-width: 160px;
+}
+
+.toolField :global([data-slot='container']),
+.toolInput {
+  width: 100%;
+}
+
+.addButton {
+  margin-left: auto;
+}
+
+/* 规则行右侧的状态文字，颜色与图标随行为变化 */
+.behavior {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-dim);
+  font-size: var(--fs-base);
+  font-weight: 500;
+}
+
+.behavior[data-tone='success'] { color: var(--status-success); }
+.behavior[data-tone='warning'] { color: var(--status-warning); }
+.behavior[data-tone='error'] { color: var(--status-error); }
+
+.behaviorIcon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 640px) {
+  .toolField {
+    flex-basis: 100%;
+  }
+
+  .behaviorField {
+    flex: 1;
+  }
+}

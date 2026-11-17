@@ -1,0 +1,148 @@
+@import '@/routes/settings/shared.module.css';
+
+.avatarButton {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.avatarButton:focus-visible {
+  outline: 2px solid var(--accent-agent);
+  outline-offset: 2px;
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--border);
+  font-size: var(--fs-lg);
+}
+
+.avatarOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg-panel) 70%, transparent);
+  color: var(--text-primary);
+  font-size: var(--fs-lg);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.avatarButton:hover .avatarOverlay,
+.avatarButton:focus-visible .avatarOverlay {
+  opacity: 1;
+}
+
+.nameLine,
+.inlineEditor,
+.urlLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+/* 姓名是这张卡的主标题，比普通行标题大一档 */
+.userName {
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.inlineEditor {
+  max-width: 320px;
+}
+
+.phoneEditor {
+  flex: 0 1 320px;
+  min-width: 0;
+  gap: var(--space-xs);
+}
+
+.editorInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.phoneValue {
+  color: var(--text-secondary);
+  font-family: var(--font-data);
+  font-size: var(--fs-base);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--status-error);
+  font-size: var(--fs-sm);
+}
+
+.avatarPicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.avatarGrid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.avatarOption {
+  padding: var(--space-xs);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.avatarOption:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.avatarOption:focus-visible {
+  outline: 2px solid var(--accent-agent);
+  outline-offset: 2px;
+}
+
+.avatarOption:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.avatarOptionActive,
+.avatarOptionActive:hover:not(:disabled) {
+  border-color: var(--accent-agent);
+  box-shadow: 0 0 0 3px var(--accent-agent-dim);
+}
+
+.avatarOptionImage {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+@media (max-width: 640px) {
+  .phoneEditor {
+    flex-basis: 100%;
+  }
+
+  .avatarGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

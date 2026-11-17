@@ -1,0 +1,7 @@
+@import '@/routes/settings/shared.module.css';
+
+.empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+}

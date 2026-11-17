@@ -1,0 +1,45 @@
+@import '@/routes/settings/shared.module.css';
+
+.feedback {
+  border-radius: var(--radius-control);
+}
+
+.self {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.roleText {
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+}
+
+/* 「移除」按钮的固定占位宽度，保证各行角色列对齐 */
+.removeSlot {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 48px;
+}
+
+.inviteForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.inviteForm :global([data-slot='label']) {
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .editableActions {
+    flex-basis: 100%;
+  }
+
+  .editableActions .control {
+    flex: 1;
+  }
+}

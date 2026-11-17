@@ -1,0 +1,30 @@
+.form {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.form :global([data-slot='label']) {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.field {
+  width: 100%;
+}
+
+/* 表单只在弹窗（约 640px）里使用：窄屏 ≤520px 时两列改单列。 */
+@media (max-width: 520px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.error {
+  margin-bottom: var(--space-md);
+}

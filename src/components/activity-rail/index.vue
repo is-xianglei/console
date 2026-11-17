@@ -119,21 +119,7 @@ onBeforeUnmount(() => {
       </UButton>
     </UTooltip>
     <div :class="$style['rail-spacer']"></div>
-    <UTooltip text="个人资料" :content="tooltipContent" arrow>
-      <UButton
-        color="neutral"
-        variant="ghost"
-        square
-        :class="[$style['rail-item'], { [$style.active]: route.name === 'profile' }]"
-        data-activity-item
-        :data-active="route.name === 'profile'"
-        aria-label="个人资料"
-        @click="navigate('/profile', $event)"
-      >
-        <i class="icon icon-circle-user-round"></i>
-      </UButton>
-    </UTooltip>
-    <UTooltip text="平台设置" :content="tooltipContent" arrow>
+    <UTooltip text="设置" :content="tooltipContent" arrow>
       <UButton
         color="neutral"
         variant="ghost"
@@ -141,7 +127,8 @@ onBeforeUnmount(() => {
         :class="[$style['rail-item'], { [$style.active]: route.name === 'settings' }]"
         data-activity-item
         :data-active="route.name === 'settings'"
-        aria-label="平台设置"
+        aria-label="设置"
+        :aria-current="route.name === 'settings' ? 'page' : undefined"
         @click="navigate('/settings', $event)"
       >
         <i class="icon icon-settings"></i>

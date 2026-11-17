@@ -124,7 +124,7 @@ const workspaceItems = computed<WorkspaceMenuItem[][]>(() => {
       description: '成员、邀请与工作区设置',
       icon: 'i-lucide-settings-2',
       onSelect: () => {
-        void router.push({ path: '/profile', query: { tab: 'workspaces' } })
+        void router.push('/settings/workspaces')
       },
     }],
   ]
