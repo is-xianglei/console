@@ -1,21 +1,19 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
-import { computed, useCssModule, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { FilterPanel, ListCard, ResourcePagination, ResourceTable } from '@/components'
-import { useAgentManager, type AgentEnabledFilter } from '@/hooks/useAgentManager'
+import { ActionIconButton, ResourcePagination } from '@/components'
+import { useAgentActions } from '@/hooks/useAgentActions'
+import { AGENT_PAGE_SIZES, useAgentManager, type AgentEnabledFilter } from '@/hooks/useAgentManager'
 import { useHighlightFromQuery } from '@/hooks/useSaveFeedback'
 import type { AgentResponse } from '@/interfaces/agent/api'
-import { useAuthStore } from '@/stores/auth'
 
 defineOptions({ name: 'AgentResourceList' })
 
-const styles = useCssModule()
-const manager = useAgentManager()
-const authStore = useAuthStore()
 const router = useRouter()
-
+const manager = useAgentManager()
+const actions = useAgentActions()
 const highlight = useHighlightFromQuery()
+const gridRef = ref<HTMLElement | null>(null)
 
 const enabledOptions = [
   { value: 'all', label: '全部' },
@@ -23,32 +21,19 @@ const enabledOptions = [
   { value: 'disabled', label: '已停用' },
 ] as { value: AgentEnabledFilter; label: string }[]
 
-/** 模型筛选：后端不支持模型维度查询（prd「接口不支持留在前端」），前端收集唯一模型名做选项。 */
-const modelOptions = computed<Array<{ value: string; label: string }>>(() => {
-  const models = new Set(manager.agents.value.map((agent) => agent.model_name ?? '').filter(Boolean))
-  return [{ value: 'all', label: '全部模型' }, ...[...models].sort().map((value) => ({ value, label: value }))]
-})
+const showSkeleton = computed(() => manager.loading.value && !manager.agents.value.length)
 
-/** 列宽由 table-baseline.module.css 的语义列类给出：同类列全站同宽。
- * 名称 / 时间 / 枚举 / 操作走 col-* 定宽，模型与能力绑定两列不设宽，自动占剩余。
- * 原先本页用 :nth-child 百分比定宽（7 档 4~25%），是另一套体系，已废弃。 */
-const columns: TableColumn<AgentResponse>[] = [
-  { id: 'name', header: '名称', meta: { class: { th: styles['col-name'], td: styles['col-name'] } } },
-  { id: 'state', header: '状态', meta: { class: { th: styles['col-status'], td: styles['col-status'] } } },
-  { id: 'model', header: '模型' },
-  { id: 'capabilities', header: '能力绑定' },
-  { id: 'createdAt', header: '创建时间', meta: { class: { th: styles['col-time'], td: styles['col-time'] } } },
-  { id: 'actions', header: '操作', meta: { class: { th: styles['col-actions'], td: styles['col-actions'] } } },
-]
-
-const deleteTitle = computed(() => manager.pendingDelete.value ? `删除 ${manager.pendingDelete.value.name}？` : '删除 Agent？')
-
-function agentCode(id: number) {
-  return `AGT-${String(id).padStart(4, '0')}`
+/** 描述为空时退回系统提示词开头；空白折叠成一行，交给两行截断。 */
+function summary(agent: AgentResponse) {
+  return (agent.description?.trim() || agent.system_prompt.trim()).replace(/\s+/g, ' ')
 }
 
-function capabilitySummary(agent: AgentResponse) {
-  return `${agent.skill_ids?.length ?? 0} Skills · ${agent.tool_ids?.length ?? 0} Tools`
+/** 卡片底部：模型名 · N 技能 · M 工具 · K MCP（为 0 的不显示）。 */
+function metaText(agent: AgentResponse) {
+  const parts = [agent.model_name || '默认模型']
+  if (agent.skill_ids?.length) parts.push(`${agent.skill_ids.length} 技能`)
+  if (agent.tool_ids?.length) parts.push(`${agent.tool_ids.length} 工具`)
+  return parts.join(' · ')
 }
 
 function goToCreate() {
@@ -67,146 +52,139 @@ function goToDuplicate(agent: AgentResponse) {
   void router.push({ name: 'agent-create', params: { module: 'build', resource: 'agents' }, query: { duplicate: String(agent.id) } })
 }
 
-async function onRefresh() {
-  await manager.loadAll()
-  if (!manager.loadingError.value) manager.showToast('Agents 与能力目录已刷新')
+/** 卡片键盘访问：只响应卡片自身的 Enter，开关 / 按钮上的回车保留它们自己的行为。 */
+function onCardKeydown(event: KeyboardEvent, agent: AgentResponse) {
+  if (event.key !== 'Enter' || event.target !== event.currentTarget) return
+  event.preventDefault()
+  goToDetail(agent)
 }
 
-function onApplyFilters() {
-  void manager.loadAll()
-}
-
-function onResetFilters() {
-  manager.resetView()
-  void manager.loadAll()
-}
-
-function onPage(page: number) {
-  manager.page.value = page
-}
-
-function onPageSize(size: number) {
-  manager.pageSize.value = size
-}
-
+/** 保存后带 ?highlight 回来：等卡片渲染出来再滚入视口。 */
 watch(
-  () => authStore.currentWorkspaceId,
-  (workspaceId) => {
-    if (workspaceId) void manager.loadAll()
+  () => [highlight.value, manager.pagedItems.value] as const,
+  ([id]) => {
+    if (!id) return
+    void nextTick(() => {
+      gridRef.value
+        ?.querySelector<HTMLElement>(`[data-agent-id="${CSS.escape(id)}"]`)
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
   },
-  { immediate: true },
 )
+
+async function onDeleteConfirm() {
+  if (await actions.confirmDelete()) manager.stepBackIfPageEmpty()
+}
 </script>
 
 <template>
-  <main :class="styles.page">
-    <FilterPanel
-      title="筛选条件"
-      :collapsible="true"
-      storage-key="agents"
-      @search="onApplyFilters"
-      @reset="onResetFilters"
-    >
-      <UFormField label="关键字"><UInput v-model="manager.state.keyword" icon="i-lucide-search" placeholder="搜索名称、ID、描述或模型" aria-label="搜索 Agent" /></UFormField>
-      <UFormField label="启用状态"><USelect :model-value="manager.state.enabled" :items="enabledOptions" aria-label="启用状态筛选" @update:model-value="(value: unknown) => { manager.state.enabled = String(value ?? 'all') as AgentEnabledFilter }" /></UFormField>
-      <UFormField label="模型"><USelect :model-value="manager.state.model" :items="modelOptions" aria-label="模型筛选" @update:model-value="(value: unknown) => { manager.state.model = String(value ?? 'all') }" /></UFormField>
-      <UFormField label="创建时间">
-        <div :class="styles.dateRange">
-          <UInput :model-value="manager.state.dateRange[0]" type="date" aria-label="开始日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [String(value ?? ''), manager.state.dateRange[1]] }" />
-          <span>~</span>
-          <UInput :model-value="manager.state.dateRange[1]" type="date" aria-label="结束日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [manager.state.dateRange[0], String(value ?? '')] }" />
+  <main :class="$style.page">
+    <div :class="$style.inner">
+      <header :class="$style.header">
+        <h1 :class="$style.title">智能体<span v-if="manager.agents.value.length" :class="$style.count">{{ manager.agents.value.length }}</span></h1>
+        <div :class="$style.toolbar">
+          <UInput v-model="manager.state.keyword" :class="$style.search" icon="i-lucide-search" placeholder="搜索" aria-label="搜索智能体" />
+          <USelect
+            :model-value="manager.state.enabled"
+            :class="$style.status"
+            :items="enabledOptions"
+            aria-label="启用状态"
+            @update:model-value="(value: unknown) => { manager.state.enabled = String(value ?? 'all') as AgentEnabledFilter }"
+          />
+          <UButton icon="i-lucide-plus" label="新建智能体" color="primary" @click="goToCreate" />
         </div>
-      </UFormField>
-    </FilterPanel>
+      </header>
 
-    <ListCard title="Agents" description="管理当前工作区的系统提示词、模型与能力绑定。">
-      <template #toolbar>
-        <UButton label="新建 Agent" icon="i-lucide-plus" color="primary" @click="goToCreate" />
-        <UTooltip :text="manager.selectedCount.value ? '批量启用' : '请先勾选至少一行'">
-          <UButton label="启用" icon="i-lucide-power" color="neutral" variant="outline" :disabled="!manager.selectedCount.value || manager.batchBusy.value" :aria-label="'批量启用'" @click="manager.batchEnable" />
-        </UTooltip>
-        <UTooltip :text="manager.selectedCount.value ? '批量停用' : '请先勾选至少一行'">
-          <UButton label="停用" icon="i-lucide-power-off" color="neutral" variant="outline" :disabled="!manager.selectedCount.value || manager.batchBusy.value" :aria-label="'批量停用'" @click="manager.batchDisable" />
-        </UTooltip>
-        <UTooltip :text="manager.selectedCount.value ? '批量删除' : '请先勾选至少一行'">
-          <UButton label="删除" icon="i-lucide-trash-2" color="error" variant="outline" :disabled="!manager.selectedCount.value || manager.batchBusy.value" :aria-label="'批量删除'" @click="manager.batchDelete" />
-        </UTooltip>
-        <UDropdownMenu :items="[[
-          { label: '刷新', icon: 'i-lucide-refresh-cw', onSelect: () => { void onRefresh() } },
-        ]]">
-          <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square :aria-label="'更多操作'" />
-        </UDropdownMenu>
-      </template>
+      <UAlert
+        v-if="manager.loadError.value"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-circle-alert"
+        :title="manager.loadError.value"
+        :actions="[{ label: '重试', color: 'neutral', variant: 'outline', onClick: manager.load }]"
+      />
 
-      <UAlert v-if="manager.loadingError.value" :class="styles.alert" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="manager.loadingError.value" :actions="[{ label: '重试', color: 'neutral', variant: 'outline', onClick: onRefresh }]" />
+      <div v-if="showSkeleton" :class="$style.grid" aria-busy="true">
+        <USkeleton v-for="n in 6" :key="n" :class="$style.skeleton" />
+      </div>
 
-      <ResourceTable
-        :columns="columns"
-        :data="manager.pagedItems.value"
-        :loading="manager.loading.value"
-        :row-key="(agent: AgentResponse) => String(agent.id)"
-        :table-class="styles.table"
-        :selectable="true"
-        :selected="manager.selectedIds.value"
-        :pin-actions="true"
-        :highlight-id="highlight"
-        :empty-mode="manager.filteredAgents.value.length ? 'filtered' : 'never'"
-        :resource-name="'Agent'"
-        @update:selected="(ids: string[]) => { manager.selectedIds.value = ids }"
-        @select="goToDetail"
-        @clear-filters="onResetFilters"
+      <UEmpty
+        v-else-if="!manager.pagedItems.value.length && !manager.loadError.value"
+        :class="$style.empty"
+        variant="naked"
+        :icon="manager.emptyMode.value === 'filtered' ? 'i-lucide-search-x' : 'i-lucide-bot'"
+        :title="manager.emptyMode.value === 'filtered' ? '没有匹配的智能体' : '还没有智能体'"
       >
-        <template #name-cell="{ row }">
-          <div :class="styles['primary-cell']">
-            <span :class="styles['entity-icon']"><UIcon name="i-lucide-bot" /></span>
-            <span>
-              <strong>{{ row.original.name }}</strong>
-              <small class="mono">{{ agentCode(row.original.id) }}</small>
-            </span>
-          </div>
+        <template #actions>
+          <UButton v-if="manager.emptyMode.value === 'filtered'" icon="i-lucide-rotate-ccw" label="清除筛选" color="neutral" variant="outline" @click="manager.resetFilters" />
+          <UButton v-else icon="i-lucide-plus" label="新建智能体" color="neutral" variant="outline" @click="goToCreate" />
         </template>
-        <template #state-cell="{ row }">
-          <UBadge :color="row.original.is_enabled ? 'success' : 'neutral'" variant="subtle" size="xs" :class="styles.statusBadge">{{ row.original.is_enabled ? '已启用' : '已停用' }}</UBadge>
-        </template>
-        <template #model-cell="{ row }"><span :class="styles.modeText">{{ row.original.model_name || '平台默认模型' }}</span></template>
-        <template #capabilities-cell="{ row }"><span :class="styles.memberText">{{ capabilitySummary(row.original) }}</span><small>服务端数字 ID 绑定</small></template>
-        <template #createdAt-cell="{ row }"><RelativeTime :value="row.original.created_at" /></template>
-        <template #actions-cell="{ row }">
-          <div :class="styles.rowActions">
-            <UTooltip text="编辑"><UButton icon="i-lucide-pencil" color="neutral" variant="ghost" square :aria-label="`编辑 ${row.original.name}`" @click.stop="goToEdit(row.original)" /></UTooltip>
-            <UDropdownMenu :items="[[
-              { label: '查看详情', icon: 'i-lucide-eye', onSelect: () => goToDetail(row.original) },
-              { label: '复制', icon: 'i-lucide-copy', onSelect: () => goToDuplicate(row.original) },
-              row.original.is_enabled ? { label: '停用', icon: 'i-lucide-power-off', onSelect: () => { void manager.toggleEnabled(row.original) } } : { label: '启用', icon: 'i-lucide-power', onSelect: () => { void manager.toggleEnabled(row.original) } },
-              { label: '删除', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => manager.requestDelete(row.original) },
-            ]]">
-              <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square :aria-label="`${row.original.name} 更多操作`" />
-            </UDropdownMenu>
-          </div>
-        </template>
-      </ResourceTable>
+      </UEmpty>
 
-      <template #footer>
-        <ResourcePagination
-          :shown="manager.pagedItems.value.length"
-          :total="manager.total.value"
-          :page="manager.page.value"
-          :items-per-page="manager.pageSize.value"
-          @update:page="onPage"
-          @update:items-per-page="onPageSize"
-        />
-      </template>
-    </ListCard>
+      <div v-else-if="manager.pagedItems.value.length" ref="gridRef" :class="$style.grid">
+        <UCard
+          v-for="agent in manager.pagedItems.value"
+          :key="agent.id"
+          :data-agent-id="agent.id"
+          :class="[$style.card, highlight === String(agent.id) && $style.highlighted]"
+          :ui="{ body: 'p-0 sm:p-0' }"
+          tabindex="0"
+          :aria-label="`查看智能体 ${agent.name}`"
+          @click="goToDetail(agent)"
+          @keydown="onCardKeydown($event, agent)"
+        >
+          <div :class="$style.cardInner">
+            <div :class="$style.cardHead">
+              <UAvatar :class="$style.avatar" icon="i-lucide-bot" size="md" />
+              <strong :class="$style.cardName">{{ agent.name }}</strong>
+              <div :class="$style.cardActions" @click.stop @keydown.stop>
+                <ActionIconButton label="编辑" icon="i-lucide-pencil" @click="goToEdit(agent)" />
+                <ActionIconButton label="复制" icon="i-lucide-copy" @click="goToDuplicate(agent)" />
+                <ActionIconButton label="删除" icon="i-lucide-trash-2" @click="actions.requestDelete(agent)" />
+              </div>
+            </div>
+            <p v-if="summary(agent)" :class="$style.cardDesc">{{ summary(agent) }}</p>
+            <div :class="$style.cardFoot">
+              <span :class="$style.cardMeta">{{ metaText(agent) }}</span>
+              <div :class="$style.cardSwitch" @click.stop @keydown.stop>
+                <USwitch
+                  :model-value="agent.is_enabled"
+                  :disabled="actions.isToggling(agent.id)"
+                  :loading="actions.isToggling(agent.id)"
+                  :aria-label="`${agent.is_enabled ? '停用' : '启用'} ${agent.name}`"
+                  @update:model-value="(value: boolean) => actions.toggleEnabled(agent, value)"
+                />
+              </div>
+            </div>
+          </div>
+        </UCard>
+      </div>
 
-    <UModal :open="Boolean(manager.pendingDelete.value)" :title="deleteTitle" description="删除后该 Agent 将从当前工作区移除，已有会话记录不会被改绑。" @update:open="(open) => { if (!open) manager.cancelDelete() }">
-      <template #body><p :class="styles.modalCopy">此操作会调用 Agents 删除接口，无法在前端撤销。</p></template>
+      <ResourcePagination
+        v-if="manager.total.value"
+        :class="$style.pagination"
+        :shown="manager.pagedItems.value.length"
+        :total="manager.total.value"
+        :page="manager.clampedPage.value"
+        :items-per-page="manager.state.pageSize"
+        :page-sizes="AGENT_PAGE_SIZES"
+        @update:page="(page: number) => { manager.state.page = page }"
+        @update:items-per-page="(size: number) => { manager.state.pageSize = size }"
+      />
+    </div>
+
+    <UModal
+      :open="actions.pendingDelete.value !== null"
+      :title="actions.pendingDelete.value ? `删除 ${actions.pendingDelete.value.name}？` : '删除智能体？'"
+      description="删除后无法恢复。"
+      @update:open="(open: boolean) => { if (!open) actions.cancelDelete() }"
+    >
       <template #footer>
-        <UButton label="取消" color="neutral" variant="outline" :disabled="manager.deleting.value" @click="manager.cancelDelete" />
-        <UButton label="确认删除" color="error" :loading="manager.deleting.value" :disabled="manager.deleting.value" @click="manager.confirmDelete" />
+        <UButton label="取消" color="neutral" variant="outline" :disabled="actions.deleting.value" @click="actions.cancelDelete" />
+        <UButton label="删除" color="error" :loading="actions.deleting.value" :disabled="actions.deleting.value" @click="onDeleteConfirm" />
       </template>
     </UModal>
   </main>
-  <Transition name="ag-toast"><div v-if="manager.toast.value" :class="styles.toast" role="status"><UIcon name="i-lucide-circle-check-big" />{{ manager.toast.value }}</div></Transition>
 </template>
 
 <style module src="./index.module.css"></style>

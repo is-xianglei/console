@@ -9,6 +9,8 @@ import {
   updateAgentSkills,
   updateAgentTools,
 } from '../http/agent'
+import { ApiError } from '../http'
+import type { AgentResponse } from '../interfaces/agent/api'
 import { getSkillList } from '../http/skill'
 import { getToolList } from '../http/tool'
 import { useAgentsStore } from './agents'
@@ -46,6 +48,7 @@ const enabledTool = {
   description: '读取设备信息',
   tool_type: 'builtin',
   runtime_name: 'asset_read',
+  bindable_profiles: ['user_agent'],
   is_system: true,
   is_enabled: true,
   created_at: '2026-08-01T00:00:00Z',
@@ -114,6 +117,67 @@ describe('agents store', () => {
     expect(updateAgentSkills).toHaveBeenCalledWith(7, { skill_ids: [] })
     expect(getAgentDetail).toHaveBeenCalledWith(7)
     expect(result.item).toMatchObject({ tool_ids: [], skill_ids: [] })
+  })
+
+  it('只修改名称时不重新提交已有绑定，保留停用工具也可保存', async () => {
+    const saved = { ...agent, name: '新名称', tool_ids: [disabledTool.id] }
+    vi.mocked(updateAgent).mockResolvedValue(saved)
+    vi.mocked(getAgentDetail).mockResolvedValue(saved)
+    const result = await useAgentsStore().saveAgent({
+      id: agent.id,
+      name: saved.name,
+      description: agent.description,
+      systemPrompt: agent.system_prompt,
+      modelName: agent.model_name,
+      isEnabled: true,
+      toolIds: [disabledTool.id],
+      skillIds: agent.skill_ids,
+    })
+
+    expect(result.error).toBeNull()
+    expect(updateAgentTools).not.toHaveBeenCalled()
+    expect(updateAgentSkills).not.toHaveBeenCalled()
+    expect(getAgentDetail).toHaveBeenCalledWith(agent.id)
+  })
+
+  it('绑定按集合比较，顺序改变不会触发 PUT', async () => {
+    const saved = { ...agent, tool_ids: [11, 12], skill_ids: [21, 22] }
+    vi.mocked(updateAgent).mockResolvedValue(saved)
+    vi.mocked(getAgentDetail).mockResolvedValue(saved)
+    const result = await useAgentsStore().saveAgent({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description,
+      systemPrompt: agent.system_prompt,
+      modelName: agent.model_name,
+      isEnabled: true,
+      toolIds: [12, 11],
+      skillIds: [22, 21],
+    })
+
+    expect(result.error).toBeNull()
+    expect(updateAgentTools).not.toHaveBeenCalled()
+    expect(updateAgentSkills).not.toHaveBeenCalled()
+  })
+
+  it('只改 Skill 时只提交 Skill 绑定', async () => {
+    vi.mocked(updateAgent).mockResolvedValue(agent)
+    vi.mocked(updateAgentSkills).mockResolvedValue({ ...agent, skill_ids: [] })
+    vi.mocked(getAgentDetail).mockResolvedValue({ ...agent, skill_ids: [] })
+    const result = await useAgentsStore().saveAgent({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description,
+      systemPrompt: agent.system_prompt,
+      modelName: agent.model_name,
+      isEnabled: true,
+      toolIds: agent.tool_ids,
+      skillIds: [],
+    })
+
+    expect(result.error).toBeNull()
+    expect(updateAgentTools).not.toHaveBeenCalled()
+    expect(updateAgentSkills).toHaveBeenCalledWith(agent.id, { skill_ids: [] })
   })
 
   it('能力绑定部分失败时等待两项完成并返回重新读取的当前配置', async () => {
@@ -214,6 +278,19 @@ describe('agents store', () => {
     expect(store.state.items).toEqual([agent])
   })
 
+  it('详情只有 404 才算不存在，网络错误和 5xx 返回 error', async () => {
+    const store = useAgentsStore()
+
+    vi.mocked(getAgentDetail).mockRejectedValueOnce(new ApiError('agent 不存在', 'NOT_FOUND', 404))
+    expect(await store.loadAgentDetail(agent.id)).toEqual({ status: 'not-found' })
+
+    vi.mocked(getAgentDetail).mockRejectedValueOnce(new ApiError('内部错误', '', 500))
+    expect(await store.loadAgentDetail(agent.id)).toEqual({ status: 'error', message: '内部错误' })
+
+    vi.mocked(getAgentDetail).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    expect(await store.loadAgentDetail(agent.id)).toEqual({ status: 'error', message: '智能体加载失败' })
+  })
+
   it('重置后忽略旧工作区尚未完成的详情响应', async () => {
     let resolveDetail!: (value: typeof agent) => void
     vi.mocked(getAgentDetail).mockReturnValue(new Promise((resolve) => { resolveDetail = resolve }))
@@ -228,7 +305,7 @@ describe('agents store', () => {
   })
 
   it('更新基础信息期间重置后不再提交能力绑定', async () => {
-    let resolveUpdate!: (value: typeof agent) => void
+    let resolveUpdate!: (value: AgentResponse) => void
     vi.mocked(updateAgent).mockReturnValue(new Promise((resolve) => { resolveUpdate = resolve }))
     const store = useAgentsStore()
     const saving = store.saveAgent({
@@ -334,5 +411,40 @@ describe('agents store', () => {
       tool_ids: [11],
       skill_ids: [21],
     })
+  })
+
+  it('setAgentEnabled 只发 PATCH is_enabled，乐观更新且请求中记入 togglingIds', async () => {
+    let resolveUpdate!: (value: AgentResponse) => void
+    vi.mocked(updateAgent).mockReturnValue(new Promise((resolve) => { resolveUpdate = resolve }))
+    const store = useAgentsStore()
+    await store.loadAgents()
+
+    const toggling = store.setAgentEnabled(agent.id, false)
+    expect(store.state.items[0]?.is_enabled).toBe(false)
+    expect(store.state.togglingIds).toEqual([agent.id])
+    // 请求中重复切换直接忽略。
+    expect(await store.setAgentEnabled(agent.id, true)).toBeNull()
+
+    resolveUpdate({ ...agent, is_enabled: false, tool_ids: undefined, skill_ids: undefined })
+    expect(await toggling).toBeNull()
+
+    expect(updateAgent).toHaveBeenCalledOnce()
+    expect(updateAgent).toHaveBeenCalledWith(agent.id, { is_enabled: false })
+    expect(updateAgentTools).not.toHaveBeenCalled()
+    expect(updateAgentSkills).not.toHaveBeenCalled()
+    expect(getAgentDetail).not.toHaveBeenCalled()
+    expect(store.state.togglingIds).toEqual([])
+    // 响应缺绑定字段时沿用本地值。
+    expect(store.state.items[0]).toMatchObject({ is_enabled: false, tool_ids: [11], skill_ids: [21] })
+  })
+
+  it('setAgentEnabled 失败回滚并返回后端 message', async () => {
+    vi.mocked(updateAgent).mockRejectedValue(new ApiError('无权限', 'FORBIDDEN', 403))
+    const store = useAgentsStore()
+    await store.loadAgents()
+
+    expect(await store.setAgentEnabled(agent.id, false)).toBe('无权限')
+    expect(store.state.items[0]?.is_enabled).toBe(true)
+    expect(store.state.togglingIds).toEqual([])
   })
 })

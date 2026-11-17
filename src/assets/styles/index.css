@@ -330,6 +330,27 @@ samp {
   font-size: var(--fs-sm);
   line-height: 1.65;
 }
+/* 放弃修改 / 删除确认弹窗（teams、workflows、skills 共用）。
+   原先写在 agents/shared/index.module.css 的 :global 里，只在加载过 agent 页面后才生效；
+   agent 页面改版删除该文件后移到这里。 */
+.ag-confirm-modal {
+  font-family: 'MiSans', sans-serif;
+}
+.ag-confirm-modal [data-slot='content'] {
+  border: 1px solid var(--border-visible);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  box-shadow: none;
+}
+.ag-confirm-modal [data-slot='title'] {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+.ag-confirm-modal [data-slot='description'] {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.65;
+}
 /* 兼容项目中沿用的 Lucide 旧图标命名。 */
 .icon-check-circle::before {
   content: '\e225';

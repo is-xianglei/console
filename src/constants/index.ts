@@ -1,5 +1,4 @@
 export * from './app-registry'
-export * from './agent'
 export * from './platform-catalog'
 export * from './seed'
 export * from './workflow'

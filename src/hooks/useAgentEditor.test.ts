@@ -43,18 +43,21 @@ describe('useAgentEditor', () => {
     const agentsStore = useAgentsStore()
     agentsStore.loadAgentDetail = vi.fn()
     agentsStore.saveAgent = vi.fn()
+    agentsStore.loadCatalogs = vi.fn().mockResolvedValue(null)
   })
 
-  it('openCreate(空) 建立空草稿', async () => {
+  it('openCreate(空) 建立空草稿并拉取能力目录', async () => {
     const editor = useAgentEditor()
     await editor.openCreate()
     expect(editor.draft.value.id).toBeNull()
     expect(editor.draft.value.name).toBe('')
+    expect(editor.draft.value.isEnabled).toBe(false)
+    expect(useAgentsStore().loadCatalogs).toHaveBeenCalledOnce()
   })
 
   it('openCreate(sourceId) 复制为副本草稿', async () => {
     const agentsStore = useAgentsStore()
-    ;(agentsStore.loadAgentDetail as ReturnType<typeof vi.fn>).mockResolvedValue(agent())
+    ;(agentsStore.loadAgentDetail as ReturnType<typeof vi.fn>).mockResolvedValue({ status: 'ok', item: agent() })
     const editor = useAgentEditor()
     await editor.openCreate(5)
     expect(editor.draft.value.id).toBeNull()
@@ -64,7 +67,7 @@ describe('useAgentEditor', () => {
 
   it('openEdit(id) 拉详情转表单模型', async () => {
     const agentsStore = useAgentsStore()
-    ;(agentsStore.loadAgentDetail as ReturnType<typeof vi.fn>).mockResolvedValue(agent())
+    ;(agentsStore.loadAgentDetail as ReturnType<typeof vi.fn>).mockResolvedValue({ status: 'ok', item: agent() })
     const editor = useAgentEditor()
     const ok = await editor.openEdit(5)
     expect(ok).toBe(true)
@@ -74,22 +77,44 @@ describe('useAgentEditor', () => {
 
   it('openEdit 详情缺失时返回 false 并设置 notFound', async () => {
     const agentsStore = useAgentsStore()
-    ;(agentsStore.loadAgentDetail as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+    ;(agentsStore.loadAgentDetail as ReturnType<typeof vi.fn>).mockResolvedValue({ status: 'not-found' })
     const editor = useAgentEditor()
     const ok = await editor.openEdit(5)
     expect(ok).toBe(false)
     expect(editor.notFound.value).toBe(true)
   })
 
-  it('saveDraft 名称或提示词为空不提交', async () => {
+  it('openEdit 加载失败时设置 loadError，不标记 notFound', async () => {
+    const agentsStore = useAgentsStore()
+    ;(agentsStore.loadAgentDetail as ReturnType<typeof vi.fn>).mockResolvedValue({ status: 'error', message: '内部错误' })
+    const editor = useAgentEditor()
+    const ok = await editor.openEdit(5)
+    expect(ok).toBe(false)
+    expect(editor.notFound.value).toBe(false)
+    expect(editor.loadError.value).toBe('内部错误')
+  })
+
+  it('saveDraft 名称或提示词为空不提交，issues 按字段给出', async () => {
     const agentsStore = useAgentsStore()
     const saveMock = (agentsStore.saveAgent as ReturnType<typeof vi.fn>)
     const editor = useAgentEditor()
     await editor.openCreate()
     editor.draft.value.name = '  '
+    expect(editor.issues.value.map((issue) => issue.field)).toEqual(['name', 'systemPrompt'])
     const ok = await editor.saveDraft()
     expect(ok).toBe(false)
     expect(saveMock).not.toHaveBeenCalled()
+  })
+
+  it('publish 强制以启用状态保存', async () => {
+    const saveMock = (useAgentsStore().saveAgent as ReturnType<typeof vi.fn>)
+    saveMock.mockResolvedValue({ item: agent(), error: null })
+    const editor = useAgentEditor()
+    await editor.openCreate()
+    editor.draft.value.name = '设备诊断'
+    editor.draft.value.systemPrompt = '依据证据分析。'
+    expect(await editor.publish()).toBe(true)
+    expect(saveMock).toHaveBeenCalledWith(expect.objectContaining({ isEnabled: true }))
   })
 
   it('saveDraft 成功后 toast 并回列表带 highlight', async () => {

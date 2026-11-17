@@ -1,0 +1,183 @@
+/* 分组 / 卡片 / 行沿用设置页写法：分组标题在卡片外，卡片里只放行或内容。 */
+@import '@/routes/settings/shared.module.css';
+
+.page {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-lg) var(--page-gutter) var(--space-xl);
+  background: var(--bg-deep);
+}
+
+.inner {
+  display: flex;
+  width: 100%;
+  max-width: 960px;
+  flex-direction: column;
+  gap: var(--space-xl);
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.skeleton {
+  height: 160px;
+  border-radius: var(--radius-lg);
+}
+
+.required {
+  margin-left: var(--space-xs);
+  color: var(--status-error);
+}
+
+/* 表单卡：两列网格，行距 24、列距 24；标签与输入框之间 8。 */
+.formGrid {
+  gap: var(--space-lg);
+}
+
+.formGrid :global([data-slot='label']) {
+  color: var(--text-secondary);
+  font-size: var(--fs-base);
+  font-weight: 500;
+}
+
+.formGrid :global([data-slot='hint']) {
+  color: var(--text-dim);
+  font-family: var(--font-data);
+  font-size: var(--fs-sm);
+}
+
+.formGrid :global([data-slot='container']) {
+  margin-top: var(--space-sm);
+}
+
+/* 输入框、文本框、下拉统一高度与内边距（默认 sm 档只有 28px 高，表单里显得挤）；
+   CSS Module 不在 @layer 里，能覆盖 Nuxt UI 的 Tailwind 工具类。 */
+.formGrid :global([data-slot='base']) {
+  min-height: 36px;
+  padding-block: var(--space-sm);
+  padding-inline-start: 12px;
+  font-size: var(--fs-base);
+  line-height: 1.5;
+}
+
+/* 下拉右侧留给箭头图标，只在没有尾部图标的输入框上补右内边距。 */
+.formGrid :global(input[data-slot='base']),
+.formGrid :global(textarea[data-slot='base']) {
+  padding-inline-end: 12px;
+}
+
+.span2 {
+  grid-column: 1 / -1;
+}
+
+/* 系统提示词：卡片本身就是输入框，不再套一层输入框边框。 */
+.promptCard {
+  padding: var(--space-lg);
+  transition: border-color var(--dur-fast);
+}
+
+.promptCard {
+  cursor: text;
+}
+
+.promptCard:focus-within {
+  border-color: var(--accent-agent);
+}
+
+/* UFormField 的 container 自带 mt-1，这里卡片内不需要。 */
+.promptCard :global([data-slot='container']) {
+  margin-top: 0;
+}
+
+.promptCard:has([aria-invalid='true']) {
+  border-color: var(--status-error);
+}
+
+.prompt {
+  display: block;
+  width: 100%;
+}
+
+/* 卡片本身就是输入区：textarea 去掉底色、圆角、内边距和全局 :focus-visible 光圈，
+   文字直接贴着卡片内边距排版；聚焦状态由卡片边框表达（.promptCard:focus-within）。 */
+.prompt :global(textarea),
+.prompt :global(textarea:focus),
+.prompt :global(textarea:focus-visible) {
+  min-height: 12em;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: var(--fs-base);
+  line-height: 1.7;
+}
+
+.prompt :global(textarea::placeholder) {
+  color: var(--text-dim);
+}
+
+.counter {
+  display: block;
+  margin-top: var(--space-md);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  text-align: right;
+}
+
+.inactive {
+  margin-left: var(--space-sm);
+  color: var(--text-dim);
+}
+
+@media (max-width: 640px) {
+  .header {
+    flex-wrap: wrap;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .promptCard {
+    padding: var(--space-md);
+  }
+
+  .span2 {
+    grid-column: auto;
+  }
+}

@@ -1,63 +1,80 @@
 <script setup lang="ts">
-import { computed, ref, useCssModule, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { DropdownMenuItem } from '@nuxt/ui'
+import { MarketSubmitButton, RelativeTime } from '@/components'
+import { useAgentActions } from '@/hooks/useAgentActions'
 import type { AgentResponse } from '@/interfaces/agent/api'
-import type { SkillResponse } from '@/interfaces/skill/model'
-import type { ToolResponse } from '@/interfaces/tool/model'
-import { useSaveFeedback } from '@/hooks/useSaveFeedback'
-import { MarketSubmitButton } from '@/components'
-import { RelativeTime } from '@/components/resource'
 import { useAgentsStore } from '@/stores/agents'
+import { renderMarkdown } from '@/utils/markdown'
 
 defineOptions({ name: 'AgentResourceDetail' })
 
-const styles = useCssModule()
 const route = useRoute()
 const router = useRouter()
 const agentsStore = useAgentsStore()
-const pendingDelete = ref(false)
-const deleting = ref(false)
-const saveFeedback = useSaveFeedback({
-  listRoute: { name: 'platform-resource', params: { module: 'build', resource: 'agents' } },
-})
+const actions = useAgentActions()
 
-const TAB_KEYS = ['basic', 'members', 'server'] as const
-type TabKey = (typeof TAB_KEYS)[number]
-
-const tabItems = [
-  { value: 'basic', label: '基础信息' },
-  { value: 'members', label: '成员' },
-  { value: 'server', label: '服务端信息' },
-]
-
-function isTabKey(value: unknown): value is TabKey {
-  return typeof value === 'string' && (TAB_KEYS as readonly string[]).includes(value)
-}
-
-const activeTab = computed<TabKey>({
-  get() {
-    const raw = route.query.tab
-    const value = Array.isArray(raw) ? raw[0] : raw
-    return isTabKey(value) ? value : 'basic'
-  },
-  set(tab) {
-    if (tab === activeTab.value) return
-    void router.replace({ query: { ...route.query, tab } })
-  },
-})
+const loading = ref(false)
+const notFound = ref(false)
+/** 网络错误、5xx 等加载失败的提示；与 404 的「不存在」分开显示，可重试。 */
+const loadError = ref('')
+const detail = ref<AgentResponse | null>(null)
 
 const agentId = computed(() => {
   const value = route.params.id
   return Number(Array.isArray(value) ? value[0] : value)
 })
+/** 详情接口的结果会写回 store.items；优先读 store，启停开关的乐观更新才能反映到这里。 */
 const agent = computed<AgentResponse | null>(
-  () => agentsStore.state.items.find((item) => item.id === agentId.value) ?? null,
+  () => agentsStore.state.items.find((item) => item.id === agentId.value) ?? detail.value,
 )
-const loading = computed(() => agentsStore.state.loading)
-const skills = computed<SkillResponse[]>(() => agentsStore.state.skills)
-const tools = computed<ToolResponse[]>(() => agentsStore.state.tools)
-const skillNames = computed(() => skills.value.filter((skill) => agent.value?.skill_ids?.includes(skill.id)).map((skill) => skill.name))
-const toolNames = computed(() => tools.value.filter((tool) => agent.value?.tool_ids?.includes(tool.id)).map((tool) => tool.name))
+
+const skillNames = computed(() => new Map(agentsStore.state.skills.map((skill) => [skill.id, skill.name])))
+const toolNames = computed(() => new Map(agentsStore.state.tools.map((tool) => [tool.id, tool.name])))
+/** 目录里找不到的 id（目录加载失败或已删除）退回显示 #id。 */
+const skills = computed(() => (agent.value?.skill_ids ?? []).map((id) => ({ id, name: skillNames.value.get(id) ?? `#${id}` })))
+const tools = computed(() => (agent.value?.tool_ids ?? []).map((id) => ({ id, name: toolNames.value.get(id) ?? `#${id}` })))
+const promptHtml = computed(() => (agent.value?.system_prompt ? renderMarkdown(agent.value.system_prompt) : ''))
+
+const menuItems = computed<DropdownMenuItem[][]>(() => {
+  const current = agent.value
+  if (!current) return []
+  return [
+    [{ label: '复制', icon: 'i-lucide-copy', onSelect: goToDuplicate }],
+    [{ label: '删除', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => actions.requestDelete(current) }],
+  ]
+})
+
+async function load() {
+  notFound.value = false
+  loadError.value = ''
+  detail.value = null
+  if (!Number.isInteger(agentId.value)) {
+    notFound.value = true
+    return
+  }
+  loading.value = true
+  // 技能 / 工具名称来自能力目录，与详情并行加载。
+  const [result] = await Promise.all([
+    agentsStore.loadAgentDetail(agentId.value),
+    agentsStore.loadCatalogs(),
+  ])
+  loading.value = false
+  // undefined：请求期间切换了工作区，结果作废。
+  if (result === undefined) return
+  if (result.status === 'not-found') {
+    notFound.value = true
+    return
+  }
+  if (result.status === 'error') {
+    loadError.value = result.message
+    return
+  }
+  detail.value = result.item
+}
+
+watch(agentId, () => { void load() }, { immediate: true })
 
 function goToList() {
   void router.push({ name: 'platform-resource', params: { module: 'build', resource: 'agents' } })
@@ -71,67 +88,126 @@ function goToDuplicate() {
   void router.push({ name: 'agent-create', params: { module: 'build', resource: 'agents' }, query: { duplicate: String(agentId.value) } })
 }
 
-async function confirmDelete() {
-  if (!agent.value || deleting.value) return
-  deleting.value = true
-  try {
-    const error = await agentsStore.removeAgent(agent.value.id)
-    if (error === undefined) return
-    if (error) return
-    await saveFeedback.afterDelete({ message: '已删除 Agent' })
-  } finally {
-    deleting.value = false
-    pendingDelete.value = false
-  }
+function onToggle(value: boolean) {
+  if (agent.value) void actions.toggleEnabled(agent.value, value)
 }
 
-watch(
-  () => route.params.id,
-  () => void agentsStore.loadAll(),
-  { immediate: true },
-)
+async function onDeleteConfirm() {
+  if (await actions.confirmDelete()) goToList()
+}
 </script>
 
 <template>
-  <main :class="styles['ag-page']">
-    <header :class="styles['ag-page-head']">
-      <div :class="styles['ag-heading']"><nav aria-label="面包屑"><span>构建资源</span><i class="icon icon-chevron-right"></i><strong>智能体编排</strong><i class="icon icon-chevron-right"></i><strong>详情</strong></nav><div><span :class="styles['ag-page-icon']"><i class="icon icon-bot"></i></span><span><h1>{{ agent?.name ?? 'Agent 详情' }}</h1><p v-if="agent">AGT-{{ String(agent.id).padStart(4, '0') }} · 由后端持久化，绑定模型、Skill 与 Tool。</p><p v-else>查看 Agent 的配置摘要、绑定能力与系统提示词。</p></span></div></div>
-      <div :class="styles['ag-page-actions']"><span :class="[styles['ag-local-badge'], 'mono']"><i class="icon icon-database"></i>API CONNECTED</span><UButton :class="styles['ag-secondary-button']" icon="i-lucide-arrow-left" label="返回列表" @click="goToList" /></div>
-    </header>
+  <main :class="$style.page">
+    <div :class="$style.inner">
+      <header :class="$style.toolbar">
+        <UButton icon="i-lucide-arrow-left" label="智能体" color="neutral" variant="ghost" @click="goToList" />
+        <div v-if="agent && !notFound && !loadError" :class="$style.actions">
+          <USwitch
+            :model-value="agent.is_enabled"
+            :disabled="actions.isToggling(agent.id)"
+            :loading="actions.isToggling(agent.id)"
+            :aria-label="`${agent.is_enabled ? '停用' : '启用'} ${agent.name}`"
+            @update:model-value="onToggle"
+          />
+          <MarketSubmitButton kind="agent" :source-id="agent.id" />
+          <UButton icon="i-lucide-pencil" label="编辑" color="primary" @click="goToEdit" />
+          <UDropdownMenu :items="menuItems">
+            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" square aria-label="更多操作" />
+          </UDropdownMenu>
+        </div>
+      </header>
 
-    <UAlert v-if="!loading && !agent" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Agent 详情加载失败" description="未找到该 Agent，可能已被删除或工作区已切换。" :actions="[{ label: '返回列表', color: 'neutral', variant: 'outline', onClick: goToList }]" />
-
-    <section v-if="agent" :class="styles['ag-detail-shell']" aria-label="Agent 详情">
-      <div :class="styles['ag-detail-state']"><UBadge color="neutral" variant="subtle" :class="[styles['ag-lifecycle'], agent.is_enabled ? 'published' : 'disabled']"><span class="dot" :class="agent.is_enabled ? 'nominal' : 'idle'"></span>{{ agent.is_enabled ? '已启用' : '已停用' }}</UBadge><span class="mono"><RelativeTime :value="agent.updated_at" /></span></div>
-      <p :class="styles['ag-detail-description']">{{ agent.description || '未填写用途描述' }}</p>
-
-      <UTabs v-model="activeTab" :items="tabItems" :content="false" variant="link" size="sm" :class="styles['ag-detail-tabs']" />
-
-      <div v-if="activeTab === 'basic'" :class="styles['ag-detail-pane']">
-        <section :class="styles['ag-detail-section']"><h3>配置摘要</h3><dl><div><dt>模型</dt><dd>{{ agent.model_name || '平台默认模型' }}</dd></div><div><dt>Skills</dt><dd>{{ agent.skill_ids?.length ?? 0 }}</dd></div><div><dt>Tools</dt><dd>{{ agent.tool_ids?.length ?? 0 }}</dd></div><div><dt>创建者 ID</dt><dd class="mono">{{ agent.created_by_user_id }}</dd></div></dl></section>
+      <div v-if="loading && !agent" :class="$style.skeletons" aria-busy="true">
+        <USkeleton :class="$style.skeletonHero" />
+        <USkeleton :class="$style.skeleton" />
+        <USkeleton :class="$style.skeleton" />
       </div>
 
-      <div v-else-if="activeTab === 'members'" :class="styles['ag-detail-pane']">
-        <section :class="styles['ag-detail-section']"><h3>绑定能力</h3><div :class="styles['ag-detail-bindings']"><span v-for="skill in skillNames" :key="skill"><i class="icon icon-wrench"></i>{{ skill }}</span><span v-for="tool in toolNames" :key="tool"><i class="icon icon-hammer"></i>{{ tool }}</span><em v-if="!skillNames.length && !toolNames.length">尚未绑定能力</em></div></section>
+      <UEmpty v-else-if="notFound" :class="$style.empty" variant="naked" icon="i-lucide-bot-off" title="智能体不存在">
+        <template #actions>
+          <UButton icon="i-lucide-arrow-left" label="返回列表" color="neutral" variant="outline" @click="goToList" />
+        </template>
+      </UEmpty>
 
-        <section :class="styles['ag-detail-section']"><h3>系统提示词</h3><p :class="styles['ag-prompt-preview']">{{ agent.system_prompt }}</p></section>
-      </div>
+      <UEmpty v-else-if="loadError" :class="$style.empty" variant="naked" icon="i-lucide-cloud-off" title="智能体加载失败" :description="loadError">
+        <template #actions>
+          <UButton icon="i-lucide-refresh-cw" label="重试" color="neutral" variant="outline" @click="load" />
+        </template>
+      </UEmpty>
 
-      <div v-else :class="styles['ag-detail-pane']">
-        <section :class="styles['ag-detail-section']"><h3>服务端信息</h3><dl><div><dt>Agent ID</dt><dd class="mono">{{ agent.id }}</dd></div><div><dt>工作区 ID</dt><dd class="mono">{{ agent.workspace_id }}</dd></div><div><dt>创建时间</dt><dd><RelativeTime :value="agent.created_at" /></dd></div><div><dt>更新时间</dt><dd><RelativeTime :value="agent.updated_at" /></dd></div></dl></section>
-      </div>
+      <template v-else-if="agent">
+        <section :class="$style.hero">
+          <UAvatar :class="$style.avatar" icon="i-lucide-bot" size="xl" />
+          <div :class="$style.heroText">
+            <h1 :class="$style.name">{{ agent.name }}</h1>
+            <p v-if="agent.description" :class="$style.description">{{ agent.description }}</p>
+          </div>
+        </section>
 
-      <footer :class="styles['ag-detail-actions']">
-        <UButton :class="styles['ag-icon-button']" icon="i-lucide-trash-2" color="error" variant="ghost" square aria-label="删除当前 Agent" @click="pendingDelete = true" />
-        <MarketSubmitButton kind="agent" :source-id="agent.id" />
-        <UButton :class="styles['ag-secondary-button']" icon="i-lucide-copy" color="neutral" variant="outline" label="复制" @click="goToDuplicate" />
-        <UButton :class="styles['ag-primary-button']" icon="i-lucide-sliders-horizontal" label="配置 Agent" @click="goToEdit" />
-      </footer>
-    </section>
+        <section v-if="promptHtml" :class="$style.group">
+          <h2 :class="$style.groupTitle">系统提示词</h2>
+          <div :class="$style.card">
+            <div :class="[$style.cardBody, $style.prompt, 'md']" v-html="promptHtml"></div>
+          </div>
+        </section>
 
-    <UModal :open="pendingDelete" class="ag-confirm-modal" :title="`删除 ${agent?.name ?? 'Agent'}？`" description="删除后该 Agent 将从当前工作区移除，已有会话记录不会被改绑。" @update:open="(open) => { if (!open) pendingDelete = false }">
-      <template #body><p class="modal-copy">此操作会调用 Agents 删除接口，无法在前端撤销。</p></template>
-      <template #footer><UButton label="取消" color="neutral" variant="outline" :disabled="deleting" @click="pendingDelete = false" /><UButton label="确认删除" color="error" :loading="deleting" :disabled="deleting" @click="confirmDelete" /></template>
+        <section :class="$style.group">
+          <h2 :class="$style.groupTitle">能力</h2>
+          <div :class="$style.card">
+            <div :class="$style.rows">
+              <div :class="$style.row">
+                <span :class="$style.rowLabel">技能</span>
+                <div :class="$style.chips">
+                  <RouterLink v-for="skill in skills" :key="skill.id" :class="$style.chipLink" :to="{ name: 'skill-detail', params: { id: String(skill.id) } }">
+                    <UBadge :label="skill.name" color="neutral" variant="soft" size="xs" />
+                  </RouterLink>
+                  <span v-if="!skills.length" :class="$style.none">无</span>
+                </div>
+              </div>
+              <div :class="$style.row">
+                <span :class="$style.rowLabel">工具</span>
+                <div :class="$style.chips">
+                  <UBadge v-for="tool in tools" :key="tool.id" :label="tool.name" color="neutral" variant="soft" size="xs" />
+                  <span v-if="!tools.length" :class="$style.none">无</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section :class="$style.group">
+          <h2 :class="$style.groupTitle">信息</h2>
+          <div :class="$style.card">
+            <dl :class="$style.rows">
+              <div :class="$style.row">
+                <dt :class="$style.rowLabel">模型</dt>
+                <dd :class="$style.value">{{ agent.model_name || '默认模型' }}</dd>
+              </div>
+              <div :class="$style.row">
+                <dt :class="$style.rowLabel">创建</dt>
+                <dd :class="$style.value"><RelativeTime :value="agent.created_at" mode="absolute" /></dd>
+              </div>
+              <div :class="$style.row">
+                <dt :class="$style.rowLabel">更新</dt>
+                <dd :class="$style.value"><RelativeTime :value="agent.updated_at" /></dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+      </template>
+    </div>
+
+    <UModal
+      :open="actions.pendingDelete.value !== null"
+      :title="actions.pendingDelete.value ? `删除 ${actions.pendingDelete.value.name}？` : '删除智能体？'"
+      description="删除后无法恢复。"
+      @update:open="(open: boolean) => { if (!open) actions.cancelDelete() }"
+    >
+      <template #footer>
+        <UButton label="取消" color="neutral" variant="outline" :disabled="actions.deleting.value" @click="actions.cancelDelete" />
+        <UButton label="删除" color="error" :loading="actions.deleting.value" :disabled="actions.deleting.value" @click="onDeleteConfirm" />
+      </template>
     </UModal>
   </main>
 </template>

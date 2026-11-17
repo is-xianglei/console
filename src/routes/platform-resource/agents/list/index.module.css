@@ -1,127 +1,243 @@
-/* Agents 列表页（p2 A-1~A-7：FilterPanel + ListCard 纵向三段，外层固定高、表格内部滚动）。 */
-
-/* 表格基线（行高、内边距、字色字号、列省略、行悬停）+ 语义列类（col-name 等）
-   的单一来源。必须放在最前。 */
-@import '@/assets/styles/table-baseline.module.css';
-
+/* 底部不留内边距：分页条吸底，由它自己提供下方留白。 */
 .page {
-  /* 高度由 AppShell 的 flex 链分配（.shell:100dvh > .workspace-shell:flex:1 >
-     .page-stage:flex:1），不再用 100vh 减顶栏。原写法在移动端会连同
-     .workspace-shell 的底部导航 padding 一起溢出，分页条被裁掉。
-     min-height: 0 不能漏——缺了它 flex 子项不收缩，overflow: hidden 会再次裁底部。 */
+  display: flex;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 16px;
-  display: flex;
   flex-direction: column;
-  gap: 16px;
-  overflow: hidden;
+  overflow-y: auto;
+  padding: var(--space-lg) var(--page-gutter) 0;
+  background: var(--bg-deep);
 }
 
-.dateRange {
-  width: 100%;
-  min-width: 0;
+/* 至少撑满一屏，卡片少时分页条也落在页面最底部。 */
+.inner {
   display: flex;
+  width: 100%;
+  max-width: var(--page-content-max);
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: var(--space-lg);
+  margin: 0 auto;
+  container: agent-list / inline-size;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: var(--space-md);
 }
 
-.dateRange > :global([data-slot='root']) {
-  flex: 1 1 0;
-  min-width: 0;
+.title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-xl);
+  font-weight: 600;
 }
 
-.dateRange span {
+.count {
   color: var(--text-dim);
-  font-size: var(--fs-xs);
+  font-family: var(--font-data);
+  font-size: var(--fs-base);
+  font-weight: 400;
 }
 
-.alert { margin: 10px 10px 0; }
-
-/* 名称 / 状态 / 时间 / 操作四类列的宽度已由基线（见文件首行 @import）的语义列类给出，
-   本页不给列写 px。原先这里用 7 条 :nth-child 百分比定宽（4/22/10/16/25/13/10%），
-   与其它页的 px 定宽是两套体系，同一语义的列在不同页面宽度完全不同；
-   p5 起列宽只认语义列类，页面不再自带尺子。
-
-   p5 前这里还有 .table 的 width/table-layout 和 th/td 的省略号规则，
-   与 .resource-table（ResourceTable 组件自身）逐条重复，现已删除——
-   表格组件是唯一的渲染方，它自己那份就是权威。 */
-
-/* 能力绑定列是「服务端数字 ID 绑定」+ 摘要两行，单行档 56px 放不下。 */
-.table :global([data-slot='td']) {
-  height: var(--table-row-height-tall);
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
-.table :global([data-slot='th']:nth-child(5)),
-.table :global([data-slot='td']:nth-child(5)) { white-space: normal; }
+.search {
+  width: 240px;
+}
 
-.table :global([data-pinned='right']) {
+.status {
+  width: 112px;
+}
+
+/* 卡片网格：按内容区宽度（容器查询）3 / 2 / 1 列，侧栏收起展开都准确。 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+@container agent-list (width < 960px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container agent-list (width < 600px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .search {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  .toolbar {
+    width: 100%;
+  }
+}
+
+.skeleton {
+  height: 168px;
+  border-radius: var(--radius-lg);
+}
+
+.empty {
+  padding: var(--space-xl) var(--space-md);
+}
+
+/* UCard 默认用 ring 描边，这里换成项目统一的 1px 边框与面板底色，无阴影。 */
+.card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background: var(--bg-panel);
-  box-shadow: -1px 0 var(--border);
+  box-shadow: none;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
 }
-.table :global([data-pinned='right'][data-slot='th']) {
-  background: var(--bg-elevated);
+
+.card:hover {
+  border-color: var(--border-visible);
+  background: var(--bg-surface);
 }
-.table :global([data-slot='tbody'] > tr:hover > [data-pinned='right']) {
-  background: var(--bg-hover);
+
+.card:focus-visible {
+  outline: 2px solid var(--accent-agent);
+  outline-offset: 2px;
 }
-.table :global([data-slot='tbody'] > tr[data-selected='true'] > [data-pinned='right']),
-.table :global([data-slot='tbody'] > tr.highlighted > [data-pinned='right']) {
+
+/* ?highlight= 命中卡片：与 Skill 卡片同一套 2s 淡出。 */
+.card.highlighted {
+  border-color: var(--accent-agent);
+  animation: highlight-fade 2s var(--ease-out) forwards;
+}
+
+@keyframes highlight-fade {
+  from { background: var(--accent-agent-dim); }
+  to { background: var(--bg-panel); }
+}
+
+/* 卡片等高：网格行内拉伸，底部一行贴底。 */
+.card > :global([data-slot='body']) {
+  height: 100%;
+}
+
+.cardInner {
+  display: flex;
+  height: 100%;
+  min-height: 168px;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+}
+
+.cardHead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.avatar {
+  flex-shrink: 0;
   background: var(--accent-agent-dim);
 }
 
-/* .primaryCell / .entityIcon 已移入 table-baseline.module.css（本文件顶部 @import），
-   类名改为 .primary-cell / .entity-icon；原先本页那份与另外 4 个 list 页逐字相同。 */
+.avatar :global([data-slot='icon']) {
+  color: var(--accent-agent);
+}
 
-.statusBadge { text-transform: none; }
-
-.modeText { color: var(--text-primary); font-size: var(--fs-sm); }
-.memberText { color: var(--text-primary); font-size: var(--fs-sm); }
-.memberText + small {
-  display: block;
-  margin-top: 3px;
+.cardName {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
+  color: var(--text-primary);
+  font-size: var(--fs-md);
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
-.rowActions :global([data-slot='trigger']) { display: inline-flex; }
+/* 编辑 / 复制 / 删除：悬停或聚焦卡片时淡入；触屏没有悬停，常驻。 */
+.cardActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin: calc(var(--space-xs) * -1) calc(var(--space-sm) * -1) calc(var(--space-xs) * -1) 0;
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
 
-.modalCopy { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.65; }
+.card:hover .cardActions,
+.card:focus-within .cardActions {
+  opacity: 1;
+}
 
-.toast {
-  min-height: 42px;
-  padding: 0 14px;
-  position: fixed;
-  bottom: 26px;
-  left: 50%;
-  z-index: 60;
-  transform: translateX(-50%);
-  border: 1px solid var(--border-visible);
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+@media (hover: none) {
+  .cardActions {
+    opacity: 1;
+  }
+}
+
+.cardDesc {
+  display: -webkit-box;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.cardFoot {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: auto;
 }
 
-.toast i {
-  color: var(--status-success);
+.cardMeta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-:global(.ag-toast-enter-active),
-:global(.ag-toast-leave-active) {
-  transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
+.cardSwitch {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
 }
 
-:global(.ag-toast-enter-from),
-:global(.ag-toast-leave-to) {
-  opacity: 0;
-  transform: translateX(-50%) translateY(8px);
+/* 分页条始终在页面最底部：卡片少时被 margin-top:auto 推到底，卡片多时吸附在可视区底部。 */
+.pagination.pagination {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: auto;
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-deep);
 }

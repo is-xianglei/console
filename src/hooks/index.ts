@@ -1,4 +1,5 @@
 export * from './useRuntimePaneResize'
+export * from './useAgentActions'
 export * from './useAgentEditor'
 export * from './useAgentManager'
 export * from './useBuildResourceManager'

@@ -19,7 +19,7 @@ const RESOURCE_PREFIX: Record<string, string> = {
   mcp: 'MCP',
 }
 
-/** 每页条数默认值，与 useAgentManager 的 DEFAULT_PAGE_SIZE 保持一致。 */
+/** 每页条数默认值。 */
 const DEFAULT_PAGE_SIZE = 20
 
 function cloneRows(rows: ResourceRow[]) {

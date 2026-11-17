@@ -27,8 +27,10 @@ export function useAgentEditor() {
   const loadingDetail = ref(false)
   const saving = ref(false)
   const error = ref('')
-  /** 详情缺失或加载失败时为 true，编辑页据此渲染「未找到」空态（B-1）。 */
+  /** 后端返回 404 时为 true，编辑页据此渲染「不存在」空态。 */
   const notFound = ref(false)
+  /** 详情加载失败（网络错误、5xx 等）的提示，编辑页据此显示错误和重试。 */
+  const loadError = ref('')
 
   const tools = computed(() => agentsStore.state.tools)
   const skills = computed(() => agentsStore.state.skills)
@@ -42,25 +44,35 @@ export function useAgentEditor() {
     void router.push({ name: 'agent-detail', params: { id: String(agent.id) } })
   }
 
+  /** 技能 / 工具目录：每次进入表单重拉，保证选项是最新的（列表页不再加载目录）。 */
+  function refreshCatalogs() {
+    void agentsStore.loadCatalogs()
+  }
+
   function startEdit(id: number) {
     draft.value = emptyAgentForm()
     loadingDetail.value = true
     error.value = ''
     notFound.value = false
+    loadError.value = ''
     return id
   }
 
   async function openEdit(id: number): Promise<boolean> {
     startEdit(id)
-    const detail = await agentsStore.loadAgentDetail(id)
+    refreshCatalogs()
+    const result = await agentsStore.loadAgentDetail(id)
     loadingDetail.value = false
-    if (detail === undefined) return false
-    if (!detail) {
-      error.value = ''
+    if (result === undefined) return false
+    if (result.status === 'not-found') {
       notFound.value = true
       return false
     }
-    draft.value = agentResponseToForm(detail)
+    if (result.status === 'error') {
+      loadError.value = result.message
+      return false
+    }
+    draft.value = agentResponseToForm(result.item)
     return true
   }
 
@@ -68,18 +80,21 @@ export function useAgentEditor() {
   async function openCreate(sourceId?: number): Promise<void> {
     error.value = ''
     notFound.value = false
+    refreshCatalogs()
     if (sourceId == null) {
       draft.value = emptyAgentForm()
       return
     }
     loadingDetail.value = true
-    const detail = await agentsStore.loadAgentDetail(sourceId)
+    const result = await agentsStore.loadAgentDetail(sourceId)
     loadingDetail.value = false
-    if (detail == null) {
-      error.value = '复制源 Agent 加载失败，已返回新建模式。请刷新后重试。'
+    if (result === undefined) return
+    if (result.status !== 'ok') {
+      error.value = result.status === 'not-found' ? '复制源不存在，已改为新建' : `复制源加载失败，已改为新建：${result.message}`
       draft.value = emptyAgentForm()
       return
     }
+    const detail = result.item
     const form = agentResponseToForm(detail)
     form.id = null
     form.workspaceId = null
@@ -129,21 +144,21 @@ export function useAgentEditor() {
       const saved = await persist(enabled)
       if (!saved) return false
       options?.onSaved?.()
-      await feedback.afterSave({ id: saved.id, message: `Agent「${saved.name}」已${verb}` })
+      await feedback.afterSave({ id: saved.id, message: `${saved.name} 已${verb}` })
       return true
     } finally {
       saving.value = false
     }
   }
 
-  /** 「保存配置」：按表单当前 isEnabled 保存。 */
+  /** 「保存」：按表单当前 isEnabled 保存（新建默认停用）。 */
   function saveDraft(options?: SaveOptions): Promise<boolean> {
     return commit(draft.value.isEnabled, '保存', options)
   }
 
   /** 「保存并启用」：强制 isEnabled = true。 */
   function publish(options?: SaveOptions): Promise<boolean> {
-    return commit(true, '发布', options)
+    return commit(true, '保存并启用', options)
   }
 
   return {
@@ -151,10 +166,12 @@ export function useAgentEditor() {
     issues,
     tools,
     skills,
+    catalogsLoading,
     loadingDetail,
     saving,
     error,
     notFound,
+    loadError,
     openEdit,
     openCreate,
     saveDraft,

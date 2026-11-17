@@ -1,42 +1,149 @@
-@import '../shared/index.module.css';
-@import '../../components/agent-inspector/index.module.css';
+/* 分组 / 卡片 / 行沿用设置页写法：分组标题在卡片外，卡片里只放行或内容。 */
+@import '@/routes/settings/shared.module.css';
 
-/* detail 全页专用：外壳与底部分区。 */
-.ag-detail-shell {
-  max-width: var(--page-content-max);
-  margin: 0 auto;
-  padding: var(--space-lg) var(--space-md);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
+.page {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-lg) var(--page-gutter) var(--space-xl);
+  background: var(--bg-deep);
+}
+
+.inner {
   display: flex;
+  width: 100%;
+  max-width: 720px;
   flex-direction: column;
+  gap: var(--space-xl);
+  margin: 0 auto;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-md);
 }
 
-.ag-detail-shell > .ag-detail-section {
-  margin-top: 0;
-}
-
-.ag-detail-tabs {
-  border-bottom: 1px solid var(--border);
-}
-
-.ag-detail-pane {
-  padding-top: var(--space-md);
-}
-
-.ag-detail-actions {
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--border);
+.actions {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
   gap: var(--space-sm);
 }
 
-.ag-detail-actions .ag-icon-button {
-  margin-right: auto;
+.skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
 }
 
-/* 弹窗说明文字改用全局 .modal-copy（src/assets/styles/index.css:326）。 */
+.skeletonHero {
+  height: 64px;
+  border-radius: var(--radius-lg);
+}
+
+.skeleton {
+  height: 160px;
+  border-radius: var(--radius-lg);
+}
+
+.empty {
+  padding: var(--space-xl) var(--space-md);
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.avatar {
+  flex-shrink: 0;
+  background: var(--accent-agent-dim);
+}
+
+.avatar :global([data-slot='icon']) {
+  color: var(--accent-agent);
+}
+
+.heroText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.name {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* 提示词过长时卡内滚动。 */
+.prompt {
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.rowLabel {
+  flex-shrink: 0;
+  width: 64px;
+  color: var(--text-secondary);
+  font-size: var(--fs-base);
+}
+
+.value {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-base);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.chips {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.chipLink {
+  display: inline-flex;
+  border-radius: var(--radius-control);
+}
+
+.chipLink:hover > * {
+  color: var(--text-primary);
+}
+
+.chipLink:focus-visible {
+  outline: 2px solid var(--accent-agent);
+  outline-offset: 2px;
+}
+
+.none {
+  color: var(--text-dim);
+  font-size: var(--fs-base);
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+}

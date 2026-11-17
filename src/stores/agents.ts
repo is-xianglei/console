@@ -26,6 +26,8 @@ interface AgentsState {
   catalogsLoading: boolean
   saving: boolean
   deleting: boolean
+  /** 正在切换启停的 Agent id（列表卡片 / 详情开关据此禁用）。 */
+  togglingIds: number[]
   /** E-2 服务端分页专用状态；默认不启用，列表仍走全量拉取 + 前端分页（prd A-6）。 */
   pageState: {
     items: AgentResponse[]
@@ -44,8 +46,19 @@ export interface SaveAgentInput {
   skillIds: number[]
 }
 
+export type AgentDetailResult =
+  | { status: 'ok'; item: AgentResponse }
+  | { status: 'not-found' }
+  | { status: 'error'; message: string }
+
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback
+}
+
+function sameBindingIds(current: number[] | undefined, next: number[]): boolean {
+  const currentIds = new Set(current ?? [])
+  const nextIds = new Set(next)
+  return currentIds.size === nextIds.size && [...nextIds].every((id) => currentIds.has(id))
 }
 
 async function getAllAgentPages() {
@@ -86,6 +99,7 @@ export const useAgentsStore = defineStore('agents', () => {
     catalogsLoading: false,
     saving: false,
     deleting: false,
+    togglingIds: [],
     pageState: {
       items: [],
       total: 0,
@@ -121,6 +135,7 @@ export const useAgentsStore = defineStore('agents', () => {
     state.catalogsLoading = false
     state.saving = false
     state.deleting = false
+    state.togglingIds = []
     state.pageState.items = []
     state.pageState.total = 0
   }
@@ -180,17 +195,22 @@ export const useAgentsStore = defineStore('agents', () => {
     return agentsError ?? catalogsError
   }
 
-  async function loadAgentDetail(agentId: number): Promise<AgentResponse | null | undefined> {
+  /**
+   * 拉单个 Agent 详情。只有后端明确返回 404 才算「不存在」；网络错误、5xx 等返回 error，
+   * 由页面显示错误并允许重试。返回 undefined 表示请求期间切换了工作区，结果作废。
+   */
+  async function loadAgentDetail(agentId: number): Promise<AgentDetailResult | undefined> {
     const generation = dataGeneration
     const workspaceId = authStore.currentWorkspaceId
     try {
       const detail = await getAgentDetail(agentId)
       if (contextChanged(generation, workspaceId)) return undefined
       upsertAgent(detail)
-      return detail
-    } catch {
+      return { status: 'ok', item: detail }
+    } catch (error) {
       if (contextChanged(generation, workspaceId)) return undefined
-      return null
+      if (error instanceof ApiError && error.status === 404) return { status: 'not-found' }
+      return { status: 'error', message: errorMessage(error, '智能体加载失败') }
     }
   }
 
@@ -262,8 +282,12 @@ export const useAgentsStore = defineStore('agents', () => {
         })
         if (contextChanged(generation, workspaceId)) return { item: null, error: null }
         const [toolsResult, skillsResult] = await Promise.allSettled([
-          updateAgentTools(input.id, { tool_ids: input.toolIds }),
-          updateAgentSkills(input.id, { skill_ids: input.skillIds }),
+          sameBindingIds(saved.tool_ids, input.toolIds)
+            ? Promise.resolve(saved)
+            : updateAgentTools(input.id, { tool_ids: input.toolIds }),
+          sameBindingIds(saved.skill_ids, input.skillIds)
+            ? Promise.resolve(saved)
+            : updateAgentSkills(input.id, { skill_ids: input.skillIds }),
         ])
         if (contextChanged(generation, workspaceId)) return { item: null, error: null }
 
@@ -315,6 +339,45 @@ export const useAgentsStore = defineStore('agents', () => {
     }
   }
 
+  function patchEnabledLocally(agentId: number, enabled: boolean) {
+    const index = state.items.findIndex((item) => item.id === agentId)
+    if (index >= 0) state.items[index] = { ...state.items[index], is_enabled: enabled }
+  }
+
+  /**
+   * 启用 / 停用：只发 PATCH /agents/{id} { is_enabled }，不动能力绑定、不回读详情。
+   * 先改界面，失败回滚并返回错误信息；请求中的 id 记在 togglingIds。
+   */
+  async function setAgentEnabled(agentId: number, enabled: boolean): Promise<string | null> {
+    if (state.togglingIds.includes(agentId)) return null
+    const generation = dataGeneration
+    const workspaceId = authStore.currentWorkspaceId
+    const previous = state.items.find((item) => item.id === agentId)?.is_enabled ?? !enabled
+    state.togglingIds = [...state.togglingIds, agentId]
+    patchEnabledLocally(agentId, enabled)
+    try {
+      const updated = await updateAgent(agentId, { is_enabled: enabled })
+      if (contextChanged(generation, workspaceId)) return null
+      const current = state.items.find((item) => item.id === agentId)
+      // PATCH 响应可能不带绑定字段，缺失时沿用本地值。
+      upsertAgent({
+        ...current,
+        ...updated,
+        tool_ids: updated.tool_ids ?? current?.tool_ids,
+        skill_ids: updated.skill_ids ?? current?.skill_ids,
+      })
+      return null
+    } catch (error) {
+      if (contextChanged(generation, workspaceId)) return null
+      patchEnabledLocally(agentId, previous)
+      return errorMessage(error, enabled ? '启用失败' : '停用失败')
+    } finally {
+      if (!contextChanged(generation, workspaceId)) {
+        state.togglingIds = state.togglingIds.filter((id) => id !== agentId)
+      }
+    }
+  }
+
   async function removeAgent(agentId: number): Promise<string | null | undefined> {
     if (state.deleting) return 'Agent 正在删除，请稍候'
     const generation = dataGeneration
@@ -345,6 +408,7 @@ export const useAgentsStore = defineStore('agents', () => {
     loadAll,
     loadAgentDetail,
     saveAgent,
+    setAgentEnabled,
     removeAgent,
   }
 })

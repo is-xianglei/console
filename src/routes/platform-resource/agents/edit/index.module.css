@@ -1,44 +1,10 @@
-.ag-loading {
+.notFound {
+  display: flex;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  color: var(--text-primary);
-  background: var(--bg-deep);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ag-not-found {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  color: var(--text-primary);
-  background: var(--bg-deep);
-  display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 var(--page-gutter);
+  background: var(--bg-deep);
 }
-
-.ag-not-found > :global(.alert) {
-  max-width: 560px;
-  width: 100%;
-}
-
-.ag-loading-inner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-}
-
-.ag-loading-back {
-  position: fixed;
-  top: 12px;
-  left: var(--page-gutter);
-}
-
-/* 离开确认弹窗的说明文字只走 UModal 的 description（同时作为对话框的 aria-describedby），
-   不要再在 #body 里写一遍，否则同一句会显示两次。 */

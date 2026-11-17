@@ -6,6 +6,8 @@ export interface ToolResponse {
   description: string
   tool_type: string
   runtime_name: string
+  /** 服务端能力策略允许显式绑定的运行身份；与启停状态分别判断。 */
+  bindable_profiles: string[]
   is_system: boolean
   is_enabled: boolean
   created_at: string
