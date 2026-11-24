@@ -11,6 +11,7 @@ vi.mock('../http/console', async (importOriginal) => ({
   ...await importOriginal<typeof import('../http/console')>(),
   getActiveTurn: vi.fn(), getPendingInteraction: vi.fn(), getSessionList: vi.fn(),
   getSessionMessageList: vi.fn(), getSessionTasks: vi.fn(), sendMessage: vi.fn(), subscribeTurn: vi.fn(),
+  getSessionPendingInputList: vi.fn(), getSessionTurnList: vi.fn(),
 }))
 vi.mock('../http/session-runtime', () => ({ getSessionSubAgentRuns: vi.fn() }))
 
@@ -24,6 +25,7 @@ const message = { id: 7, session_id: 42, turn_id: 'old-turn', role: 'assistant',
 const runtimeRun: SubAgentRunResponse = {
   id: 21, session_id: 42, member_name: 'explore', status: 'succeeded', prompt: '任务',
   report: '已完成', error_message: null, started_at: session.created_at, finished_at: session.created_at,
+  parent_id: 'toolu_01A', turn_id: null, agent_name: 'explore', sub_run_id: 'run-21',
 }
 function subscription(): SseHandlers { return vi.mocked(subscribeTurn).mock.calls.at(-1)![2] }
 
@@ -42,7 +44,7 @@ beforeEach(() => {
 
 describe('会话运行的持久化恢复', () => {
   it('恢复运行报告、失败原因和首项选择', async () => {
-    vi.mocked(getSessionSubAgentRuns).mockResolvedValue([runtimeRun, { ...runtimeRun, id: 22, status: 'failed', report: null, error_message: '成员已停用' }])
+    vi.mocked(getSessionSubAgentRuns).mockResolvedValue([runtimeRun, { ...runtimeRun, id: 22, sub_run_id: 'run-22', status: 'failed', report: null, error_message: '成员已停用' }])
     const store = useConsoleStore()
     await store.reloadConsole()
     expect(getSessionSubAgentRuns).toHaveBeenCalledWith('42')
@@ -91,15 +93,19 @@ describe('会话运行的持久化恢复', () => {
   })
 
   it('当前快照重建时保留其他轮次报告和有效选中项', async () => {
-    vi.mocked(getSessionSubAgentRuns).mockResolvedValue([runtimeRun, { ...runtimeRun, id: 22, status: 'running', report: null }])
+    vi.mocked(getSessionSubAgentRuns).mockResolvedValue([runtimeRun, { ...runtimeRun, id: 22, sub_run_id: 'run-22', status: 'running', report: null }])
     vi.mocked(getActiveTurn).mockResolvedValue({ turn_id: 'current-turn', status: 'running', executing: true, last_event_offset: 4 })
     const store = useConsoleStore()
     await store.reloadConsole()
     await vi.waitFor(() => expect(subscribeTurn).toHaveBeenCalled())
     store.selectAgent('run-21')
     subscription().onEvent({ type: 'run_snapshot', sequence: 4, session_id: 42, turn_id: 'current-turn', state: {
-      actors: [{ actor: { role: 'subagent', name: 'explore', run_id: 'run-22' }, in_turn: true,
-        blocks: [{ index: 0, kind: 'text', text: '当前实时回答', closed: true }] }],
+      main: { segment: 0, in_turn: false, blocks: [] },
+      sub_runs: [{
+        sub_run_id: 'run-22', parent_id: 'toolu_01A', agent_id: null, agent_name: 'explore', task: null,
+        in_turn: true, errors: [],
+        blocks: [{ index: 0, kind: 'text', text: '当前实时回答', closed: true }],
+      }],
     } })
     expect(store.state.agents.map((agent) => agent.id)).toEqual(['run-21', 'run-22'])
     expect(store.state.agents[0]?.stream).toEqual([{ kind: 'answer', text: '已完成', streaming: false }])
@@ -112,11 +118,11 @@ describe('会话运行的持久化恢复', () => {
     await store.reloadConsole()
     store.dispatch('执行')
     const handlers = vi.mocked(sendMessage).mock.calls.at(-1)![1]
-    const actor = { role: 'subagent', name: 'explore', run_id: 'run-21' }
-    handlers.onEvent({ type: 'turn_start', sequence: 1, session_id: 42, turn_id: 'current-turn', actor })
-    handlers.onEvent({ type: 'tool_use', sequence: 2, session_id: 42, turn_id: 'current-turn', actor, tool: { id: 'tool-1', name: 'Read', input: { path: 'file.txt' } } })
+    const run = { parent_id: 'toolu_01A', sub_run_id: 'run-21', agent_id: null, agent_name: 'explore' }
+    handlers.onEvent({ type: 'subagent_event', sub_type: 'turn_start', sequence: 1, session_id: 42, ...run })
+    handlers.onEvent({ type: 'subagent_event', sub_type: 'tool_use', sequence: 2, session_id: 42, ...run, tool: { id: 'tool-1', name: 'Read', input: { path: 'file.txt' } } })
     store.selectAgent('run-21')
-    vi.mocked(getSessionSubAgentRuns).mockResolvedValue([runtimeRun, { ...runtimeRun, id: 22 }])
+    vi.mocked(getSessionSubAgentRuns).mockResolvedValue([runtimeRun, { ...runtimeRun, id: 22, sub_run_id: 'run-22' }])
     handlers.onEvent({ type: 'run_end', sequence: 3, session_id: 42, turn_id: 'current-turn' })
     await vi.waitFor(() => expect(store.state.agents).toHaveLength(2))
     expect(store.state.selectedAgentId).toBe('run-21')
@@ -136,7 +142,7 @@ describe('已结束轮次的快照恢复', () => {
     const store = useConsoleStore()
     await store.reloadConsole()
     await vi.waitFor(() => expect(subscribeTurn).toHaveBeenCalled())
-    subscription().onEvent({ type: 'run_snapshot', sequence: 9, session_id: 42, turn_id: 'paused-turn', state: { actors: [], interaction } })
+    subscription().onEvent({ type: 'run_snapshot', sequence: 9, session_id: 42, turn_id: 'paused-turn', state: { main: { segment: 0, in_turn: false, blocks: [] }, sub_runs: [], interaction } })
     subscription().onEvent({ type: 'run_end', sequence: 10, session_id: 42, turn_id: 'paused-turn' })
     const cards = store.state.messages.flatMap((item) => item.blocks ?? []).filter((block) => block.kind === 'interaction')
     expect(cards).toHaveLength(1)
@@ -149,7 +155,7 @@ describe('已结束轮次的快照恢复', () => {
     const store = useConsoleStore()
     await store.reloadConsole()
     await vi.waitFor(() => expect(subscribeTurn).toHaveBeenCalled())
-    subscription().onEvent({ type: 'run_snapshot', sequence: 9, session_id: 42, turn_id: 'old-turn', state: { actors: [], tasks: null } })
+    subscription().onEvent({ type: 'run_snapshot', sequence: 9, session_id: 42, turn_id: 'old-turn', state: { main: { segment: 0, in_turn: false, blocks: [] }, sub_runs: [], tasks: null } })
     subscription().onEvent({ type: 'run_end', sequence: 10, session_id: 42, turn_id: 'old-turn' })
     expect(store.state.tasks).toMatchObject([{ id: '18', name: '历史任务', state: 'queued' }])
   })
@@ -177,8 +183,9 @@ describe('已结束轮次的快照恢复', () => {
     expect(store.state.busy).toBe(false)
     const handlers = subscription()
     handlers.onEvent({ type: 'run_snapshot', sequence: 9, session_id: 42, turn_id: 'failed-turn', state: {
-      actors: [], errors: [{ sequence: 8, error: { code: 'WORKFLOW_RUN_FAILED', message: '成员已停用', fatal: true } }],
-      workflow: [{ phase: 'member', status: 'failed', agent_id: 6, member_name: '停用成员', ordinal: 2, total: 2 }],
+      main: { segment: 0, in_turn: false, blocks: [] }, sub_runs: [],
+      errors: [{ sequence: 8, error: { code: 'WORKFLOW_RUN_FAILED', message: '成员已停用', fatal: true } }],
+      workflow: [{ phase: 'member', status: 'failed', agent_id: 6, member_name: '停用成员', member_id: 'member:6', ordinal: 2, total: 2 }],
     } })
     handlers.onEvent({ type: 'run_end', sequence: 10, session_id: 42, turn_id: 'failed-turn' })
     handlers.onDone?.()
@@ -186,7 +193,7 @@ describe('已结束轮次的快照恢复', () => {
     expect(store.state.messages.at(-1)?.blocks).toContainEqual(expect.objectContaining({ kind: 'tool', tag: 'ERROR', body: '成员已停用' }))
     expect(store.state.busy).toBe(false)
     expect(store.state.recovering).toBe(false)
-    expect(store.state.workflowProgress.members[6]).toMatchObject({ status: 'failed', memberName: '停用成员' })
+    expect(store.state.workflowProgress.members['member:6']).toMatchObject({ status: 'failed', memberName: '停用成员' })
     expect(subscribeTurn).toHaveBeenCalledTimes(1)
     expect(getSessionMessageList).toHaveBeenCalledTimes(1)
     expect(getActiveTurn).toHaveBeenCalledTimes(1)
@@ -210,7 +217,7 @@ describe('已结束轮次的快照恢复', () => {
     await vi.waitFor(() => expect(subscribeTurn).toHaveBeenCalled())
     const handlers = subscription()
     expect(store.dispatch('新一轮')).toBe(true)
-    handlers.onEvent({ type: 'run_snapshot', sequence: 9, session_id: 42, turn_id: 'old-turn', state: { actors: [], errors: [] } })
+    handlers.onEvent({ type: 'run_snapshot', sequence: 9, session_id: 42, turn_id: 'old-turn', state: { main: { segment: 0, in_turn: false, blocks: [] }, sub_runs: [], errors: [] } })
     handlers.onEvent({ type: 'run_end', sequence: 10, session_id: 42, turn_id: 'old-turn' })
     expect(store.state.messages.some((item) => item.text === '新一轮')).toBe(true)
     expect(store.state.busy).toBe(true)
@@ -225,7 +232,8 @@ describe('已结束轮次的快照恢复', () => {
     await vi.waitFor(() => expect(subscribeTurn).toHaveBeenCalled())
     const handlers = subscription()
     handlers.onEvent({ type: 'run_snapshot', sequence: 9, session_id: 42, turn_id: 'current-turn', state: {
-      actors: [], errors: [{ error: { code: 'WORKFLOW_RUN_FAILED', message: '成员已停用', fatal: true } }],
+      main: { segment: 0, in_turn: false, blocks: [] }, sub_runs: [],
+      errors: [{ error: { code: 'WORKFLOW_RUN_FAILED', message: '成员已停用', fatal: true } }],
     } })
     handlers.onEvent({ type: 'run_end', sequence: 10, session_id: 42, turn_id: 'current-turn' })
     await nextTick()

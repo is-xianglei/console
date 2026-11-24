@@ -41,7 +41,9 @@ vi.mock('../http/console', async (importOriginal) => ({
   getPendingInteraction: vi.fn(),
   getSessionList: vi.fn(),
   getSessionMessageList: vi.fn(),
+  getSessionPendingInputList: vi.fn(),
   getSessionTasks: vi.fn(),
+  getSessionTurnList: vi.fn(),
   respondInteraction: vi.fn(),
   sendMessage: vi.fn(),
   shareSession: vi.fn(),
@@ -176,22 +178,33 @@ describe('console store 会话恢复', () => {
     expect(getActiveTurn).not.toHaveBeenCalled()
   })
 
-  it('新草稿连接失败后结束忙碌并显示错误', () => {
-    const store = useConsoleStore()
-    store.resetConsole()
-    store.dispatch('你好')
-    vi.mocked(sendMessage).mock.calls.at(-1)![1].onError?.(new Error('服务不可用'))
-    expect(store.state.busy).toBe(false)
-    expect(store.state.recovering).toBe(false)
-    expect(store.state.messages.at(-1)?.blocks).toContainEqual(expect.objectContaining({
-      kind: 'tool', tag: 'ERROR', body: '服务不可用', done: true,
-    }))
+  it('新草稿连接失败时用同一发言 ID 原样重发，连续失败后结束忙碌并显示错误', async () => {
+    vi.useFakeTimers()
+    try {
+      const store = useConsoleStore()
+      store.resetConsole()
+      store.dispatch('你好')
+      const payload = vi.mocked(sendMessage).mock.calls[0]![0]
+      for (let index = 0; index < 4; index += 1) {
+        vi.mocked(sendMessage).mock.calls.at(-1)![1].onError?.(new Error('服务不可用'))
+        await vi.runAllTimersAsync()
+      }
+      // 新会话还没有会话 ID 也能重发：幂等范围是当前用户。
+      expect(sendMessage).toHaveBeenCalledTimes(4)
+      for (const call of vi.mocked(sendMessage).mock.calls) expect(call[0]).toEqual(payload)
+      expect(getActiveTurn).not.toHaveBeenCalled()
+      expect(store.state.busy).toBe(false)
+      expect(store.state.recovering).toBe(false)
+      expect(store.state.messages.filter((item) => item.role === 'user')).toHaveLength(1)
+      expect(store.state.messages.at(-1)?.blocks).toContainEqual(expect.objectContaining({
+        kind: 'tool', tag: 'ERROR', body: '服务不可用', done: true,
+      }))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('run_started 早于 session_ready 时仍能恢复后端轮次', async () => {
-    vi.mocked(getActiveTurn).mockResolvedValue({
-      turn_id: 'turn-1', status: 'running', executing: true, last_event_offset: 1,
-    })
+  it('run_started 早于 session_ready 时断线：用同一发言 ID 重发，拿到原回合的订阅流', async () => {
     const store = useConsoleStore()
     store.resetConsole()
     store.dispatch('你好')
@@ -199,9 +212,20 @@ describe('console store 会话恢复', () => {
     handlers.onEvent({ type: 'run_started', sequence: 1, session_id: 42, turn_id: 'turn-1' })
     expect(store.state.activeSessionId).toBe('42')
     handlers.onError?.(new Error('断线'))
-    await vi.waitFor(() => expect(subscribeTurn).toHaveBeenCalled())
-    expect(getActiveTurn).toHaveBeenCalledWith('42')
-    expect(subscribeTurn).toHaveBeenCalledWith(42, 'turn-1', expect.any(Object))
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(sendMessage).mock.calls[1]![0]).toEqual(vi.mocked(sendMessage).mock.calls[0]![0])
+    expect(getActiveTurn).not.toHaveBeenCalled()
+    expect(subscribeTurn).not.toHaveBeenCalled()
+    // 起始发言的重发按订阅语义：run_snapshot 开头。
+    vi.mocked(sendMessage).mock.calls[1]![1].onEvent({ type: 'run_snapshot', turn_id: 'turn-1', sequence: 3, state: {
+      status: 'running', last_offset: 3,
+      main: { segment: 1, in_turn: true, blocks: [{ segment: 1, index: 0, kind: 'text', text: '你好！', closed: false, sequence: 2 }] },
+      sub_runs: [],
+    } })
+    expect(store.state.messages.map((item) => [item.role, item.turnId, item.text ?? item.blocks?.map((block) => block.kind === 'answer' && block.text)])).toEqual([
+      ['user', 'turn-1', '你好'],
+      ['ai', 'turn-1', ['你好！']],
+    ])
   })
 
   it('初次恢复的流式正文触发 Vue 响应式更新', async () => {
@@ -260,9 +284,10 @@ describe('console store 会话恢复', () => {
     const handlers = vi.mocked(subscribeTurn).mock.calls.at(-1)![2]
     handlers.onEvent({ type: 'run_snapshot', sequence: 10, session_id: 42, turn_id: 'turn-1', state: {
       truncated, last_offset: 10,
-      actors: [{ actor: { role: 'orchestrator', name: 'orchestrator' }, in_turn: true,
-        blocks: [{ index: 0, kind: 'text', text: truncated ? '恢复后回答' : '暂停前回答', closed: true }] }],
-      errors: [{ sequence: 9, actor: { role: 'orchestrator', name: 'orchestrator' },
+      main: { segment: 1, in_turn: true,
+        blocks: [{ segment: 1, index: 0, kind: 'text', text: truncated ? '恢复后回答' : '暂停前回答', closed: true }] },
+      sub_runs: [],
+      errors: [{ sequence: 9,
         error: { code: 'RETRY', message: '可恢复错误', retriable: true, fatal: false } }],
     } })
     const answers = store.state.messages.flatMap((item) => item.blocks ?? [])
@@ -306,8 +331,9 @@ describe('console store 会话恢复', () => {
     handlers.onEvent({ type: 'tool_sources', sequence: 2, session_id: 42, turn_id: 'turn-1', data: { session_id: 42, faults: [fault] } })
     handlers.onEvent({ type: 'run_snapshot', sequence: 3, session_id: 42, turn_id: 'turn-1', state: {
       last_offset: 3,
-      actors: [{ actor: { role: 'orchestrator', name: 'orchestrator' }, in_turn: true,
-        blocks: [{ index: 0, kind: 'text', text: '继续回答', closed: true }] }],
+      main: { segment: 1, in_turn: true,
+        blocks: [{ segment: 1, index: 0, kind: 'text', text: '继续回答', closed: true }] },
+      sub_runs: [],
     } })
     expect(store.state.messages.at(-1)?.blocks).toEqual([
       { kind: 'sources', faults: [fault] },
@@ -474,7 +500,7 @@ describe('console store 会话恢复', () => {
 
     expect(store.dispatch('使用设备 Agent 检查告警')).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, agent_id: 9, content: '使用设备 Agent 检查告警' },
+      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, agent_id: 9, content: '使用设备 Agent 检查告警', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -487,7 +513,7 @@ describe('console store 会话恢复', () => {
 
     expect(store.dispatch('改用默认 Agent', { agentId: null })).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, content: '改用默认 Agent' },
+      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, content: '改用默认 Agent', client_input_id: expect.any(String) },
       expect.any(Object),
     )
     expect(store.state.sessions[0]?.agentId).toBeNull()
@@ -502,7 +528,7 @@ describe('console store 会话恢复', () => {
     expect(store.state.sessions[0]?.agentId).toBe(9)
     expect(store.dispatch('继续当前会话', { agentId: 12 })).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: 42, content: '继续当前会话' },
+      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: 42, content: '继续当前会话', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -625,7 +651,6 @@ describe('console store Workflow 对话', () => {
       type: 'workflow_progress',
       sequence,
       session_id: 12,
-      actor: { role: 'orchestrator', name: 'orchestrator' },
       progress,
     }
   }
@@ -640,7 +665,7 @@ describe('console store Workflow 对话', () => {
     expect(store.state.workbenchMode).toBe('graph')
     expect(store.dispatch('按 Workflow 执行')).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, workflow_id: 5, content: '按 Workflow 执行' },
+      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, workflow_id: 5, content: '按 Workflow 执行', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -654,7 +679,7 @@ describe('console store Workflow 对话', () => {
     expect(store.state.newSessionWorkflowId).toBeNull()
     expect(store.dispatch('改用 Agent')).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, agent_id: 9, content: '改用 Agent' },
+      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, agent_id: 9, content: '改用 Agent', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -673,7 +698,7 @@ describe('console store Workflow 对话', () => {
     expect(store.state.workbenchMode).toBe('graph')
     expect(store.dispatch('继续', { agentId: 12, workflowId: 7 })).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: 61, content: '继续' },
+      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: 61, content: '继续', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -692,7 +717,7 @@ describe('console store Workflow 对话', () => {
     expect(store.state.newSessionWorkflowId).toBeNull()
   })
 
-  it('workflow_progress 按 agent_id 归并成员并记录路由与汇总阶段', () => {
+  it('workflow_progress 按 member_id 归并成员并记录路由与汇总阶段', () => {
     const { store, emit } = startWorkflowStream()
     emit(progressEvent({ phase: 'routing', status: 'running' }))
     expect(store.state.workflowProgress.routing).toBe('running')
@@ -701,10 +726,11 @@ describe('console store Workflow 对话', () => {
     expect(store.state.workflowProgress.routing).toBe('done')
     expect(store.state.workflowProgress.routedAgentId).toBe(2)
 
-    emit(progressEvent({ phase: 'member', status: 'running', agent_id: 2, member_name: '专业评审', ordinal: 1, total: 2 }))
+    emit(progressEvent({ phase: 'member', status: 'running', agent_id: 2, member_name: '专业评审', member_id: 'member:2', ordinal: 1, total: 2 }))
     // 配置期失败：没有 member_name，但要保留此前记录的名字与序号
-    emit(progressEvent({ phase: 'member', status: 'failed', agent_id: 2 }))
-    expect(store.state.workflowProgress.members[2]).toEqual({
+    emit(progressEvent({ phase: 'member', status: 'failed', agent_id: 2, member_id: 'member:2' }))
+    expect(store.state.workflowProgress.members['member:2']).toEqual({
+      memberId: 'member:2',
       agentId: 2,
       memberName: '专业评审',
       status: 'failed',
@@ -719,7 +745,7 @@ describe('console store Workflow 对话', () => {
     expect(store.state.messages.at(-1)?.blocks ?? []).toHaveLength(0)
   })
 
-  it('member 事件缺少 agent_id 时忽略并告警', () => {
+  it('member 事件缺少 agent_id 与 member_id 时忽略并告警', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { store, emit } = startWorkflowStream()
     emit(progressEvent({ phase: 'member', status: 'running', member_name: '匿名' }))
@@ -798,14 +824,16 @@ describe('console store 推理块收尾兜底', () => {
     expect(answer()).toMatchObject({ kind: 'answer', text: '半截回答', streaming: false })
   })
 
-  /** 再灌入一个子代理：推理块和回答块都只开了头，没有 block_stop / turn_end */
+  /** 再灌入一个子运行：推理块和回答块都只开了头，没有 block_stop / turn_end */
   function startSubAgentStream(handlers: ReturnType<typeof startThinkingStream>['handlers']) {
-    const actor = { role: 'subagent' as const, name: 'research', run_id: 'run-9' }
-    handlers.onEvent({ type: 'turn_start', sequence: 80, session_id: 12, actor })
-    handlers.onEvent({ type: 'block_start', sequence: 81, session_id: 12, actor, block: { index: 0, block_type: 'thinking' } })
-    handlers.onEvent({ type: 'thinking_delta', sequence: 82, session_id: 12, actor, block: { index: 0 }, text: '查历史' })
-    handlers.onEvent({ type: 'block_start', sequence: 83, session_id: 12, actor, block: { index: 1, block_type: 'text' } })
-    handlers.onEvent({ type: 'text_delta', sequence: 84, session_id: 12, actor, block: { index: 1 }, text: '半截' })
+    const run = { parent_id: 'toolu_01A', sub_run_id: 'run-9', agent_id: null, agent_name: 'research' }
+    const sub = (sub_type: string, sequence: number, overrides: Partial<SseEvent> = {}): SseEvent =>
+      ({ type: 'subagent_event', sub_type, sequence, session_id: 12, ...run, ...overrides })
+    handlers.onEvent(sub('turn_start', 80))
+    handlers.onEvent(sub('block_start', 81, { block: { index: 0, block_type: 'thinking' } }))
+    handlers.onEvent(sub('thinking_delta', 82, { block: { index: 0 }, text: '查历史' }))
+    handlers.onEvent(sub('block_start', 83, { block: { index: 1, block_type: 'text' } }))
+    handlers.onEvent(sub('text_delta', 84, { block: { index: 1 }, text: '半截' }))
     const stream = () => useConsoleStore().state.agents.find((a) => a.id === 'run-9')?.stream
     expect(stream()).toEqual([
       { kind: 'think', text: '查历史', done: false },
@@ -992,7 +1020,7 @@ describe('console store Team 会话', () => {
     expect(store.sessionTeamId(store.state.activeSessionId)).toBe(3)
     expect(store.dispatch('写一份周报')).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, team_definition_id: 3, content: '写一份周报' },
+      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, team_definition_id: 3, content: '写一份周报', client_input_id: expect.any(String) },
       expect.any(Object),
     )
 
@@ -1032,15 +1060,18 @@ describe('console store Team 会话', () => {
     expect(store.state.messages[3]?.inbox).toEqual({ trigger: true, entries: [{ heading: 'writer 已转为空闲', body: '初稿完成' }] })
   })
 
-  it('派发新回合不清空队友，lead 回合里的 teammate 事件不再建子代理面板', async () => {
+  it('派发新回合不清空队友，lead 回合的子运行帧建子代理面板', async () => {
     const store = await openTeamSession()
     const teamRuntime = useTeamRuntimeStore()
     expect(teamRuntime.state.panels.map((panel) => panel.id)).toEqual(['writer'])
 
     expect(store.dispatch('继续')).toBe(true)
     const handlers = vi.mocked(sendMessage).mock.calls.at(-1)![1]
-    handlers.onEvent({ type: 'turn_start', sequence: 1, session_id: 42, turn_id: 'turn-2', actor: { role: 'teammate', name: 'writer' } })
-    expect(store.state.agents).toEqual([])
+    handlers.onEvent({
+      type: 'subagent_event', sub_type: 'turn_start', sequence: 1, session_id: 42,
+      parent_id: 'toolu_01A', sub_run_id: 'run-2', agent_id: null, agent_name: 'general-purpose', task: '查一下',
+    })
+    expect(store.state.agents.map((agent) => [agent.id, agent.parentId])).toEqual([['run-2', 'toolu_01A']])
     expect(teamRuntime.state.members.map((member) => member.name)).toEqual(['writer'])
     expect(teamRuntime.state.panels.map((panel) => panel.id)).toEqual(['writer'])
   })
@@ -1050,10 +1081,9 @@ describe('console store Team 会话', () => {
     vi.useFakeTimers()
     store.dispatch('分派任务')
     const handlers = vi.mocked(sendMessage).mock.calls.at(-1)![1]
-    const actor = { role: 'orchestrator', name: 'lead' }
-    handlers.onEvent({ type: 'tool_use', sequence: 1, session_id: 42, turn_id: 'turn-2', actor, tool: { id: 'c-1', name: 'SendMessage', input: { recipient: 'writer' } } })
+    handlers.onEvent({ type: 'tool_use', sequence: 1, session_id: 42, turn_id: 'turn-2', tool: { id: 'c-1', name: 'SendMessage', input: { recipient: 'writer' } } })
     const before = vi.mocked(getSessionTeamMemberList).mock.calls.length
-    handlers.onEvent({ type: 'tool_result', sequence: 2, session_id: 42, turn_id: 'turn-2', actor, tool: { id: 'c-1', name: 'SendMessage', output: '已投递' } })
+    handlers.onEvent({ type: 'tool_result', sequence: 2, session_id: 42, turn_id: 'turn-2', tool: { id: 'c-1', name: 'SendMessage', output: '已投递' } })
     await vi.advanceTimersByTimeAsync(300)
     expect(vi.mocked(getSessionTeamMemberList).mock.calls.length).toBe(before + 1)
   })
@@ -1067,37 +1097,21 @@ describe('console store Team 会话', () => {
     expect(vi.mocked(getSessionMessageList).mock.calls.length).toBe(historyCalls)
 
     await followAutoTurn(store)
-    expect(store.isAutoTurnActive()).toBe(true)
+    expect(store.state.activeTurnId).toBe('turn-auto')
   })
 
-  it('自动回合执行中允许发送：先断开跟随，409 时等一秒自动重试一次', async () => {
+  it('自动回合执行中发言注入它：断开原跟随，发言显示为排队中，不再有 409 重试', async () => {
     const store = await openTeamSession()
     const abortAuto = await followAutoTurn(store)
-    vi.useFakeTimers()
 
     expect(store.dispatch('先停一下，改成写月报')).toBe(true)
     expect(abortAuto).toHaveBeenCalled()
     expect(sendMessage).toHaveBeenCalledTimes(1)
-    vi.mocked(sendMessage).mock.calls.at(-1)![1].onError?.(new SseOpenError('会话正在执行', 'HTTP_ERROR', 409))
-    expect(store.state.busy).toBe(true)
-
-    await vi.advanceTimersByTimeAsync(1000)
-    expect(sendMessage).toHaveBeenCalledTimes(2)
-    expect(vi.mocked(sendMessage).mock.calls.at(-1)![0]).toMatchObject({ session_id: 42, content: '先停一下，改成写月报' })
-
-    // 只重试一次：第二次 409 照常收尾并展示原因。
-    vi.mocked(sendMessage).mock.calls.at(-1)![1].onError?.(new SseOpenError('会话正在执行', 'HTTP_ERROR', 409))
-    await vi.advanceTimersByTimeAsync(1000)
-    expect(sendMessage).toHaveBeenCalledTimes(2)
-    expect(store.state.busy).toBe(false)
-    expect(store.state.messages.at(-1)?.blocks).toContainEqual(expect.objectContaining({ tag: 'ERROR', body: '会话正在执行' }))
-  })
-
-  it('用户回合执行中仍然不能发送', async () => {
-    const store = await openTeamSession()
-    expect(store.dispatch('第一条')).toBe(true)
-    expect(store.isAutoTurnActive()).toBe(false)
-    expect(store.dispatch('第二条')).toBe(false)
+    expect(store.state.messages.at(-1)).toMatchObject({ role: 'user', text: '先停一下，改成写月报', queued: true })
+    vi.mocked(sendMessage).mock.calls.at(-1)![1].onError?.(new SseOpenError('会话回合准入冲突，请稍后重试', 'HTTP_ERROR', 409))
     expect(sendMessage).toHaveBeenCalledTimes(1)
+    expect(store.state.messages.flatMap((item) => item.blocks ?? [])).toContainEqual(expect.objectContaining({
+      tag: 'ERROR', body: '会话回合准入冲突，请稍后重试',
+    }))
   })
 })

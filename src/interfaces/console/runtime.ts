@@ -2,15 +2,25 @@
 export interface SubAgentRunResponse {
   id: number
   session_id: number
+  /** 内部运行标识（成员带 wf-、委派带 delegate- 前缀，可能截断），不要用来显示。 */
   member_name: string
   /** 委派自建 Agent 与 Workflow 成员填写，内置子代理为空。 */
   agent_id?: number | null
+  /** running、succeeded、failed、interrupted；续跑时同一次 Agent 调用下可能有一条 interrupted 加一条新记录。 */
   status: string
   prompt: string
   report: string | null
   error_message: string | null
   started_at: string
   finished_at: string | null
+  /** 与流里的 parent_id 相同：Agent 工具为父调用的 tool_use ID，Workflow 成员为 member:{agent_id}；父调用键落库之前的历史记录为 null。 */
+  parent_id: string | null
+  /** 父回合；历史记录为 null。 */
+  turn_id: string | null
+  /** 与流里的 agent_name 同源，是运行当时的名字（数据库 Agent 的名称原文，内置子代理为类型名）。 */
+  agent_name: string
+  /** 与流里的 sub_run_id 相同（run-{id}），直接用它，不要自己拼。 */
+  sub_run_id: string
 }
 
 /** working：有待处理的工作（正在运行或排队等认领）；idle：空闲等消息；shutdown：已关停。 */
@@ -60,7 +70,11 @@ export interface TeamMessageResponse {
   created_at: string
 }
 
-export type TeamActivationStatus = 'running' | 'completed' | 'failed' | 'interrupted'
+/**
+ * 队友激活状态：queued 等后台认领；needs_attention 有结果未知的工具调用、需要人工处理。
+ * interrupted 不再产生，只剩旧数据。
+ */
+export type TeamActivationStatus = 'queued' | 'running' | 'completed' | 'failed' | 'needs_attention' | 'interrupted'
 
 /** 队友的一次后台执行；id 即 activation_id，也是它事件流的订阅键。 */
 export interface TeamActivationResponse {

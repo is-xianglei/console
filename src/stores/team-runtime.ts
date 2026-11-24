@@ -14,7 +14,7 @@ import type {
   TeamMessageResponse,
   TeamNotification,
 } from '@/interfaces/console/runtime'
-import { createSseReducer, replaySnapshotActors } from '@/utils/sse-reducer'
+import { createSseReducer, createStreamCursor, replaySnapshot } from '@/utils/sse-reducer'
 import { latestActivation } from '@/utils/team-runtime'
 
 /** 还有成员 working 时的兜底轮询间隔：成员状态变化和新消息没有推送。 */
@@ -24,6 +24,8 @@ const REFRESH_DEBOUNCE = 300
 /** 团队通知流断开后的重连等待，逐次翻倍，封顶 10 秒。 */
 const RECONNECT_BASE = 1_000
 const RECONNECT_MAX = 10_000
+/** 还没结束、要订阅跟随的激活：排队等认领的也要订阅，开始执行后才有 run_started。 */
+const LIVE_ACTIVATION_STATUSES = new Set(['queued', 'running'])
 
 interface TeamRuntimeState {
   /** 当前跟随的后端会话；没有时为 null。 */
@@ -35,8 +37,6 @@ interface TeamRuntimeState {
   panels: SubAgent[]
   /** 面板当前展示的是哪次激活。 */
   panelActivation: Record<string, string>
-  /** 由队友消息触发的 lead 自动回合（收到过 team_lead_turn 通知）。 */
-  autoTurnIds: string[]
 }
 
 export interface OpenTeamSessionOptions {
@@ -58,7 +58,6 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
     activations: [],
     panels: [],
     panelActivation: {},
-    autoTurnIds: [],
   })
 
   let generation = 0
@@ -77,14 +76,6 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
   /** 会话里有队友（或是 Team 会话）时右栏才出现团队视图。 */
   const hasTeam = computed(() => state.members.length > 0 || state.messages.length > 0)
   const workingCount = computed(() => state.members.filter((member) => member.status === 'working').length)
-
-  function isAutoTurn(turnId: string | null | undefined): boolean {
-    return Boolean(turnId) && state.autoTurnIds.includes(turnId!)
-  }
-
-  function markAutoTurn(turnId: string) {
-    if (!state.autoTurnIds.includes(turnId)) state.autoTurnIds.push(turnId)
-  }
 
   function clearTimers() {
     if (reconnectTimer) clearTimeout(reconnectTimer)
@@ -113,7 +104,6 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
     state.activations = []
     state.panels = []
     state.panelActivation = {}
-    state.autoTurnIds = []
   }
 
   /** 打开会话：已经在跟随同一会话时只刷新一次。 */
@@ -179,13 +169,13 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
     }, REFRESH_DEBOUNCE)
   }
 
-  /** 运行中的激活逐个订阅；成员最近一次已结束的激活也订阅一次，面板据快照显示它的输出。 */
+  /** 排队或运行中的激活逐个订阅；成员最近一次已结束的激活也订阅一次，面板据快照显示它的输出。 */
   function followActivations() {
     for (const member of state.members) {
       const activation = latestActivation(member, state.activations)
       const activationId = activation?.id ?? member.activation_id
       if (!activationId) continue
-      if (state.panelActivation[member.name] === activationId && activation?.status !== 'running') continue
+      if (state.panelActivation[member.name] === activationId && !LIVE_ACTIVATION_STATUSES.has(activation?.status ?? '')) continue
       subscribeActivation(activationId, member.name)
     }
   }
@@ -203,6 +193,7 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
 
   /**
    * 订阅一次激活：快照先重置面板再重放，增量用现有 reducer 写进该成员的面板。
+   * 帧按 sequence 去重；续跑（run_resumed）时按水位丢掉已显示的半截内容。
    * 新激活开始时面板换成新激活的输出；读到 run_end 后刷新成员和消息。
    */
   function subscribeActivation(activationId: string, memberName: string) {
@@ -214,9 +205,16 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
       state.panelActivation[memberName] = activationId
       panel.stream.splice(0)
     }
-    // 激活流里只有 teammate 的事件，ai 只是 reducer 必需的占位。
+    // 激活流只有主线，产出者就是该队友：主线内容写进它的面板，ai 只是 reducer 必需的占位。
     const placeholder: ChatMessage = { id: `activation-${activationId}`, role: 'ai', time: '', blocks: [] }
-    let reducer = createSseReducer({ ai: placeholder, agents: state.panels, selectAgent: () => {} })
+    const buildReducer = () => createSseReducer({
+      ai: placeholder,
+      agents: [],
+      selectAgent: () => {},
+      mainPanel: panel,
+    })
+    let reducer = buildReducer()
+    const cursor = createStreamCursor(activationId)
     const live = () => current === generation && state.panelActivation[memberName] === activationId
     const stop = () => {
       activationStreams.get(activationId)?.()
@@ -224,6 +222,7 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
     }
     const handle = (event: SseEvent) => {
       if (current !== generation) return
+      if (!cursor.accept(event)) return
       // 面板已换成更新的激活时，旧激活只需收尾，不再写面板。
       if (event.type === 'run_end') {
         if (live()) reducer.settleStreams()
@@ -236,13 +235,17 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
       if (event.type === 'run_snapshot') {
         const snapshot = event.state
         panel.stream.splice(0)
-        reducer = createSseReducer({ ai: placeholder, agents: state.panels, selectAgent: () => {} })
+        reducer = buildReducer()
         if (snapshot && typeof snapshot === 'object') {
-          replaySnapshotActors(snapshot, reducer.handle, Number(sessionId), activationId, (role) => role !== 'orchestrator')
+          // 激活流只有主线，快照读 main；sub_runs 不会有内容。
+          replaySnapshot(snapshot as Record<string, unknown>, reducer.handle, Number(sessionId), activationId)
         }
         return
       }
-      if (event.actor?.role === 'orchestrator' || !event.actor) return
+      if (event.type === 'run_resumed') {
+        reducer.fold(cursor.runStartedAt ?? event.sequence ?? 0, event.watermark ?? 0, event.sub_run_watermarks ?? {})
+        return
+      }
       reducer.handle(event)
     }
     activationStreams.set(activationId, subscribeTeamActivation(sessionId, activationId, {
@@ -272,10 +275,7 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
       }
       scheduleRefresh()
     } else if (notification.type === 'team_lead_turn') {
-      if (notification.turn_id) {
-        markAutoTurn(notification.turn_id)
-        options?.onLeadTurn(notification.turn_id)
-      }
+      if (notification.turn_id) options?.onLeadTurn(notification.turn_id)
       scheduleRefresh()
     } else if (notification.type === 'stream_error') {
       reconnect()
@@ -320,8 +320,6 @@ export const useTeamRuntimeStore = defineStore('team-runtime', () => {
     state,
     hasTeam,
     workingCount,
-    isAutoTurn,
-    markAutoTurn,
     open,
     close,
     refresh,

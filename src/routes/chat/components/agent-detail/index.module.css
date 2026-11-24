@@ -58,6 +58,16 @@
   font-weight: 600;
   color: var(--text-primary);
 }
+/* 子运行 turn_start 的 task：单行截断，完整任务看 title。 */
+.detail-task {
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .detail-meta {
   display: grid;
   grid-template-columns: 1fr 1fr;

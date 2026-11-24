@@ -2,13 +2,15 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import type {
   ActiveTurnResponse,
   InteractionResolutionRequest,
+  PendingInputResponse,
   PendingInteractionResponse,
-  RuntimeSuspensionResponse,
   SessionDeleteResult,
+  SessionTurnResponse,
   ShareSessionRequest,
   ShareSessionResponse,
   SendMessageRequest,
   SseHandlers,
+  SuspensionCancelResponse,
   TurnCancelResponse,
 } from '../interfaces/console/api'
 import type {
@@ -189,8 +191,8 @@ export function getPendingInteraction(
 }
 
 /**
- * 响应人工交互并建立新的恢复 SSE 流。
- * 旧流在 interaction_request 后会正常关闭，后续事件只从本流继续推送。
+ * 提交人工交互决定。后端只记下决定、立即返回 SSE，从决定之前的位置跟随下一次执行；
+ * 同一决定重复提交或提问被取消时只有 run_snapshot 加 run_end。
  */
 export function respondInteraction(
   sessionId: number | string,
@@ -205,12 +207,12 @@ export function respondInteraction(
   )
 }
 
-/** 取消会话暂停点以及其中尚未处理的交互请求。 */
+/** 取消会话暂停点以及其中尚未处理的交互请求；有排队发言时响应带上接手它们的后继回合。 */
 export function cancelInteraction(
   sessionId: number | string,
   suspensionId: string,
-): Promise<RuntimeSuspensionResponse> {
-  return request<RuntimeSuspensionResponse>(
+): Promise<SuspensionCancelResponse> {
+  return request<SuspensionCancelResponse>(
     `/interactions/sessions/${sessionId}/suspensions/${encodeURIComponent(suspensionId)}/cancel`,
     { method: 'POST' },
   )
@@ -221,7 +223,17 @@ export function getActiveTurn(sessionId: number | string): Promise<ActiveTurnRes
   return request<ActiveTurnResponse | null>(`/sessions/${sessionId}/active-turn`)
 }
 
-/** 订阅指定轮次的快照续播流。 */
+/** 会话里还没被回合认领的发言（按提交顺序）；刷新页面后据此还原「排队中」。 */
+export function getSessionPendingInputList(sessionId: number | string): Promise<PendingInputResponse[]> {
+  return request<PendingInputResponse[]>(`/sessions/${sessionId}/pending-inputs`)
+}
+
+/** 会话的全部回合及状态（含历史回合），每个回合带结果未知的工具调用。 */
+export function getSessionTurnList(sessionId: number | string): Promise<SessionTurnResponse[]> {
+  return request<SessionTurnResponse[]>(`/sessions/${sessionId}/turns`)
+}
+
+/** 订阅指定轮次：先收 run_snapshot 再续播；断线或收到 stream_error 后用它续上。 */
 export function subscribeTurn(
   sessionId: number | string,
   turnId: string,
@@ -233,7 +245,10 @@ export function subscribeTurn(
   )
 }
 
-/** 真正取消后端轮次执行；仅断开 SSE 不会停止执行。 */
+/**
+ * 停止回合：任何没结束的回合都能停（queued、执行中断等待续跑、等待审批）。只取消这个回合，
+ * 不清空排队的发言；有排队发言时响应的 session_status 为 running，由后继回合接手。
+ */
 export function cancelTurn(
   sessionId: number | string,
   turnId: string,

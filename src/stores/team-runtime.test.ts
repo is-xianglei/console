@@ -30,7 +30,10 @@ function member(overrides: Partial<TeamMemberResponse> = {}): TeamMemberResponse
   }
 }
 
-const actor = { role: 'teammate', name: 'writer', run_id: 'a-1' }
+/** 队友激活流只有主线：帧不带归属。 */
+function mainFrame(type: string, sequence: number, overrides: Partial<SseEvent> = {}): SseEvent {
+  return { type, sequence, session_id: 42, ...overrides }
+}
 
 /** 记下每次订阅拿到的回调，测试里手动推帧。 */
 const streamHandlers: SseHandlers<TeamNotification>[] = []
@@ -96,9 +99,13 @@ describe('队友运行时', () => {
     const handlers = activationHandlers.get('a-1')!
     handlers.onEvent({
       type: 'run_snapshot', sequence: 3, session_id: 42, turn_id: 'a-1',
-      state: { actors: [{ actor, in_turn: true, blocks: [{ index: 0, kind: 'text', text: '初稿第一段', closed: true }] }] },
+      state: {
+        main: { segment: 1, in_turn: true, blocks: [{ index: 0, kind: 'text', text: '初稿第一段', closed: true, sequence: 2 }] },
+        sub_runs: [],
+        errors: [],
+      },
     })
-    handlers.onEvent({ type: 'tool_use', sequence: 4, session_id: 42, turn_id: 'a-1', actor, tool: { id: 't-1', name: 'SendMessage', input: { recipient: 'lead' } } })
+    handlers.onEvent(mainFrame('tool_use', 4, { turn_id: 'a-1', tool: { id: 't-1', name: 'SendMessage', input: { recipient: 'lead' } } }))
 
     const panel = store.state.panels.find((item) => item.id === 'writer')!
     expect(panel.stream).toMatchObject([
@@ -113,17 +120,17 @@ describe('队友运行时', () => {
     const store = useTeamRuntimeStore()
     await store.open('42', { teamSession: true, onLeadTurn: vi.fn() })
     streamHandlers[0]!.onEvent({ type: 'team_activation', session_id: 42, member: 'writer', activation_id: 'a-1' })
-    activationHandlers.get('a-1')!.onEvent({ type: 'block_start', sequence: 1, session_id: 42, turn_id: 'a-1', actor, block: { index: 0, block_type: 'text' } })
+    activationHandlers.get('a-1')!.onEvent(mainFrame('block_start', 1, { turn_id: 'a-1', block: { index: 0, block_type: 'text' } }))
 
     streamHandlers[0]!.onEvent({ type: 'team_activation', session_id: 42, member: 'writer', activation_id: 'a-2' })
-    activationHandlers.get('a-1')!.onEvent({ type: 'text_delta', sequence: 2, session_id: 42, turn_id: 'a-1', actor, block: { index: 0 }, text: '旧' })
+    activationHandlers.get('a-1')!.onEvent(mainFrame('text_delta', 2, { turn_id: 'a-1', block: { index: 0 }, text: '旧' }))
 
     const panel = store.state.panels.find((item) => item.id === 'writer')!
     expect(panel.stream).toEqual([])
     expect(store.state.panelActivation.writer).toBe('a-2')
   })
 
-  it('team_lead_turn 记为自动回合并交给控制台订阅', async () => {
+  it('team_lead_turn 交给控制台订阅', async () => {
     vi.mocked(getSessionTeamMemberList).mockResolvedValue([member()])
     const onLeadTurn = vi.fn()
     const store = useTeamRuntimeStore()
@@ -131,7 +138,6 @@ describe('队友运行时', () => {
 
     streamHandlers[0]!.onEvent({ type: 'team_lead_turn', session_id: 42, turn_id: 'turn-auto', cursor: '2-0' })
     expect(onLeadTurn).toHaveBeenCalledWith('turn-auto')
-    expect(store.isAutoTurn('turn-auto')).toBe(true)
   })
 
   it('通知流断开后按最后收到的 cursor 续订，stream_error 同样重连', async () => {
@@ -178,8 +184,53 @@ describe('队友运行时', () => {
     expect(vi.mocked(getSessionTeamMessageList).mock.calls.length).toBe(calls + 1)
 
     store.close()
+    const onLeadTurn = vi.fn()
     streamHandlers[0]!.onEvent({ type: 'team_lead_turn', session_id: 42, turn_id: 'late' })
     expect(store.state.members).toEqual([])
-    expect(store.isAutoTurn('late')).toBe(false)
+    expect(onLeadTurn).not.toHaveBeenCalled()
+  })
+
+  it('排队中的激活也订阅；帧按 sequence 去重', async () => {
+    vi.mocked(getSessionTeamMemberList).mockResolvedValue([member({ status: 'working', activation_id: 'a-1' })])
+    vi.mocked(getSessionTeamActivationList).mockResolvedValue([{
+      id: 'a-1', session_id: 42, member_id: 1, status: 'queued', error_message: null,
+      created_at: '2026-11-15T00:00:00Z', finished_at: null,
+    }])
+    const store = useTeamRuntimeStore()
+    await store.open('42', { teamSession: true, onLeadTurn: vi.fn() })
+    expect(subscribeTeamActivation).toHaveBeenCalledWith('42', 'a-1', expect.any(Object))
+
+    const handlers = activationHandlers.get('a-1')!
+    handlers.onEvent({ type: 'run_snapshot', sequence: 0, turn_id: 'a-1', state: { main: { segment: 0, in_turn: false, blocks: [] }, sub_runs: [], errors: [] } })
+    handlers.onEvent({ type: 'run_started', sequence: 1, session_id: 42, turn_id: 'a-1' })
+    handlers.onEvent(mainFrame('block_start', 2, { block: { index: 0, block_type: 'text' } }))
+    handlers.onEvent(mainFrame('text_delta', 3, { block: { index: 0 }, text: '初稿' }))
+    // 断线重放的旧帧不再写一遍。
+    handlers.onEvent(mainFrame('text_delta', 3, { block: { index: 0 }, text: '初稿' }))
+    expect(store.state.panels.find((item) => item.id === 'writer')!.stream).toMatchObject([{ kind: 'answer', text: '初稿' }])
+  })
+
+  it('激活续跑时按水位丢掉没落库的半截输出', async () => {
+    vi.mocked(getSessionTeamMemberList).mockResolvedValue([member()])
+    const store = useTeamRuntimeStore()
+    await store.open('42', { teamSession: true, onLeadTurn: vi.fn() })
+    streamHandlers[0]!.onEvent({ type: 'team_activation', session_id: 42, member: 'writer', activation_id: 'a-1' })
+    const handlers = activationHandlers.get('a-1')!
+    handlers.onEvent({ type: 'run_started', sequence: 1, session_id: 42, turn_id: 'a-1' })
+    handlers.onEvent(mainFrame('block_start', 2, { block: { index: 0, block_type: 'text' } }))
+    handlers.onEvent(mainFrame('text_delta', 3, { block: { index: 0 }, text: '已落库' }))
+    handlers.onEvent(mainFrame('block_stop', 4, { block: { index: 0 } }))
+    handlers.onEvent(mainFrame('block_start', 6, { block: { index: 1, block_type: 'text' } }))
+    handlers.onEvent(mainFrame('text_delta', 7, { block: { index: 1 }, text: '半截' }))
+
+    handlers.onEvent({ type: 'run_started', sequence: 65, session_id: 42, turn_id: 'a-1' })
+    handlers.onEvent({ type: 'run_resumed', sequence: 66, turn_id: 'a-1', attempt: 2, watermark: 4 })
+    handlers.onEvent(mainFrame('block_start', 67, { block: { index: 0, block_type: 'text' } }))
+    handlers.onEvent(mainFrame('text_delta', 68, { block: { index: 0 }, text: '续跑' }))
+
+    expect(store.state.panels.find((item) => item.id === 'writer')!.stream).toEqual([
+      { kind: 'answer', text: '已落库', streaming: false },
+      { kind: 'answer', text: '续跑', streaming: true },
+    ])
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SubAgent, WorkflowProgressState } from '@/interfaces/console/model'
+import type { SubAgent, WorkflowMemberProgress, WorkflowProgressState } from '@/interfaces/console/model'
 import type { WorkflowResponse } from '@/interfaces/workflow/api'
 import {
   deriveWorkflowEdgeActive,
@@ -33,8 +33,16 @@ function progress(overrides: Partial<WorkflowProgressState> = {}): WorkflowProgr
   return { members: {}, routing: null, routedAgentId: null, merging: null, ...overrides }
 }
 
+/** 挂在成员卡 member:{agentId} 下的子运行面板；id 是 sub_run_id。 */
 function panel(runId: string, agentId: number): SubAgent {
-  return { id: runId, pid: runId, name: `wf-${agentId}`, icon: 'bot', status: 'run', progress: 50, stream: [], agentId }
+  return {
+    id: runId, pid: runId, name: `wf-${agentId}`, icon: 'bot', status: 'run', progress: 50, stream: [], agentId,
+    parentId: `member:${agentId}`,
+  }
+}
+
+function member(agentId: number, name: string, status: 'running' | 'done' | 'failed', extra: Partial<WorkflowMemberProgress> = {}): WorkflowMemberProgress {
+  return { memberId: `member:${agentId}`, agentId, memberName: name, status, ...extra }
 }
 
 describe('buildWorkflowTopology', () => {
@@ -67,12 +75,12 @@ describe('buildWorkflowTopology', () => {
 })
 
 describe('resolveWorkflowRuntime / deriveWorkflowEdgeActive', () => {
-  it('顺序模式:成员状态按 agent_id 取,runId 从面板反查,边随前驱完成逐段点亮', () => {
+  it('顺序模式:成员状态按 member_id 取,runId 取挂在成员卡下的子运行,边随前驱完成逐段点亮', () => {
     const topo = buildWorkflowTopology(workflow('sequential', [[1, 'A'], [2, 'B']]))
     const state = progress({
       members: {
-        1: { agentId: 1, memberName: 'A', status: 'done', ordinal: 1, total: 2 },
-        2: { agentId: 2, memberName: 'B', status: 'running', ordinal: 2, total: 2 },
+        'member:1': member(1, 'A', 'done', { ordinal: 1, total: 2 }),
+        'member:2': member(2, 'B', 'running', { ordinal: 2, total: 2 }),
       },
     })
     const runtime = resolveWorkflowRuntime(topo.nodes, state, [panel('run-1', 1), panel('run-2', 2)])
@@ -86,12 +94,22 @@ describe('resolveWorkflowRuntime / deriveWorkflowEdgeActive', () => {
     expect(deriveWorkflowStatusText(topo.nodes, runtime, state)).toBe('B · 执行中')
   })
 
+  it('同一成员卡下续跑重跑的多条子运行全部保留，最后一条是当前的；别家成员的面板不串', () => {
+    const topo = buildWorkflowTopology(workflow('sequential', [[1, 'A'], [2, 'B']]))
+    const state = progress({ members: { 'member:1': member(1, 'A', 'done') } })
+    const runtime = resolveWorkflowRuntime(topo.nodes, state, [
+      panel('run-11', 1), panel('run-12', 1), panel('run-21', 2),
+    ])
+    expect(runtime.m1).toEqual({ status: 'completed', runId: 'run-12' })
+    expect(runtime.m2).toEqual({ status: 'pending', runId: null })
+  })
+
   it('智能路由:只有命中成员的入边点亮,其余成员保持 pending', () => {
     const topo = buildWorkflowTopology(workflow('llm_routing', [[1, 'A'], [2, 'B']]))
     const state = progress({
       routing: 'done',
       routedAgentId: 2,
-      members: { 2: { agentId: 2, memberName: 'B', status: 'done' } },
+      members: { 'member:2': member(2, 'B', 'done') },
     })
     const runtime = resolveWorkflowRuntime(topo.nodes, state, [])
     expect(runtime.router).toEqual({ status: 'completed', runId: null })
@@ -113,8 +131,8 @@ describe('resolveWorkflowRuntime / deriveWorkflowEdgeActive', () => {
     const topo = buildWorkflowTopology(workflow('parallel', [[1, 'A'], [2, 'B']]))
     const running = progress({
       members: {
-        1: { agentId: 1, memberName: 'A', status: 'done' },
-        2: { agentId: 2, memberName: 'B', status: 'failed' },
+        'member:1': member(1, 'A', 'done'),
+        'member:2': member(2, 'B', 'failed'),
       },
       merging: 'running',
     })

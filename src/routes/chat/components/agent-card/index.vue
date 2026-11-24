@@ -16,6 +16,7 @@ const statusLabel: Record<string, string> = {
   run: '执行中',
   done: '已完成',
   error: '失败',
+  interrupted: '已中断',
 }
 /** think/run 是「正在进行」语义,用 Orb 循环动画;其余是静止态,保留静态 dot。 */
 function isRunning(s: string) {
@@ -25,6 +26,7 @@ function isRunning(s: string) {
 function dotClass(s: string) {
   if (s === 'done') return 'nominal'
   if (s === 'error') return 'error'
+  if (s === 'interrupted') return 'warning'
   return 'idle'
 }
 </script>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useToast } from '@nuxt/ui/composables'
 import type {
   EnterPlanModeResolutionRequest,
   ExitPlanModeResolutionRequest,
@@ -21,6 +22,7 @@ const props = defineProps<{
 }>()
 
 const { state, respondInteraction, cancelInteraction } = useConsoleStore()
+const toast = useToast()
 const selectedAnswers = reactive<Record<string, string | string[]>>({})
 const customAnswers = reactive<Record<string, string>>({})
 const feedback = ref('')
@@ -144,8 +146,10 @@ function onPlanDecision(decision: 'approve' | 'reject') {
   }
 }
 
-function onCancelRun() {
-  void cancelInteraction(props.interaction.request_id, props.interaction.suspension_id)
+/** 交互已经决定时后端返回 409，原因直接展示。 */
+async function onCancelRun() {
+  const result = await cancelInteraction(props.interaction.request_id, props.interaction.suspension_id)
+  if (!result.ok && result.message) toast.add({ title: result.message, color: 'error', icon: 'i-lucide-circle-alert' })
 }
 </script>
 

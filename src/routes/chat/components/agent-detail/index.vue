@@ -39,6 +39,7 @@ const statusLabel: Record<string, string> = {
   run: '执行中',
   done: '已完成',
   error: '失败',
+  interrupted: '已中断',
 }
 
 const detailTiles = computed<DetailTile[]>(() => {
@@ -70,6 +71,7 @@ const detailTiles = computed<DetailTile[]>(() => {
           <span :class="$style['agent-ic']"><i :class="`icon icon-${agent.icon}`"></i></span>
           <span :class="$style['detail-title']">{{ agent.name }}</span>
         </div>
+        <p v-if="agent.task" :class="$style['detail-task']" :title="agent.task">{{ agent.task }}</p>
         <div :class="$style['detail-meta']">
           <div v-for="tile in detailTiles" :key="tile.label" :class="$style['detail-tile']">
             <div :class="$style['detail-tile-l']">{{ tile.label }}</div>

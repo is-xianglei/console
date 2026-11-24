@@ -7,6 +7,8 @@ import type {
   SessionVisibility,
   SseEvent,
   ToolApprovalRequestPayload,
+  TurnStatus,
+  UnknownToolCall,
   UserQuestionRequestPayload,
 } from './model'
 
@@ -27,6 +29,11 @@ export interface SendMessageRequest extends Partial<ChatModelSelection> {
   team_definition_id?: number | null
   /** 用户消息正文。 */
   content: string
+  /**
+   * 前端为每条发言生成的 ID（UUID）：各处回显，用来对上发言；同时是幂等键，
+   * 同一 ID 原样重发不会再入队，返回跟随原发言的流；同一 ID 内容不同返回 409。
+   */
+  client_input_id?: string
 }
 
 /** 会话删除结果。 */
@@ -128,6 +135,13 @@ export type InteractionRequestResponse =
       request_payload: ExitPlanModeRequestPayload
     })
 
+/** 取消暂停点的响应：暂停点元数据加上收尾后的会话状态与后继回合（与停止接口同义）。 */
+export interface SuspensionCancelResponse extends RuntimeSuspensionResponse {
+  session_status: string
+  /** 同一事务建出的后继回合，接手排队的发言；没有排队发言时为 null。 */
+  successor_turn_id: string | null
+}
+
 export interface RuntimeSuspensionResponse {
   id: string
   session_id: number
@@ -144,19 +158,44 @@ export interface PendingInteractionResponse {
   requests: InteractionRequestResponse[]
 }
 
-/** 会话当前最新轮次的执行快照。 */
+/** 会话当前最新轮次的执行快照。status 为 queued 或 running 都应订阅，不能只看 executing。 */
 export interface ActiveTurnResponse {
   turn_id: string
-  status: string
+  status: TurnStatus | string
+  /** running 且为 false 表示执行中断、等待续跑。 */
   executing: boolean
   last_event_offset: number
 }
 
-/** 取消轮次后的状态。 */
+/** 取消轮次后的状态。session_status 为 running 时，排队的发言已由后继回合接手。 */
 export interface TurnCancelResponse {
   turn_id: string
-  status: string
+  status: TurnStatus | string
   session_status: string
+  /** 同一事务建出的后继回合，接手排队的发言；没有排队发言时为 null。停止后直接订阅它。 */
+  successor_turn_id: string | null
+}
+
+/** 会话里还没被回合认领的发言，按提交顺序。 */
+export interface PendingInputResponse {
+  input_id: number
+  /** 客户端发言 ID，没传时为 null。 */
+  client_input_id: string | null
+  session_id: number
+  /** 当前负责这条发言的回合；会话已归档时为空。 */
+  turn_id: string | null
+  content: string
+  created_at: string
+}
+
+/** 会话的一个回合（含历史回合），带结果未知的工具调用。 */
+export interface SessionTurnResponse {
+  turn_id: string
+  status: TurnStatus | string
+  /** 回合起始的 user 消息，用来把提示卡挂到消息列表上。 */
+  started_message_id: number | null
+  created_at: string
+  unknown_tool_calls: UnknownToolCall[]
 }
 
 /** 控制台 SSE 生命周期回调。 */

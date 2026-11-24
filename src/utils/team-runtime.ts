@@ -60,18 +60,29 @@ export function latestActivation(
   return activations.find((item) => item.member_id === member.id) ?? null
 }
 
-/** working 且有运行中的激活为「运行中」，没有为「排队中」；idle「空闲」；shutdown「已关停」。 */
+/** 最近一次激活的失败原因：执行失败，或结果未知、需要人工处理。 */
+function activationError(activation: TeamActivationResponse | null): string | null {
+  if (activation?.status === 'failed') return activation.error_message || '运行失败'
+  if (activation?.status === 'needs_attention') return activation.error_message || '需要人工处理'
+  return null
+}
+
+/**
+ * working 且有运行中的激活为「运行中」，没有（激活 queued）为「排队中」；shutdown「已关停」；
+ * idle 时最近一次激活需要人工处理为「需要人工处理」，否则「空闲」。
+ */
 export function memberDisplayStatus(
   member: TeamMemberResponse,
   activation: TeamActivationResponse | null,
 ): MemberDisplayStatus {
-  const error = activation?.status === 'failed' ? activation.error_message || '运行失败' : null
+  const error = activationError(activation)
   if (member.status === 'shutdown') return { tone: 'shutdown', label: '已关停', error }
   if (member.status === 'working') {
     return activation?.status === 'running'
       ? { tone: 'running', label: '运行中', error: null }
       : { tone: 'queued', label: '排队中', error }
   }
+  if (activation?.status === 'needs_attention') return { tone: 'idle', label: '需要人工处理', error }
   return { tone: 'idle', label: '空闲', error }
 }
 

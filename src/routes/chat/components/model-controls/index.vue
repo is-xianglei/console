@@ -25,7 +25,8 @@ const effortView = ref<'effort' | 'model'>('effort')
 const effortDraft = ref(0)
 const selection = computed(() => consoleStore.activeChatSelection())
 const activeSession = computed(() => consoleStore.state.sessions.find((item) => item.id === consoleStore.state.activeSessionId))
-const disabled = computed(() => saving.value || consoleStore.state.chatSelectionSaving || consoleStore.state.busy || activeSession.value?.readOnly === true)
+/** 回合排队、执行或等待交互期间后端不允许改模型选项。 */
+const disabled = computed(() => saving.value || consoleStore.state.chatSelectionSaving || consoleStore.hasOpenTurn() || activeSession.value?.readOnly === true)
 const caps = computed(() => models.capabilities)
 const workflowActive = computed(() => consoleStore.sessionWorkflowId(consoleStore.state.activeSessionId) != null)
 /** Team 会话包含多智能体协作，后端拒绝极速模式。 */
@@ -89,7 +90,7 @@ watch(() => [consoleStore.state.activeSessionId, auth.state.user?.id, auth.curre
   effortView.value = 'effort'
   effortDraft.value = effortIndex.value
 })
-watch(() => consoleStore.state.busy || activeSession.value?.readOnly === true, (unavailable) => {
+watch(() => consoleStore.hasOpenTurn() || activeSession.value?.readOnly === true, (unavailable) => {
   if (unavailable) activePanel.value = null
 })
 

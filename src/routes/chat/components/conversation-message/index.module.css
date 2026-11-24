@@ -1,8 +1,15 @@
 .msg { display: flex; flex-direction: column; gap: 8px; animation: global(entry-appear) 250ms var(--ease-out); }
 .msg-user { align-items: flex-end; }
 .ai-blocks { display: flex; flex-direction: column; gap: 12px; }
-.bubble-user {
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   max-width: 80%;
+}
+.bubble-user {
+  min-width: 0;
   padding: 11px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -19,3 +26,5 @@
 .byline-ic i { font-size: 12px; }
 .byline-name { color: var(--text-muted); font-family: var(--font-ui); font-size: var(--fs-micro); font-weight: 600; letter-spacing: 0; text-transform: uppercase; }
 .byline-time { margin-left: auto; color: var(--text-dim); font-size: var(--fs-xs); }
+.bubble-user.queued { opacity: 0.55; }
+.queued-tag { display: inline-flex; align-items: center; gap: 4px; }

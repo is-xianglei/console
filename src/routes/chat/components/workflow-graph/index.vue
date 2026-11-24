@@ -141,7 +141,7 @@ const routedMemberName = computed(() => {
   const agentId = store.state.workflowProgress.routedAgentId
   if (!workflow.value || agentId == null) return null
   const member = workflow.value.agents.find((item) => item.agent_id === agentId)
-  return member?.agent_name ?? store.state.workflowProgress.members[agentId]?.memberName ?? null
+  return member?.agent_name ?? store.state.workflowProgress.members[`member:${agentId}`]?.memberName ?? null
 })
 
 const statusText = computed(() => {
@@ -187,7 +187,7 @@ onBeforeUnmount(() => {
 })
 
 // ===== 交互 =====
-/** 点节点切右栏：面板键就是事件里的 actor.run_id，未跑过的节点没有流可看。 */
+/** 点节点切右栏：面板键就是 sub_run_id，未跑过的节点没有流可看。 */
 function onFocusNode(runId: string) {
   if (!store.state.agents.some((agent) => agent.id === runId)) return
   store.selectAgent(runId)

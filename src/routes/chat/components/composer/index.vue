@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { SelectItem } from '@nuxt/ui'
+import { useToast } from '@nuxt/ui/composables'
 import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
 import { useConsoleStore } from '@/stores/console'
@@ -43,6 +44,7 @@ const workflowsStore = useWorkflowsStore()
 const teamsStore = useTeamsStore()
 const authStore = useAuthStore()
 const skillsStore = useSkillsStore()
+const toast = useToast()
 const {
   state,
   dispatch,
@@ -196,11 +198,10 @@ let nextAttachmentId = 1
 
 const hasText = computed(() => value.value.trim().length > 0)
 const enhancing = computed(() => phase.value === 'enhancing')
-/** 正在执行的是队友消息触发的自动回合：允许发送，发送会先中断它。 */
-const autoTurnActive = computed(() => consoleStore.isAutoTurnActive())
-const sendActive = computed(() => hasText.value && !enhancing.value && (!state.busy || autoTurnActive.value) && !state.chatSelectionSaving && !readOnlySession.value)
-/** 执行中且不能发送时按钮是「停止」；自动回合里有文字时是「发送」。 */
-const showStop = computed(() => state.busy && !(autoTurnActive.value && hasText.value))
+/** 回合执行中、排队中、等待审批时都能发送：发言注入当前回合，先显示为排队中。 */
+const sendActive = computed(() => hasText.value && !enhancing.value && !state.chatSelectionSaving && !readOnlySession.value)
+/** 有没结束的回合且输入框为空时按钮是「停止」，有文字时是「发送」。 */
+const showStop = computed(() => consoleStore.hasOpenTurn() && !hasText.value)
 const showPill = computed(() => hasText.value && !enhancing.value)
 /** 技能菜单与斜杠命令只列出已启用的 skill（停用的 agent 运行时不可用）。 */
 const enabledSkills = computed(() => skillsStore.state.skills.filter((sk) => sk.is_enabled))
@@ -544,6 +545,12 @@ function revert() {
 }
 
 // ===== 发送：走真实业务派发 =====
+/** 停止没结束的回合；被拒（比如回合已经结束）时直接展示后端原因。 */
+async function onStop() {
+  const result = await stopExecution()
+  if (!result.ok && result.message) toast.add({ title: result.message, color: 'error', icon: 'i-lucide-circle-alert' })
+}
+
 function send() {
   if (!sendActive.value) return
   // dispatch 返回 false（内容为空或 busy）时不清空输入，保留用户已输入内容
@@ -704,7 +711,7 @@ onBeforeUnmount(() => {
             aria-multiline="true"
             aria-label="描述任务或提出问题"
             :data-empty="!hasText || undefined"
-            :data-placeholder="autoTurnActive ? '发送会中断当前自动回合' : '描述任务或提出问题…'"
+            data-placeholder="描述任务或提出问题…"
             @input="onEditorInput"
             @keydown="onEditorKeydown"
             @keyup="saveSelection"
@@ -826,7 +833,7 @@ onBeforeUnmount(() => {
               :class="[$style['icon-btn'], $style.send, sendActive ? $style['send-active'] : '']"
               :aria-label="showStop ? '停止执行' : '发送消息'"
               :disabled="showStop ? readOnlySession : !sendActive"
-              @click="showStop ? stopExecution() : send()"
+              @click="showStop ? onStop() : send()"
             >
               <UIcon v-if="showStop" name="i-lucide-square" />
               <UIcon v-else name="i-lucide-arrow-up" />

@@ -18,7 +18,7 @@ export interface WfNodeData {
   disabled: boolean
   /** 运行时状态，默认 pending */
   status: WfStatus
-  /** 事件里的 actor.run_id，有值才可点击跳转 */
+  /** 挂在该成员卡下的子运行 sub_run_id，有值才可点击跳转 */
   runId: string | null
 }
 

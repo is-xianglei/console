@@ -32,10 +32,10 @@ function workflowStatusOf(status: 'running' | 'done' | 'failed' | null | undefin
   return 'pending'
 }
 
-/** 把 Workflow 进度按节点 id 解析成运行时表：成员看 members[agent_id]，
+/** 把 Workflow 进度按节点 id 解析成运行时表：成员看 members[member:{agent_id}]，
  *  「智能路由」节点看 routing，「汇总结果」节点看 merging；起点/终点没有自身状态。
- *  runId 从右栏面板反查：成员以 SubAgent 运行，面板 agentId 即事件 actor.agent_id，
- *  面板 id 即 run_id。同一成员多轮会话只会有当前轮的面板（dispatch 每轮清空）。 */
+ *  runId 取挂在该成员卡下的子运行：按 parentId === member:{agent_id} 找面板，
+ *  同一父卡下可能有续跑重跑建出的多条，全部保留、最后一条是当前的。 */
 export function resolveWorkflowRuntime(
   nodes: TopoNode[],
   progress: WorkflowProgressState,
@@ -45,11 +45,14 @@ export function resolveWorkflowRuntime(
   for (const node of nodes) {
     if (node.data.kind === 'member') {
       if (node.data.agentId == null) continue
-      const member = progress.members[node.data.agentId]
-      const panel = agents.find((agent) => agent.agentId === node.data.agentId)
+      const memberId = `member:${node.data.agentId}`
+      const member = progress.members[memberId]
+      // 只有本轮真的跑到这个成员才挂面板；没跑过的节点即使有历史记录也不点亮。
+      const runs = member ? agents.filter((agent) => agent.parentId === memberId) : []
+      const current = runs[runs.length - 1]
       result[node.id] = {
         status: workflowStatusOf(member?.status),
-        runId: panel?.id ?? null,
+        runId: current?.id ?? null,
       }
     } else if (node.data.kind === 'router') {
       result[node.id] = { status: workflowStatusOf(progress.routing), runId: null }
