@@ -107,9 +107,26 @@
   font-size: var(--fs-sm);
 }
 
-.wf-heading > nav strong {
+.wf-heading > nav [data-slot='list'] {
+  gap: 5px;
+}
+
+.wf-heading > nav [data-slot='link'] {
+  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
+}
+
+/* 原来「Workflows」和「详情」都加粗，这里保持一致 */
+.wf-heading > nav [data-slot='item']:not(:first-child) [data-slot='link'] {
   color: var(--text-muted);
   font-weight: 500;
+}
+
+.wf-heading > nav [data-slot='separatorIcon'] {
+  width: 11px;
+  height: 11px;
+  color: inherit;
 }
 
 .wf-heading > div {

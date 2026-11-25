@@ -112,11 +112,6 @@
   font-style: normal;
 }
 
-.wf-detail-empty {
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-}
-
 .wf-detail-list {
   margin: 0;
   display: flex;

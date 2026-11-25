@@ -100,6 +100,7 @@
 }
 
 .avatarOption {
+  display: block;
   padding: var(--space-xs);
   border: 1px solid var(--border);
   border-radius: 50%;
@@ -132,6 +133,7 @@
 .avatarOptionImage {
   display: block;
   width: 100%;
+  height: auto;
   aspect-ratio: 1;
   border-radius: 50%;
   object-fit: cover;

@@ -26,25 +26,6 @@
   overflow: hidden;
 }
 
-/* 日期范围：两个输入等分字段格子宽度。 */
-.dateRange {
-  width: 100%;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dateRange > :global([data-slot='root']) {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.dateRange span {
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
-}
-
 /* 表格样式由基线提供；本页只保留行操作按钮组与加入方式文本的覆写。 */
 .rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 .joinModeText { text-transform: none; }

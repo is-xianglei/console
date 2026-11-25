@@ -158,6 +158,7 @@
   flex: 0 0 20px;
   display: grid;
   place-items: center;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -179,8 +180,9 @@
   color: var(--text-primary);
 }
 
-.treeToggle i {
-  font-size: var(--fs-sm);
+.treeToggle svg {
+  width: 14px;
+  height: 14px;
 }
 
 .empty {

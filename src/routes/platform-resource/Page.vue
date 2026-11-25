@@ -302,7 +302,7 @@ onBeforeUnmount(() => {
         >
           <template #name-cell="{ row }">
             <UButton color="neutral" variant="ghost" :class="$style['resource-name-button']" @click.stop="selectedId = row.original.id">
-              <span :class="$style['resource-name']"><span class="dot" :class="row.original.status" :aria-label="getStatusLabel(row.original.status)"></span>{{ row.original.name }}</span>
+              <span :class="$style['resource-name']"><UChip as="span" standalone size="xs" :ui="{ base: `dot ${row.original.status}` }" :aria-label="getStatusLabel(row.original.status)" />{{ row.original.name }}</span>
               <span :class="[$style['resource-id'], 'mono']">{{ row.original.id }}</span>
             </UButton>
           </template>
@@ -325,7 +325,7 @@ onBeforeUnmount(() => {
               <span :class="[$style['inspector-kicker'], 'mono']">{{ selectedRow.id }}</span>
               <h2>{{ selectedRow.name }}</h2>
             </div>
-            <UBadge :color="statusColor[selectedRow.status]" variant="subtle" size="xs"><span class="dot" :class="selectedRow.status"></span>{{ statusLabel[selectedRow.status] }}</UBadge>
+            <UBadge :color="statusColor[selectedRow.status]" variant="subtle" size="xs"><UChip as="span" standalone size="xs" :ui="{ base: `dot ${selectedRow.status}` }" />{{ statusLabel[selectedRow.status] }}</UBadge>
           </header>
           <UTabs v-model="inspectorTab" :items="inspectorItems" :content="false" variant="link" size="sm" :class="$style['inspector-tabs']" />
           <div :class="$style['inspector-body']">
@@ -344,9 +344,9 @@ onBeforeUnmount(() => {
               <UButton type="submit" label="保存草稿" icon="i-lucide-save" color="neutral" variant="outline" block :class="$style['secondary-action']" />
             </UForm>
             <template v-else>
-              <div :class="$style['history-item']"><span class="dot nominal" aria-label="正常"></span><div><strong>配置已同步</strong><p class="mono">今天 14:31 · system</p></div></div>
-              <div :class="$style['history-item']"><span class="dot warning" aria-label="需关注"></span><div><strong>治理策略已更新</strong><p class="mono">昨天 18:42 · {{ selectedRow.owner }}</p></div></div>
-              <div :class="$style['history-item']"><span class="dot idle" aria-label="未启用"></span><div><strong>资源已创建</strong><p class="mono">2026-07-18 09:16 · platform</p></div></div>
+              <div :class="$style['history-item']"><UChip as="span" standalone size="xs" :ui="{ base: 'dot nominal' }" aria-label="正常" /><div><strong>配置已同步</strong><p class="mono">今天 14:31 · system</p></div></div>
+              <div :class="$style['history-item']"><UChip as="span" standalone size="xs" :ui="{ base: 'dot warning' }" aria-label="需关注" /><div><strong>治理策略已更新</strong><p class="mono">昨天 18:42 · {{ selectedRow.owner }}</p></div></div>
+              <div :class="$style['history-item']"><UChip as="span" standalone size="xs" :ui="{ base: 'dot idle' }" aria-label="未启用" /><div><strong>资源已创建</strong><p class="mono">2026-07-18 09:16 · platform</p></div></div>
             </template>
           </div>
         </template>

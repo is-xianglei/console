@@ -22,5 +22,5 @@
 .workspace-option-current .workspace-item-symbol { border-color: color-mix(in srgb, var(--accent-agent) 34%, var(--border)); background: var(--accent-agent-dim); color: var(--accent-agent); }
 .workspace-current { color: var(--accent-agent); display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); white-space: nowrap; }
 .workspace-current svg,.workspace-spinner { width: 12px; height: 12px; }
-.workspace-spinner { color: var(--accent-agent); animation: global(spin) 1s linear infinite; }
+.workspace-spinner { color: var(--accent-agent); }
 @media (max-width: 760px) { .workspace-options,.workspace-viewport { max-height: calc(100dvh - 166px); } }

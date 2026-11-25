@@ -153,9 +153,7 @@ function onSelectSubagent(id: string) {
           :selected="!effectiveMember && a.id === state.selectedAgentId"
           @select="onSelectSubagent(a.id)"
         />
-        <div v-if="!state.agents.length && !teammates.length" :class="[$style['roster-empty'], 'mono']">
-          暂无派发的子代理<br />派发任务后将在此实时显示
-        </div>
+        <UEmpty v-if="!state.agents.length && !teammates.length" variant="naked" size="xs" title="暂无派发的子代理" description="派发任务后将在此实时显示" />
       </div>
 
       <AgentDetail

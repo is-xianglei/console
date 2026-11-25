@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { defineShortcuts } from '@nuxt/ui/composables'
 import { WORKFLOW_MODE_OPTIONS, minWorkflowMembers } from '@/constants/workflow'
 import type { AgentResponse } from '@/interfaces/agent/api'
 import type {
@@ -184,34 +185,25 @@ function onSave() {
   emit('save')
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') onCloseRequest()
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
-    event.preventDefault()
-    void onSave()
-  }
-}
+defineShortcuts({
+  escape: { usingInput: true, handler: () => onCloseRequest() },
+  meta_s: { usingInput: true, handler: () => { void onSave() } },
+})
 
 /** 按下把手但未启动拖拽时清理武装状态，避免后续文本拖动误触发行排序。 */
 function handlePointerUp() {
   dragArmedIndex.value = null
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
-  window.addEventListener('pointerup', handlePointerUp)
-})
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleKeydown)
-  window.removeEventListener('pointerup', handlePointerUp)
-})
+onMounted(() => window.addEventListener('pointerup', handlePointerUp))
+onBeforeUnmount(() => window.removeEventListener('pointerup', handlePointerUp))
 </script>
 
 <template>
   <main ref="builderRoot" :class="$style['wf-builder']">
     <header :class="$style['wf-builder-head']">
       <UTooltip text="返回 Workflows"><UButton :class="$style['wf-icon-button']" icon="i-lucide-arrow-left" color="neutral" variant="ghost" square aria-label="返回 Workflows" @click="onCloseRequest" /></UTooltip>
-      <div :class="$style['wf-builder-title']"><nav><span>Workflows</span><template v-if="mode === 'edit'"><i class="icon icon-chevron-right"></i><strong>{{ workflow.name }}</strong></template></nav><h1>{{ mode === 'create' ? '创建 Workflow' : '编辑 Workflow' }}</h1></div>
+      <div :class="$style['wf-builder-title']"><UBreadcrumb :items="mode === 'edit' ? [{ label: 'Workflows' }, { label: workflow.name }] : [{ label: 'Workflows' }]" /><h1>{{ mode === 'create' ? '创建 Workflow' : '编辑 Workflow' }}</h1></div>
       <div :class="$style['wf-builder-actions']"><UButton :class="$style['wf-primary-button']" icon="i-lucide-save" label="保存" :loading="saving" :disabled="saving" @click="onSave" /></div>
     </header>
     <UAlert v-if="error" :class="$style['wf-validation-banner']" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="error" />

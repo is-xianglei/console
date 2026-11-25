@@ -8,7 +8,10 @@
 .header { min-height: 86px; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .heading { min-width: 0; }
 .breadcrumb { margin-bottom: 9px; display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-family: var(--font-data); font-size: var(--fs-sm); text-transform: uppercase; }
-.breadcrumb strong { color: var(--text-muted); font-weight: 600; }
+.breadcrumb [data-slot='list'] { gap: 6px; }
+.breadcrumb [data-slot='link'] { color: inherit; font-size: inherit; font-weight: 400; }
+.breadcrumb [data-slot='item']:last-child [data-slot='link'] { color: var(--text-muted); font-weight: 600; }
+.breadcrumb [data-slot='separatorIcon'] { width: 12px; height: 12px; color: inherit; }
 .titleRow { display: flex; align-items: flex-start; gap: 11px; }
 .titleRow h1 { color: var(--text-primary); font-family: var(--font-ui); font-size: 19px; font-weight: 680; }
 .titleRow p { max-width: 720px; margin-top: 4px; color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.55; }

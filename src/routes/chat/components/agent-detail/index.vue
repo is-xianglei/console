@@ -58,12 +58,13 @@ const detailTiles = computed<DetailTile[]>(() => {
 <template>
   <div ref="scroller" :class="$style['agent-detail']">
     <!-- 空状态 -->
-    <div v-if="!agent" :class="$style['detail-empty']">
-      <svg :class="$style['hx']" viewBox="0 0 20 22" fill="none">
-        <path d="M10 0L19.66 5.5V16.5L10 22L0.34 16.5V5.5L10 0Z" fill="currentColor" />
-      </svg>
-      <p>{{ emptyText ?? '选中一个子代理以查看它的推理、回答与工具调用' }}</p>
-    </div>
+    <UEmpty v-if="!agent" variant="naked" :class="$style['detail-empty']" :description="emptyText ?? '选中一个子代理以查看它的推理、回答与工具调用'">
+      <template #leading>
+        <svg :class="$style['hx']" viewBox="0 0 20 22" fill="none" aria-hidden="true">
+          <path d="M10 0L19.66 5.5V16.5L10 22L0.34 16.5V5.5L10 0Z" fill="currentColor" />
+        </svg>
+      </template>
+    </UEmpty>
 
     <template v-else>
       <div :class="$style['detail-head']">

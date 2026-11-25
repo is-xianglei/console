@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, toRef } from 'vue'
+import { computed, toRef } from 'vue'
+import { defineShortcuts } from '@nuxt/ui/composables'
 import { useRouter } from 'vue-router'
 import { useBuildResourceManager } from '@/hooks/useBuildResourceManager'
 import type { ResourcePage, ResourceStatus } from '@/interfaces/platform/model'
@@ -43,22 +44,23 @@ function onSingleStatusChange(id: string, status: ResourceStatus) {
   manager.updateStatus([id], status)
 }
 
-function handleEscape(event: KeyboardEvent) {
-  if (event.key !== 'Escape') return
-  if (manager.pendingDeleteIds.value.length) manager.pendingDeleteIds.value = []
-  else if (manager.formOpen.value) manager.formOpen.value = false
-  else if (manager.selectedId.value) manager.selectedId.value = ''
-}
-
-onMounted(() => window.addEventListener('keydown', handleEscape))
-onBeforeUnmount(() => window.removeEventListener('keydown', handleEscape))
+defineShortcuts({
+  escape: {
+    usingInput: true,
+    handler: () => {
+      if (manager.pendingDeleteIds.value.length) manager.pendingDeleteIds.value = []
+      else if (manager.formOpen.value) manager.formOpen.value = false
+      else if (manager.selectedId.value) manager.selectedId.value = ''
+    },
+  },
+})
 </script>
 
 <template>
   <main :class="$style['br-page']">
     <header :class="$style['br-page-head']">
       <div :class="$style['br-heading']">
-        <nav aria-label="面包屑"><span>构建资源</span><UIcon name="i-lucide-chevron-right" /><strong>{{ page.group }}</strong></nav>
+        <UBreadcrumb :items="[{ label: '构建资源' }, { label: page.group }]" />
         <div :class="$style['br-title-row']"><span :class="$style['br-title-icon']"><UIcon :name="`i-lucide-${page.icon}`" /></span><div><h1>{{ page.title }}</h1><p>{{ page.description }}</p></div></div>
       </div>
       <div :class="$style['br-head-actions']">

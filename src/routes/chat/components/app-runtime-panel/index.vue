@@ -56,7 +56,7 @@ function selectTab(value: string | number) {
     </div>
 
     <header :class="$style['runtime-head']">
-      <span class="dot nominal" title="实时连接正常"></span>
+      <UChip as="span" standalone size="xs" :ui="{ base: 'dot nominal' }" title="实时连接正常" />
       <h2>{{ app.name }} · 实时</h2>
       <span :class="[$style['runtime-source'], 'mono']">{{ app.subject }}</span>
       <UButton color="neutral" variant="ghost" square title="刷新应用数据" aria-label="刷新应用数据" @click="refreshRuntime">
@@ -104,10 +104,14 @@ function selectTab(value: string | number) {
           @click="selectedAssetIndex = index; notify(`已选择${asset.name}`)"
         >
           <span :class="$style['asset-main']">
-            <span :class="$style['asset-name']"><span class="dot" :class="asset.status"></span>{{ asset.name }}</span>
-            <span :class="[$style['health-bar'], { [$style.warning]: asset.status === 'warning' }]">
-              <span :style="{ width: `${asset.score}%` }"></span>
-            </span>
+            <span :class="$style['asset-name']"><UChip as="span" standalone size="xs" :ui="{ base: `dot ${asset.status}` }" />{{ asset.name }}</span>
+            <UProgress
+              :model-value="asset.score"
+              size="xs"
+              :class="$style['health-bar']"
+              :ui="{ base: $style['health-track'], indicator: asset.status === 'warning' ? $style['health-fill-warning'] : $style['health-fill'] }"
+              :aria-label="`${asset.name} 健康度`"
+            />
           </span>
           <span :class="[$style['asset-reading'], 'mono']">{{ asset.reading }}</span>
           <span :class="[$style['asset-state'], { [$style.warning]: asset.status === 'warning' }]">{{ asset.status === 'warning' ? '预警' : '正常' }}</span>
@@ -116,7 +120,7 @@ function selectTab(value: string | number) {
 
       <section :class="$style['detail-panel']">
         <div :class="$style['detail-title']">
-          <span class="dot" :class="selectedAsset?.status ?? 'nominal'"></span>
+          <UChip as="span" standalone size="xs" :ui="{ base: `dot ${selectedAsset?.status ?? 'nominal'}` }" />
           <strong>{{ selectedAsset?.name ?? app.detail }}</strong>
           <span :class="[$style['review-state'], 'mono']">{{ app.reviewLabel }}</span>
         </div>

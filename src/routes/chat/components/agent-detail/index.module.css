@@ -20,7 +20,7 @@
   opacity: 0.2;
   animation: global(glow-breathe) 3s ease-in-out infinite;
 }
-.detail-empty p {
+.detail-empty [data-slot='description'] {
   font-family: var(--font-body);
   font-size: 12px;
   color: var(--text-dim);

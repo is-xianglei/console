@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import type { SelectItem } from '@nuxt/ui'
+import type { DropdownMenuItem, SelectItem } from '@nuxt/ui'
 import { useToast } from '@nuxt/ui/composables'
 import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
@@ -160,8 +160,6 @@ watch(
 // ===== contentEditable 编辑器状态 =====
 const value = ref('')
 const phase = ref<Phase>('idle')
-const menuOpen = ref(false)
-const skillsOpen = ref(false)
 /** 附件为前端占位：后端 SendMessageRequest 尚无附件字段，文件只在本地预览，发送时不会上传。
  *  存原始 File 以便 UChatAttachment 读出名称、大小与图片预览（浅层 ref 避免 File 被代理）。 */
 const attachments = shallowRef<File[]>([])
@@ -181,7 +179,6 @@ let ignoreHover = false
 
 const editor = ref<HTMLElement | null>(null)
 const frame = ref<HTMLElement | null>(null)
-const plusWrap = ref<HTMLElement | null>(null)
 const fileRef = ref<HTMLInputElement | null>(null)
 let preEnhanceHTML = ''
 let pendingHTML: string | null = null
@@ -206,6 +203,27 @@ const slashResults = computed(() => {
     (sk) => sk.name.toLowerCase().includes(q) || sk.description.toLowerCase().includes(q),
   )
 })
+/** 插入技能后焦点要留在输入框，不能被菜单关闭时还给 + 按钮。 */
+let keepEditorFocus = false
+const plusItems = computed<DropdownMenuItem[][]>(() => [
+  [
+    { label: '图片', icon: 'i-lucide-image', onSelect: () => openPicker('image') },
+    { label: '文件', icon: 'i-lucide-paperclip', onSelect: () => openPicker('file') },
+  ],
+  [{
+    label: '技能',
+    icon: 'i-lucide-book-open',
+    children: enabledSkills.value.length
+      ? enabledSkills.value.map((sk) => ({ label: sk.name, onSelect: () => addSkillFromMenu(sk.name) }))
+      : [{ label: skillsStore.state.skillsLoading ? '加载中…' : '暂无已启用的技能', disabled: true }],
+  }],
+])
+
+function onPlusCloseAutoFocus(event: Event) {
+  if (!keepEditorFocus) return
+  keepEditorFocus = false
+  event.preventDefault()
+}
 
 watch(
   showPill,
@@ -332,8 +350,8 @@ function addSkillFromMenu(name: string) {
     range.selectNodeContents(el)
     range.collapse(false)
   }
+  keepEditorFocus = true
   insertPillOverRange(range, name)
-  menuOpen.value = false
 }
 
 // ===== 斜杠命令检测与应用 =====
@@ -601,7 +619,6 @@ function openPicker(kind: 'image' | 'file') {
   input.accept = kind === 'image' ? 'image/*' : ''
   input.value = ''
   input.click()
-  menuOpen.value = false
 }
 
 function addFiles(files: File[]) {
@@ -652,32 +669,9 @@ function onPaste(e: ClipboardEvent) {
   addFiles(files)
 }
 
-// ===== + 菜单：打开期间挂 document 级监听，关闭/卸载时清理 =====
-function onDocDown(e: PointerEvent) {
-  if (menuOpen.value && plusWrap.value && !plusWrap.value.contains(e.target as Node))
-    menuOpen.value = false
-}
-
-function onDocKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') menuOpen.value = false
-}
-
-watch(menuOpen, (open) => {
-  if (open) {
-    document.addEventListener('pointerdown', onDocDown)
-    document.addEventListener('keydown', onDocKey)
-  } else {
-    skillsOpen.value = false
-    document.removeEventListener('pointerdown', onDocDown)
-    document.removeEventListener('keydown', onDocKey)
-  }
-})
-
 onBeforeUnmount(() => {
   abort?.abort()
   if (pillTimer) clearTimeout(pillTimer)
-  document.removeEventListener('pointerdown', onDocDown)
-  document.removeEventListener('keydown', onDocKey)
   // 斜杠面板的 window 监听由 watch 的 onCleanup 负责，这里兜底再清一次
   window.removeEventListener('keydown', onSlashWindowKey, true)
 })
@@ -762,72 +756,18 @@ onBeforeUnmount(() => {
         </div>
 
         <div :class="$style.row">
-          <div ref="plusWrap" :class="$style['plus-wrap']">
-            <button
-              type="button"
-              :class="[$style['icon-btn'], $style.plus]"
-              :data-open="menuOpen || undefined"
-              aria-label="添加附件或技能"
-              :aria-expanded="menuOpen"
-              @click="menuOpen = !menuOpen"
-            >
+          <UDropdownMenu :items="plusItems" :content="{ side: 'top', align: 'start', sideOffset: 6, onCloseAutoFocus: onPlusCloseAutoFocus }">
+            <UButton :class="[$style['icon-btn'], $style.plus]" color="neutral" variant="ghost" aria-label="添加附件或技能">
               <span :class="$style['plus-icon']"><UIcon name="i-lucide-plus" /></span>
-            </button>
-
-            <div v-if="menuOpen" :class="$style.menu" role="menu">
-              <!-- 附件为占位实现：title 提示用户文件不会真正上传 -->
-              <button type="button" role="menuitem" :class="$style['menu-item']" title="附件功能待后端支持，发送时不会上传" @click="openPicker('image')">
-                <span :class="$style['menu-icon']"><UIcon name="i-lucide-image" /></span>
-                <span :class="$style['menu-name']">图片</span>
-              </button>
-              <button type="button" role="menuitem" :class="$style['menu-item']" title="附件功能待后端支持，发送时不会上传" @click="openPicker('file')">
-                <span :class="$style['menu-icon']"><UIcon name="i-lucide-paperclip" /></span>
-                <span :class="$style['menu-name']">文件</span>
-              </button>
-              <div :class="$style['menu-divider']"></div>
-              <div
-                :class="$style['menu-sub']"
-                @mouseenter="skillsOpen = true"
-                @mouseleave="skillsOpen = false"
-              >
-                <button
-                  type="button"
-                  role="menuitem"
-                  :class="$style['menu-item']"
-                  aria-haspopup="menu"
-                  :aria-expanded="skillsOpen"
-                  @click="skillsOpen = true"
-                >
-                  <span :class="$style['menu-icon']"><UIcon name="i-lucide-book-open" /></span>
-                  <span :class="$style['menu-name']">技能</span>
-                  <span :class="$style['menu-chevron']"><UIcon name="i-lucide-chevron-right" /></span>
-                </button>
-                <div v-if="skillsOpen" :class="$style['menu-flyout']" role="menu">
-                  <button
-                    v-for="sk in enabledSkills"
-                    :key="sk.id"
-                    type="button"
-                    role="menuitem"
-                    :class="$style['menu-item']"
-                    @click="addSkillFromMenu(sk.name)"
-                  >
-                    <span :class="$style['menu-name']">{{ sk.name }}</span>
-                  </button>
-                  <div v-if="!enabledSkills.length" :class="$style['slash-empty']">
-                    {{ skillsStore.state.skillsLoading ? '加载中…' : '暂无已启用的技能' }}
-                  </div>
-                </div>
-              </div>
-              <div :class="$style['menu-divider']"></div>
-            </div>
-          </div>
+            </UButton>
+          </UDropdownMenu>
 
           <!-- Agent/Workflow 下拉，融入工具栏左侧 -->
           <USelect v-model="selectedTarget" :class="$style['agent-select']" :items="targetItems" :icon="targetIcon" value-key="value" label-key="label" :disabled="persistedSession || state.busy || readOnlySession" :loading="agentsStore.state.loading || workflowsStore.state.loading || teamsStore.state.loading" aria-label="选择新会话的 Agent、Workflow 或 Team" />
 
           <div :class="$style.right">
             <span v-if="enhancing" :class="[$style['icon-btn'], $style['spinner-btn']]" aria-label="正在增强提示词">
-              <UIcon name="i-lucide-loader-circle" :class="$style.spinner" />
+              <UIcon name="i-lucide-loader-circle" class="animate-spin" />
             </span>
             <button
               v-else-if="pillMounted"

@@ -110,7 +110,7 @@ function resourceMenuItems(row: ResourceRow) {
 
     <template #status-cell="{ row }">
       <UBadge :color="statusColor(row.original.status)" variant="subtle" size="xs" :class="$style['br-status']">
-        <span class="dot" :class="row.original.status"></span>{{ statusLabel(row.original.status) }}
+        <UChip as="span" standalone size="xs" :ui="{ base: `dot ${row.original.status}` }" />{{ statusLabel(row.original.status) }}
       </UBadge>
     </template>
 

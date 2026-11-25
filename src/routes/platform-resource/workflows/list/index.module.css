@@ -19,24 +19,6 @@
   overflow: hidden;
 }
 
-.dateRange {
-  width: 100%;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dateRange > :global([data-slot='root']) {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.dateRange span {
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-}
-
 .alert { margin: 10px 10px 0; }
 
 /* 表格区（ListCard 承载滚动，这里只保留表格自身样式）。 */

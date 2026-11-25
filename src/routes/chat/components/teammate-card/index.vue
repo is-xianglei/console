@@ -34,7 +34,7 @@ const DOT: Record<MemberDisplayStatus['tone'], string> = {
       <span :class="$style.name">{{ name }}</span>
       <span :class="[$style.status, { [$style.error]: status.error }]">
         <AiOrb v-if="status.tone === 'running'" :class="$style.orb" :size="14" :label="status.label" />
-        <span v-else class="dot" :class="status.error ? 'error' : DOT[status.tone]"></span>
+        <UChip v-else as="span" standalone size="xs" :ui="{ base: `dot ${status.error ? 'error' : DOT[status.tone]}` }" />
         {{ status.label }}
       </span>
     </div>

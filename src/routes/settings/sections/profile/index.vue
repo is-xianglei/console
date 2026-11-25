@@ -90,12 +90,12 @@ async function onLogout() {
           </li>
           <template v-else-if="profile">
             <li :class="$style.row">
-              <button type="button" :class="$style.avatarButton" aria-label="更换头像" @click="openAvatarPicker">
+              <UButton :class="$style.avatarButton" color="neutral" variant="link" aria-label="更换头像" @click="openAvatarPicker">
                 <UAvatar :class="$style.avatar" :src="profile.avatar_url || undefined" :alt="displayName" />
                 <span :class="$style.avatarOverlay" aria-hidden="true">
                   <UIcon name="i-lucide-pencil" />
                 </span>
-              </button>
+              </UButton>
               <div :class="$style.rowMain">
                 <div v-if="editingField === 'full_name'" :class="$style.inlineEditor">
                   <UInput
@@ -183,18 +183,19 @@ async function onLogout() {
       <template #body>
         <div :class="$style.avatarPicker">
           <div :class="$style.avatarGrid">
-            <button
+            <UButton
               v-for="item in DEFAULT_AVATARS"
               :key="item.id"
-              type="button"
               :class="[$style.avatarOption, profile?.avatar_url === item.url && $style.avatarOptionActive]"
+              color="neutral"
+              variant="ghost"
               :aria-label="`默认头像 ${item.id.slice(-1)}`"
               :aria-pressed="profile?.avatar_url === item.url"
               :disabled="savingAvatar"
               @click="pickAvatar(item.url)"
             >
-              <img :src="item.url" alt="" :class="$style.avatarOptionImage">
-            </button>
+              <UAvatar :src="item.url" alt="" :class="$style.avatarOptionImage" />
+            </UButton>
           </div>
           <UFormField label="头像 URL" name="avatarUrl" :error="avatarUrlError || false">
             <div :class="$style.urlLine">

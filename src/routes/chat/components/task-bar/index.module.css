@@ -30,12 +30,6 @@
   flex-shrink: 0;
   color: var(--accent-agent);
 }
-.spin {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
 .title {
   font-weight: 600;
 }

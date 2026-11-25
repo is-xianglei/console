@@ -45,7 +45,7 @@ function openItem(key: string, routePath?: string) {
       </section>
     </div>
     <footer :class="$style['module-foot']">
-      <span class="dot nominal"></span>
+      <UChip as="span" standalone size="xs" :ui="{ base: 'dot nominal' }" />
       <span>配置目录已同步</span>
       <span class="mono">14:32</span>
     </footer>

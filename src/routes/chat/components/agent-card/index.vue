@@ -1,14 +1,22 @@
 <script setup lang="ts">
+import { computed, useCssModule } from 'vue'
 import { AiOrb } from '@/components'
 import type { SubAgent } from '@/interfaces'
 
 defineOptions({ name: 'AgentCard' })
 
-defineProps<{
+const props = defineProps<{
   agent: SubAgent
   selected: boolean
 }>()
 defineEmits<{ select: [] }>()
+const styles = useCssModule()
+/** 进度条颜色随状态变：推理中、已完成各有颜色。 */
+const fillClass = computed(() => [
+  styles['agent-mini-fill'],
+  props.agent.status === 'think' ? styles.think : '',
+  props.agent.status === 'done' ? styles.done : '',
+].filter(Boolean).join(' '))
 
 const statusLabel: Record<string, string> = {
   queued: '排队',
@@ -45,20 +53,15 @@ function dotClass(s: string) {
     </div>
     <div :class="$style['agent-card-bot']">
       <AiOrb v-if="isRunning(agent.status)" :class="$style['orb-fit']" :size="14" :label="statusLabel[agent.status]" />
-      <span v-else class="dot" :class="dotClass(agent.status)"></span>
+      <UChip v-else as="span" standalone size="xs" :ui="{ base: `dot ${dotClass(agent.status)}` }" />
       <span :class="$style['agent-status-txt']">{{ statusLabel[agent.status] }}</span>
-      <span :class="$style['agent-mini-prog']">
-        <span
-          :class="[
-            $style['agent-mini-fill'],
-            {
-              [$style.think]: agent.status === 'think',
-              [$style.done]: agent.status === 'done',
-            },
-          ]"
-          :style="{ width: agent.progress + '%' }"
-        ></span>
-      </span>
+      <UProgress
+        :model-value="agent.progress"
+        size="xs"
+        :class="$style['agent-mini-prog']"
+        :ui="{ base: $style['agent-mini-track'], indicator: fillClass }"
+        :aria-label="`${agent.name} 进度`"
+      />
     </div>
   </button>
 </template>

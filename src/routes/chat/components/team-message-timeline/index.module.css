@@ -66,9 +66,3 @@
   color: var(--text-primary);
 }
 
-.empty {
-  padding: 24px 14px;
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  text-align: center;
-}

@@ -2,7 +2,7 @@
 import type { TableColumn } from '@nuxt/ui'
 import { computed, ref, useCssModule, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FilterPanel, ListCard, ResourcePagination, ResourceTable } from '@/components'
+import { DateRangeInput, FilterPanel, ListCard, ResourcePagination, ResourceTable } from '@/components'
 import GroupFormModal from '../components/group-form-modal/index.vue'
 import { groupJoinModeLabel, groupTypeLabel, groupVisibilityLabel } from '@/hooks/useGroupEditor'
 import { useGroupManager, type GroupEnabledFilter } from '@/hooks/useGroupManager'
@@ -134,11 +134,7 @@ watch(
         <USelect :model-value="manager.state.groupType" :items="typeOptions" aria-label="类型" @update:model-value="(value: unknown) => { manager.state.groupType = String(value ?? 'all') }" />
       </UFormField>
       <UFormField label="创建时间">
-        <div :class="styles.dateRange">
-          <UInput :model-value="manager.state.dateRange[0]" type="date" aria-label="开始日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [String(value ?? ''), manager.state.dateRange[1]] }" />
-          <span>~</span>
-          <UInput :model-value="manager.state.dateRange[1]" type="date" aria-label="结束日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [manager.state.dateRange[0], String(value ?? '')] }" />
-        </div>
+        <DateRangeInput v-model="manager.state.dateRange" />
       </UFormField>
       <!-- 原为状态 Tabs：v-model 与选项值不变。与同页「类型」下拉一致，改动即写 state，
            由 manager 的 state 深度监听（300ms 防抖）触发重拉。 -->

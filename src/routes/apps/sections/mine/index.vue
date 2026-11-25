@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
+import type { TableColumn } from '@nuxt/ui'
 import { useToast } from '@nuxt/ui/composables'
 import { RelativeTime } from '@/components'
 import { MARKET_KIND_LABELS, MARKET_LISTING_STATUS_META, MARKET_VERSION_STATUS_META } from '@/constants/market'
@@ -28,6 +29,16 @@ const authStore = useAuthStore()
 const marketStore = useMarketStore()
 
 const loadError = ref('')
+const versionColumns: TableColumn<MarketVersion>[] = [
+  { id: 'version', header: '版本' },
+  { id: 'status', header: '状态' },
+  { id: 'category', header: '分类' },
+  { id: 'release_note', header: '版本说明' },
+  { id: 'review_comment', header: '审核意见 / 驳回理由' },
+  { id: 'created_at', header: '提交时间' },
+  { id: 'reviewed_at', header: '审核时间' },
+  { id: 'actions', header: () => h('span', { class: 'sr-only' }, '操作'), meta: { class: { td: 'text-right whitespace-nowrap' } } },
+]
 const pendingAction = ref<PendingAction | null>(null)
 const acting = ref(false)
 /** 正在重新上架的条目 ID，对应按钮显示 loading。 */
@@ -228,51 +239,35 @@ async function onRelist(item: MarketMyListingItem) {
 
         <p v-if="item.listing.status_reason" :class="$style.statusReason">下架原因：{{ item.listing.status_reason }}</p>
 
-        <div :class="$style.tableWrap">
-          <table :class="$style.versions">
-            <thead>
-              <tr>
-                <th>版本</th>
-                <th>状态</th>
-                <th>分类</th>
-                <th>版本说明</th>
-                <th>审核意见 / 驳回理由</th>
-                <th>提交时间</th>
-                <th>审核时间</th>
-                <th aria-label="操作"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="version in item.versions" :key="version.id">
-                <td class="mono">v{{ version.version_number }}</td>
-                <td>
-                  <UBadge
-                    :label="MARKET_VERSION_STATUS_META[version.status].label"
-                    :color="MARKET_VERSION_STATUS_META[version.status].color"
-                    variant="subtle"
-                    size="xs"
-                  />
-                </td>
-                <td>{{ getCategoryLabel(marketStore.state.categories, version.category) }}</td>
-                <td :class="$style.textCell">{{ version.release_note || '—' }}</td>
-                <td :class="[$style.textCell, { [$style.rejected]: version.status === 'rejected' }]">{{ version.review_comment || '—' }}</td>
-                <td><RelativeTime :value="version.created_at" /></td>
-                <td><RelativeTime :value="version.reviewed_at" /></td>
-                <td :class="$style.actionCell">
-                  <UButton
-                    v-if="version.status === 'pending'"
-                    label="撤回"
-                    color="neutral"
-                    variant="outline"
-                    size="xs"
-                    icon="i-lucide-undo-2"
-                    @click="requestWithdraw(item, version)"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <UTable :data="item.versions" :columns="versionColumns" :get-row-id="(version: MarketVersion) => String(version.id)" :ui="{ root: $style.tableWrap, base: $style.versions }">
+          <template #version-cell="{ row }"><span class="mono">v{{ row.original.version_number }}</span></template>
+          <template #status-cell="{ row }">
+            <UBadge
+              :label="MARKET_VERSION_STATUS_META[row.original.status].label"
+              :color="MARKET_VERSION_STATUS_META[row.original.status].color"
+              variant="subtle"
+              size="xs"
+            />
+          </template>
+          <template #category-cell="{ row }">{{ getCategoryLabel(marketStore.state.categories, row.original.category) }}</template>
+          <template #release_note-cell="{ row }"><span :class="$style.textCell">{{ row.original.release_note || '—' }}</span></template>
+          <template #review_comment-cell="{ row }">
+            <span :class="[$style.textCell, { [$style.rejected]: row.original.status === 'rejected' }]">{{ row.original.review_comment || '—' }}</span>
+          </template>
+          <template #created_at-cell="{ row }"><RelativeTime :value="row.original.created_at" /></template>
+          <template #reviewed_at-cell="{ row }"><RelativeTime :value="row.original.reviewed_at" /></template>
+          <template #actions-cell="{ row }">
+            <UButton
+              v-if="row.original.status === 'pending'"
+              label="撤回"
+              color="neutral"
+              variant="outline"
+              size="xs"
+              icon="i-lucide-undo-2"
+              @click="requestWithdraw(item, row.original)"
+            />
+          </template>
+        </UTable>
       </article>
     </div>
 

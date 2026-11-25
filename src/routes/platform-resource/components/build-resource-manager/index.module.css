@@ -32,13 +32,25 @@
   font-size: var(--fs-sm);
 }
 
-.br-heading nav i {
-  font-size: 11px;
+.br-heading nav [data-slot='list'] {
+  gap: 5px;
 }
 
-.br-heading nav strong {
+.br-heading nav [data-slot='link'] {
+  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
+}
+
+.br-heading nav [data-slot='item']:last-child [data-slot='link'] {
   color: var(--text-muted);
   font-weight: 500;
+}
+
+.br-heading nav [data-slot='separatorIcon'] {
+  width: 11px;
+  height: 11px;
+  color: inherit;
 }
 
 .br-title-row {

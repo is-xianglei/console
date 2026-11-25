@@ -122,6 +122,7 @@
 }
 
 .textCell {
+  display: block;
   max-width: 260px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -131,7 +132,3 @@
   color: var(--status-error);
 }
 
-.actionCell {
-  text-align: right;
-  white-space: nowrap;
-}

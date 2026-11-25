@@ -137,31 +137,36 @@ function onFieldsKeydown(event: KeyboardEvent) {
   <section :class="styles.filterPanel" :aria-label="props.title">
     <header :class="styles.head">
       <span :class="styles.title">{{ props.title }}</span>
-      <button
+      <UButton
         v-if="props.collapsible"
-        type="button"
         :class="styles.toggle"
+        color="neutral"
+        variant="link"
+        size="xs"
+        :label="collapsed ? '展开' : '收起'"
+        :trailing-icon="collapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
         :aria-expanded="!collapsed"
         :aria-controls="bodyId"
         :aria-label="`${collapsed ? '展开' : '收起'}${props.title}`"
         @click="toggle"
-      >
-        {{ collapsed ? '展开' : '收起' }}
-        <UIcon :name="collapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" />
-      </button>
+      />
     </header>
 
-    <div v-show="!collapsed" :id="bodyId" :class="styles.body">
-      <div ref="fieldsRef" :class="styles.fields" @keydown="onFieldsKeydown">
-        <slot />
-      </div>
-      <div :class="[styles.actions, multiRow && styles.stacked]">
-        <slot name="actions">
-          <UButton label="查询" icon="i-lucide-search" color="primary" @click="emit('search')" />
-          <UButton label="重置" icon="i-lucide-rotate-ccw" color="neutral" variant="outline" :disabled="props.resetDisabled" @click="emit('reset')" />
-        </slot>
-      </div>
-    </div>
+    <UCollapsible :open="!collapsed" :unmount-on-hide="false">
+      <template #content>
+        <div :id="bodyId" :class="styles.body">
+          <div ref="fieldsRef" :class="styles.fields" @keydown="onFieldsKeydown">
+            <slot />
+          </div>
+          <div :class="[styles.actions, multiRow && styles.stacked]">
+            <slot name="actions">
+              <UButton label="查询" icon="i-lucide-search" color="primary" @click="emit('search')" />
+              <UButton label="重置" icon="i-lucide-rotate-ccw" color="neutral" variant="outline" :disabled="props.resetDisabled" @click="emit('reset')" />
+            </slot>
+          </div>
+        </div>
+      </template>
+    </UCollapsible>
   </section>
 </template>
 

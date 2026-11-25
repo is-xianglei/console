@@ -8,11 +8,4 @@
 .loadingIcon {
   width: 24px;
   height: 24px;
-  animation: loading-spin 800ms linear infinite;
-}
-
-@keyframes loading-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }

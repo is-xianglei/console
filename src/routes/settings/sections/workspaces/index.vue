@@ -245,10 +245,12 @@ onMounted(() => {
       <div :class="$style.card">
         <ul v-if="currentWorkspace" :class="$style.rows">
           <li :class="$style.row">
-            <span :class="$style.workspaceMark">
-              <img v-if="currentWorkspace.logo_url" :src="currentWorkspace.logo_url" alt="" />
-              <template v-else>{{ currentWorkspace.display_name.slice(0, 1).toUpperCase() }}</template>
-            </span>
+            <UAvatar
+              :class="$style.workspaceMark"
+              :src="currentWorkspace.logo_url || undefined"
+              :text="currentWorkspace.display_name.slice(0, 1).toUpperCase()"
+              alt=""
+            />
             <div :class="$style.rowMain">
               <span :class="$style.rowTitle">
                 {{ currentWorkspace.display_name }}

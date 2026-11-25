@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { DropdownMenuItem } from '@nuxt/ui'
+import type { CommandPaletteGroup, CommandPaletteItem, DropdownMenuItem } from '@nuxt/ui'
+import { defineShortcuts } from '@nuxt/ui/composables'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { PlatformModuleKey } from '@/interfaces/platform/model'
@@ -20,7 +21,6 @@ const teamRuntime = useTeamRuntimeStore()
 const { state, toggleTheme, toggleLeft, toggleRight, selectSession, resetConsole } = consoleStore
 const authStore = useAuthStore()
 const paletteOpen = ref(false)
-const commandQuery = ref('')
 const isMobile = ref(false)
 const mobileContextOpen = ref(false)
 const mobileRightOpen = ref(false)
@@ -68,11 +68,17 @@ const moduleContext = computed<PlatformModuleKey | null>(() => {
 })
 const healthDot = computed(() => state.health === 'ok' ? 'nominal' : state.health === 'degraded' ? 'warning' : state.health === 'unknown' ? 'idle' : 'error')
 const healthText = computed(() => state.health === 'ok' ? 'SYSTEM NOMINAL' : state.health === 'degraded' ? 'PARTIAL SERVICE' : state.health === 'unknown' ? 'CONNECTING…' : 'BACKEND OFFLINE')
-const filteredCommands = computed(() => {
-  const query = commandQuery.value.trim().toLowerCase()
-  if (!query) return commandItems
-  return commandItems.filter((item) => `${item.label} ${item.meta}`.toLowerCase().includes(query))
-})
+/** 图标仍用 lucide 字体，放在 iconClass 里由 item-leading 插槽渲染。 */
+const commandGroups: CommandPaletteGroup<CommandPaletteItem>[] = [{
+  id: 'navigate',
+  label: 'NAVIGATE',
+  items: commandItems.map((item) => ({
+    label: item.label,
+    description: item.meta,
+    iconClass: `icon icon-${item.icon}`,
+    onSelect: () => openCommand(item.to),
+  })),
+}]
 
 watch(() => [route.params.sessionId, state.sessionsLoading, state.sessions.map((session) => session.id).join('|')] as const, ([sessionId, sessionsLoading]) => {
   if (route.name !== 'chat' || sessionsLoading || typeof sessionId !== 'string') return
@@ -102,10 +108,9 @@ const userMenuItems: DropdownMenuItem[][] = [
   [{ label: '退出登录', icon: 'i-lucide-log-out', onSelect: () => { void onLogout() } }],
 ]
 
-function openCommand(item: typeof commandItems[number]) {
+function openCommand(to: string) {
   paletteOpen.value = false
-  commandQuery.value = ''
-  void router.push(item.to)
+  void router.push(to)
 }
 
 function toggleContextSidebar() {
@@ -128,24 +133,16 @@ function updateViewport() {
   if (!isMobile.value) closeMobilePanels()
 }
 
-function onGlobalKey(event: KeyboardEvent) {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-    event.preventDefault()
-    paletteOpen.value = !paletteOpen.value
-  }
-  if (event.key === 'Escape') {
-    paletteOpen.value = false
-  }
-}
+defineShortcuts({
+  meta_k: () => { paletteOpen.value = !paletteOpen.value },
+})
 
 onMounted(() => {
   updateViewport()
   window.addEventListener('resize', updateViewport)
-  window.addEventListener('keydown', onGlobalKey)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateViewport)
-  window.removeEventListener('keydown', onGlobalKey)
 })
 </script>
 
@@ -171,10 +168,10 @@ onBeforeUnmount(() => {
         <i class="icon icon-panel-left"></i>
       </UButton>
       <UButton color="neutral" variant="outline" :class="$style['command-search']" @click="paletteOpen = true">
-        <i class="icon icon-search"></i><span>搜索资源、应用和人员</span><kbd class="mono">⌘ K</kbd>
+        <i class="icon icon-search"></i><span>搜索资源、应用和人员</span><span :class="$style.kbds"><UKbd value="meta" /><UKbd value="K" /></span>
       </UButton>
       <div :class="$style['cmd-spacer']"></div>
-      <div :class="[$style['cmd-stat'], 'mono']"><span class="dot" :class="healthDot"></span>{{ healthText }}</div>
+      <div :class="[$style['cmd-stat'], 'mono']"><UChip as="span" standalone size="xs" :ui="{ base: `dot ${healthDot}` }" />{{ healthText }}</div>
       <div :class="[$style['cmd-stat'], 'mono']">◇ {{ agentCount }} RUNNING</div>
       <UDropdownMenu v-if="authStore.state.user" :items="userMenuItems" :content="{ align: 'end', sideOffset: 6 }">
         <UButton color="neutral" variant="outline" :class="$style['cmd-user']" aria-label="用户菜单">
@@ -212,32 +209,17 @@ onBeforeUnmount(() => {
       <Transition name="right-slide"><AgentSidebar v-if="showRight" /></Transition>
     </div>
 
-    <UModal
-      v-model:open="paletteOpen"
-      title="全局命令搜索"
-      :close="false"
-      :ui="{ content: 'command-palette-content', body: 'p-0' }"
-    >
-      <template #body>
-        <section :class="$style['command-palette']" aria-label="全局命令搜索">
-          <div :class="$style['palette-input']">
-            <UInput
-              v-model="commandQuery"
-              autofocus
-              :class="$style['palette-search-input']"
-              placeholder="输入资源、应用或人员名称…"
-              @keydown.enter="filteredCommands[0] && openCommand(filteredCommands[0])"
-            >
-              <template #leading><i class="icon icon-search"></i></template>
-              <template #trailing><kbd class="mono">ESC</kbd></template>
-            </UInput>
-          </div>
-          <div :class="[$style['palette-label'], 'mono']">NAVIGATE · {{ filteredCommands.length }}</div>
-          <div :class="$style['palette-results']">
-            <UButton v-for="item in filteredCommands" :key="item.to" color="neutral" variant="ghost" block @click="openCommand(item)"><i :class="`icon icon-${item.icon}`"></i><span><strong>{{ item.label }}</strong><small class="mono">{{ item.meta }}</small></span><i class="icon icon-arrow-up-right"></i></UButton>
-            <UEmpty v-if="!filteredCommands.length" :class="$style['palette-empty']" icon="i-lucide-search-x" title="没有匹配的资源" />
-          </div>
-        </section>
+    <UModal v-model:open="paletteOpen" title="全局命令搜索" :ui="{ content: 'command-palette-content' }">
+      <template #content>
+        <UCommandPalette
+          :groups="commandGroups"
+          placeholder="输入资源、应用或人员名称…"
+          :class="$style['command-palette']"
+          @update:open="paletteOpen = $event"
+        >
+          <template #item-leading="{ item }"><i :class="[$style['palette-icon'], item.iconClass]"></i></template>
+          <template #empty><UEmpty icon="i-lucide-search-x" title="没有匹配的资源" variant="naked" /></template>
+        </UCommandPalette>
       </template>
     </UModal>
   </div>

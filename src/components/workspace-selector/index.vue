@@ -178,7 +178,7 @@ const workspaceItems = computed<WorkspaceMenuItem[][]>(() => {
         <span :class="[$style['workspace-item-symbol'], 'mono']">{{ (item as WorkspaceMenuItem).workspaceCode }}</span>
       </template>
       <template #workspace-trailing="{ item }">
-        <UIcon v-if="(item as WorkspaceMenuItem).loading" name="i-lucide-loader-circle" :class="$style['workspace-spinner']" />
+        <UIcon v-if="(item as WorkspaceMenuItem).loading" name="i-lucide-loader-circle" :class="[$style['workspace-spinner'], 'animate-spin']" />
         <span v-else-if="(item as WorkspaceMenuItem).current" :class="$style['workspace-current']">
           <UIcon name="i-lucide-check" />
           当前

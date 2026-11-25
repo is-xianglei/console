@@ -1,6 +1,7 @@
 export { default as ResourceTable } from './table/index.vue'
 export { default as ResourcePagination } from './pagination/index.vue'
 export { default as FilterPanel } from './filter-panel/index.vue'
+export { default as DateRangeInput } from './date-range-input/index.vue'
 export { default as ListCard } from './list-card/index.vue'
 export { default as ActionIconButton } from './action-icon-button/index.vue'
 export { default as RelativeTime } from './cells/relative-time/index.vue'

@@ -6,7 +6,7 @@
 .empty-mark { width: 54px; height: 54px; color: var(--accent-agent); display: grid; place-items: center; opacity: .22; animation: global(glow-breathe) 3s var(--ease-in-out) infinite; }
 .empty-mark i { font-size: 42px; }
 .conversation-empty h2 { margin-top: 8px; color: var(--text-secondary); font-family: var(--font-ui); font-size: 13px; font-weight: 600; }
-.conversation-empty p { margin-top: 4px; font-family: var(--font-data); font-size: var(--fs-xs); }
+.conversation-empty p,.conversation-empty [data-slot='description'] { margin-top: 4px; font-family: var(--font-data); font-size: var(--fs-xs); }
 /* Team 草稿：名单一行一个成员，成员名 / 角色 / Agent 三列。 */
 .team-draft p { margin-top: 12px; color: var(--text-muted); font-family: var(--font-body); font-size: 12px; }
 .roster { display: flex; flex-direction: column; gap: 2px; width: min(460px, 100%); margin: 14px 0 0; padding: 0; list-style: none; text-align: left; }

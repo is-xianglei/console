@@ -102,7 +102,7 @@ onBeforeUnmount(() => {
       <button type="button" :class="$style.head" :aria-expanded="open">
         <UIcon
           :name="running ? 'i-lucide-loader-circle' : allDone ? 'i-lucide-circle-check' : 'i-lucide-list-checks'"
-          :class="[$style['head-icon'], { [$style.spin]: running }]"
+          :class="[$style['head-icon'], { 'animate-spin': running }]"
         />
         <span :class="$style.title">任务编排</span>
         <span :class="[$style.count, 'mono']">{{ doneCount }} / {{ state.tasks.length }}</span>

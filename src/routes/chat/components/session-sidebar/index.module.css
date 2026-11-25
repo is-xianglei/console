@@ -14,7 +14,7 @@
 .twisty { width: 14px; color: inherit; font-size: 11px; transition: transform var(--dur-fast) var(--ease-out); }.app-group.collapsed .twisty { transform: rotate(-90deg); }
 .app-icon { width: 21px; height: 21px; flex: 0 0 21px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-card); color: var(--accent-agent); display: grid; place-items: center; }.app-icon i { font-size: 12px; }
 .item-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.session-list { padding-left: 35px; }.app-group.collapsed .session-list { display: none; }
+.session-list { padding-left: 35px; }
 .session-item { width: 100%; min-width: 0; height: 29px; padding: 0 5px 0 7px; position: relative; display: flex; align-items: center; gap: 4px; border-radius: var(--radius-control); color: var(--text-muted); font-family: var(--font-body); font-size: 12px; transition: color var(--dur-fast), background var(--dur-fast); }
 .session-main { flex: 1; height: 100%; padding: 0; color: inherit; font-family: inherit; font-size: inherit; }
 .session-main:hover { background: transparent; color: inherit; }

@@ -30,23 +30,29 @@ useStickToBottom(scroller, inner)
   <section :class="[$style['conversation-pane'], { [$style.split]: split }]" aria-label="对话">
     <div ref="scroller" :class="$style['conv-scroll']" role="log" aria-live="polite" :aria-busy="state.busy">
       <div ref="inner" :class="$style['conv-inner']">
-        <div v-if="!state.messages.length && draftTeam" :class="[$style['conversation-empty'], $style['team-draft']]" role="status">
-          <span :class="$style['empty-mark']" aria-hidden="true"><i class="icon icon-users-round"></i></span>
-          <h2>{{ draftTeam.name }}</h2>
-          <ul :class="$style.roster" aria-label="Team 成员">
-            <li v-for="member in draftTeam.members" :key="member.name">
-              <strong>{{ member.name }}</strong>
-              <span>{{ member.role }}</span>
-              <small :class="{ [$style.missing]: member.agent_name === null }">{{ member.agent_name ?? 'Agent 已删除' }}</small>
-            </li>
-          </ul>
-          <p>给主 Agent 发消息，由它分派任务</p>
-        </div>
-        <div v-else-if="!state.messages.length" :class="$style['conversation-empty']" role="status">
-          <span :class="$style['empty-mark']" aria-hidden="true"><i class="icon icon-hexagon"></i></span>
-          <h2>{{ activeApp ? '等待制造任务' : '新对话' }}</h2>
-          <p>{{ activeApp ? `${activeApp.subject} · ${activeApp.team}` : 'CONVERSATION READY' }}</p>
-        </div>
+        <UEmpty v-if="!state.messages.length && draftTeam" variant="naked" :title="draftTeam.name" :class="[$style['conversation-empty'], $style['team-draft']]" role="status">
+          <template #leading><span :class="$style['empty-mark']" aria-hidden="true"><i class="icon icon-users-round"></i></span></template>
+          <template #body>
+            <ul :class="$style.roster" aria-label="Team 成员">
+              <li v-for="member in draftTeam.members" :key="member.name">
+                <strong>{{ member.name }}</strong>
+                <span>{{ member.role }}</span>
+                <small :class="{ [$style.missing]: member.agent_name === null }">{{ member.agent_name ?? 'Agent 已删除' }}</small>
+              </li>
+            </ul>
+          </template>
+          <template #footer><p>给主 Agent 发消息，由它分派任务</p></template>
+        </UEmpty>
+        <UEmpty
+          v-else-if="!state.messages.length"
+          variant="naked"
+          :title="activeApp ? '等待制造任务' : '新对话'"
+          :description="activeApp ? `${activeApp.subject} · ${activeApp.team}` : 'CONVERSATION READY'"
+          :class="$style['conversation-empty']"
+          role="status"
+        >
+          <template #leading><span :class="$style['empty-mark']" aria-hidden="true"><i class="icon icon-hexagon"></i></span></template>
+        </UEmpty>
         <ConversationMessage
           v-for="message in state.messages"
           :key="message.id"

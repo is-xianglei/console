@@ -44,7 +44,7 @@ function onStatusChange(id: string, value: string | number | boolean | Record<st
 
       <div :class="$style['br-inspector-body']">
         <div :class="$style['br-detail-status']">
-          <UBadge :color="statusColor(row.status)" variant="subtle" size="xs"><span class="dot" :class="row.status"></span>{{ statusLabel[row.status] }}</UBadge>
+          <UBadge :color="statusColor(row.status)" variant="subtle" size="xs"><UChip as="span" standalone size="xs" :ui="{ base: `dot ${row.status}` }" />{{ statusLabel[row.status] }}</UBadge>
           <USelect :model-value="row.status" :items="statusItems" aria-label="更新资源状态" @update:model-value="onStatusChange(row.id, $event)" />
         </div>
         <p :class="$style['br-detail-description']">{{ row.description }}</p>
@@ -64,8 +64,8 @@ function onStatusChange(id: string, value: string | number | boolean | Record<st
 
         <section :class="$style['br-detail-section']">
           <h3>最近变更</h3>
-          <div :class="$style['br-activity']"><span class="dot nominal"></span><p><strong>配置已同步</strong><small>今天 14:31 · system</small></p></div>
-          <div :class="$style['br-activity']"><span class="dot idle"></span><p><strong>资源已创建</strong><small>2026-07-18 · {{ row.owner }}</small></p></div>
+          <div :class="$style['br-activity']"><UChip as="span" standalone size="xs" :ui="{ base: 'dot nominal' }" /><p><strong>配置已同步</strong><small>今天 14:31 · system</small></p></div>
+          <div :class="$style['br-activity']"><UChip as="span" standalone size="xs" :ui="{ base: 'dot idle' }" /><p><strong>资源已创建</strong><small>2026-07-18 · {{ row.owner }}</small></p></div>
         </section>
       </div>
 

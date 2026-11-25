@@ -39,7 +39,7 @@ function timeText(iso: string) {
       <p :class="[$style.content, { [$style.conclusionBody]: item.type === 'idle_notification' }]">{{ item.content }}</p>
     </li>
   </ol>
-  <p v-else :class="[$style.empty, 'mono']">还没有团队消息</p>
+  <UEmpty v-else variant="naked" size="xs" icon="i-lucide-messages-square" title="还没有团队消息" />
 </template>
 
 <style module src="./index.module.css"></style>

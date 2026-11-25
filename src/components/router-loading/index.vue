@@ -4,7 +4,7 @@ defineOptions({ name: 'RouterLoading' })
 
 <template>
   <div :class="$style.routerLoading" role="status" aria-label="页面加载中">
-    <UIcon name="i-lucide-loader-circle" :class="$style.loadingIcon" />
+    <UIcon name="i-lucide-loader-circle" :class="[$style.loadingIcon, 'animate-spin']" />
   </div>
 </template>
 

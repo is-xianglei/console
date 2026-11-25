@@ -177,7 +177,7 @@ watch(
   <main :class="styles.page">
     <header :class="styles.header">
       <div :class="styles.heading">
-        <nav :class="styles.breadcrumb" aria-label="面包屑"><span>组织管理</span><i class="icon icon-chevron-right"></i><span>部门</span><i class="icon icon-chevron-right"></i><strong>详情</strong></nav>
+        <UBreadcrumb :class="styles.breadcrumb" :items="[{ label: '组织管理' }, { label: '部门' }, { label: '详情' }]" />
         <div :class="styles.titleRow">
           <span :class="styles.titleIcon"><UIcon name="i-lucide-building-2" /></span>
           <div><h1>{{ department?.name ?? '部门详情' }}</h1><p v-if="department">DEPT-{{ department.id }} · {{ department.description || '未填写部门描述。' }}</p><p v-else>查看部门的层级、负责人与直属成员。</p></div>

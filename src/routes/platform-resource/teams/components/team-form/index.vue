@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { defineShortcuts } from '@nuxt/ui/composables'
 import { ActionIconButton } from '@/components'
 import { focusFirstError } from '@/hooks/useFormHelpers'
 import { emptyTeamMember, suggestMemberName, teamSaveErrorRows } from '@/hooks/useTeamEditor'
@@ -123,19 +124,14 @@ function inOverlay(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest('[role="dialog"], [data-reka-popper-content-wrapper]'))
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && !event.defaultPrevented && !inOverlay(event.target)) emit('close')
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
-    event.preventDefault()
-    void onSave()
-  }
-}
+defineShortcuts({
+  escape: { usingInput: true, handler: (event: KeyboardEvent) => { if (!inOverlay(event.target)) emit('close') } },
+  meta_s: { usingInput: true, handler: () => { void onSave() } },
+})
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
   if (!agentsStore.state.items.length && !agentsStore.state.loading) void agentsStore.loadAgents()
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 </script>
 
 <template>

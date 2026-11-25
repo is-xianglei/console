@@ -114,7 +114,7 @@ watch(
 <template>
   <main :class="styles['wf-page']">
     <header :class="styles['wf-page-head']">
-      <div :class="styles['wf-heading']"><nav aria-label="面包屑"><span>构建资源</span><i class="icon icon-chevron-right"></i><strong>Workflows</strong><i class="icon icon-chevron-right"></i><strong>详情</strong></nav><div><span :class="styles['wf-page-icon']"><i class="icon icon-workflow"></i></span><span><h1>{{ detail?.name ?? 'Workflow 详情' }}</h1><p v-if="detail">WF-{{ String(detail.id).padStart(4, '0') }} · 由后端持久化，会话绑定后按编排模式执行。</p><p v-else>查看 Workflow 的成员组成、编排模式与服务端信息。</p></span></div></div>
+      <div :class="styles['wf-heading']"><UBreadcrumb :items="[{ label: '构建资源' }, { label: 'Workflows' }, { label: '详情' }]" /><div><span :class="styles['wf-page-icon']"><i class="icon icon-workflow"></i></span><span><h1>{{ detail?.name ?? 'Workflow 详情' }}</h1><p v-if="detail">WF-{{ String(detail.id).padStart(4, '0') }} · 由后端持久化，会话绑定后按编排模式执行。</p><p v-else>查看 Workflow 的成员组成、编排模式与服务端信息。</p></span></div></div>
       <div :class="styles['wf-page-actions']"><span :class="[styles['wf-local-badge'], 'mono']"><i class="icon icon-database"></i>API CONNECTED</span><UButton :class="styles['wf-secondary-button']" icon="i-lucide-arrow-left" label="返回列表" @click="goToList" /></div>
     </header>
 
@@ -122,7 +122,7 @@ watch(
 
     <section v-if="detail" :class="styles['wf-detail-shell']" aria-label="Workflow 详情">
       <div :class="styles['wf-detail-top']">
-        <UBadge color="neutral" variant="subtle" :class="[styles['wf-lifecycle'], detail.is_enabled ? 'published' : 'disabled']"><span class="dot" :class="detail.is_enabled ? 'nominal' : 'idle'"></span>{{ detail.is_enabled ? '已启用' : '已停用' }}</UBadge>
+        <UBadge color="neutral" variant="subtle" :class="[styles['wf-lifecycle'], detail.is_enabled ? 'published' : 'disabled']"><UChip as="span" standalone size="xs" :ui="{ base: `dot ${detail.is_enabled ? 'nominal' : 'idle'}` }" />{{ detail.is_enabled ? '已启用' : '已停用' }}</UBadge>
         <span :class="styles['wf-detail-mode']">{{ WORKFLOW_MODE_LABEL[detail.mode] }} <small class="mono">{{ detail.mode.toUpperCase() }}</small></span>
         <UAlert v-if="brokenMembers(detail) > 0" color="error" variant="subtle" icon="i-lucide-triangle-alert" title="部分成员 Agent 已停用或已删除，Workflow 将无法运行。" />
       </div>
@@ -148,7 +148,7 @@ watch(
             <em v-if="!isMemberAvailable(member)"><i class="icon icon-triangle-alert"></i>已失效</em>
           </li>
         </ol>
-        <p v-if="!detail.agents.length" :class="styles['wf-detail-empty']">尚未添加任何执行成员。</p>
+        <UEmpty v-if="!detail.agents.length" variant="naked" size="xs" icon="i-lucide-users" title="尚未添加任何执行成员" />
       </div>
 
       <div v-else :class="styles['wf-detail-pane']">

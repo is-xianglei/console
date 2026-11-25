@@ -60,7 +60,7 @@ onMounted(async () => {
       </template>
     </UEmpty>
     <div v-else :class="$style.pending" role="status">
-      <UIcon name="i-lucide-loader-circle" :class="$style.spinner" />
+      <UIcon name="i-lucide-loader-circle" :class="[$style.spinner, 'animate-spin']" />
       <span>正在完成授权</span>
     </div>
   </main>

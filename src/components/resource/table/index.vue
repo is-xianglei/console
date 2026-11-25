@@ -236,15 +236,17 @@ defineExpose<{ expandAll: () => void; collapseAll: () => void }>({ expandAll, co
     <!-- 树形首列：缩进 + 展开箭头。父组件仍通过 #<treeColumnId>-cell 提供内容。 -->
     <template v-if="treeColumnId" #[`${treeColumnId}-cell`]="slotProps">
       <div :class="styles.treeRow" :style="slotProps.row.depth > 0 ? { '--tree-indent': `${slotProps.row.depth * 16}px` } : undefined">
-        <button
+        <UButton
           v-if="slotProps.row.getCanExpand()"
-          type="button"
           :class="styles.treeToggle"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          square
+          :icon="slotProps.row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
           :aria-label="slotProps.row.getIsExpanded() ? '折叠' : '展开'"
           @click.stop="slotProps.row.toggleExpanded()"
-        >
-          <UIcon :name="slotProps.row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" />
-        </button>
+        />
         <slot :name="`${treeColumnId}-cell`" v-bind="slotProps" />
       </div>
     </template>

@@ -39,24 +39,32 @@
   font-size: var(--fs-sm);
 }
 
-.wf-builder-title nav i {
-  font-size: 11px;
+.wf-builder-title nav [data-slot='list'] {
+  gap: 5px;
 }
 
-/* 面包屑：列表名与分隔符不收缩（中文不逐字折行），只有末项名称过长时省略；四个 Builder 写法一致。 */
-.wf-builder-title nav > span,
-.wf-builder-title nav > i {
+/* 面包屑：列表名与分隔符不收缩（中文不逐字折行），只有末项名称过长时省略（UBreadcrumb 的 label 自带 truncate）。 */
+.wf-builder-title nav [data-slot='item']:not(:last-child),
+.wf-builder-title nav [data-slot='separator'] {
   flex: none;
   white-space: nowrap;
 }
 
-.wf-builder-title nav strong {
-  min-width: 0;
-  overflow: hidden;
+.wf-builder-title nav [data-slot='link'] {
+  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
+}
+
+.wf-builder-title nav [data-slot='item']:not(:first-child):last-child [data-slot='link'] {
   color: var(--text-muted);
   font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.wf-builder-title nav [data-slot='separatorIcon'] {
+  width: 11px;
+  height: 11px;
+  color: inherit;
 }
 
 .wf-builder-title h1 {

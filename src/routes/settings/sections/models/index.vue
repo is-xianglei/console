@@ -66,7 +66,7 @@ onMounted(() => { void models.load() })
         <ul v-if="loading && !providers.length" :class="$style.rows" aria-busy="true" aria-label="加载中">
           <li v-for="n in 3" :key="n" :class="$style.row"><USkeleton class="h-10 w-full" /></li>
         </ul>
-        <p v-else-if="!providers.length" :class="[$style.cardBody, $style.empty]">还没有模型供应商</p>
+        <UEmpty v-else-if="!providers.length" variant="naked" size="sm" icon="i-lucide-cpu" title="还没有模型供应商" />
         <ul v-else :class="$style.rows">
           <li v-for="item in providers" :key="item.provider_id" :class="$style.row">
             <div :class="$style.rowMain">

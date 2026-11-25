@@ -2,7 +2,7 @@
 import type { TableColumn } from '@nuxt/ui'
 import { computed, useCssModule, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { FilterPanel, ListCard, ResourcePagination, ResourceTable } from '@/components'
+import { DateRangeInput, FilterPanel, ListCard, ResourcePagination, ResourceTable } from '@/components'
 import { WORKFLOW_MODE_LABEL, WORKFLOW_MODE_OPTIONS } from '@/constants/workflow'
 import { useHighlightFromQuery } from '@/hooks/useSaveFeedback'
 import { useWorkflowManager, type WorkflowEnabledFilter } from '@/hooks/useWorkflowManager'
@@ -107,11 +107,7 @@ watch(
       <UFormField label="启用状态"><USelect :model-value="manager.state.enabled" :items="enabledOptions" aria-label="启用状态筛选" @update:model-value="(value: unknown) => { manager.state.enabled = String(value ?? 'all') as WorkflowEnabledFilter }" /></UFormField>
       <UFormField label="编排模式"><USelect :model-value="manager.state.mode" :items="modeOptions" aria-label="编排模式筛选" @update:model-value="(value: unknown) => { manager.state.mode = value as ('all' | WorkflowResponse['mode']) }" /></UFormField>
       <UFormField label="创建时间">
-        <div :class="styles.dateRange">
-          <UInput :model-value="manager.state.dateRange[0]" type="date" aria-label="开始日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [String(value ?? ''), manager.state.dateRange[1]] }" />
-          <span>~</span>
-          <UInput :model-value="manager.state.dateRange[1]" type="date" aria-label="结束日期" @update:model-value="(value: unknown) => { manager.state.dateRange = [manager.state.dateRange[0], String(value ?? '')] }" />
-        </div>
+        <DateRangeInput v-model="manager.state.dateRange" />
       </UFormField>
     </FilterPanel>
 

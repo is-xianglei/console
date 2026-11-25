@@ -178,9 +178,7 @@ watch(
       <aside v-if="!manager.treeCollapsed.value" :class="styles.deptPanel" aria-label="部门结构">
         <header :class="styles.treeHeader">
           <span :class="styles.treeTitle"><UIcon name="i-lucide-folder-tree" />部门结构</span>
-          <button type="button" :class="styles.treeToggleBtn" :aria-label="'收起部门树'" @click="toggleTree">
-            <UIcon name="i-lucide-panel-left-close" />
-          </button>
+          <UButton :class="styles.treeToggleBtn" color="neutral" variant="ghost" square icon="i-lucide-panel-left-close" aria-label="收起部门树" @click="toggleTree" />
         </header>
         <div :class="styles.treeSearch">
           <UInput v-model="manager.treeSearch.value" icon="i-lucide-search" size="sm" placeholder="搜索部门名称" aria-label="搜索部门">

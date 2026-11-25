@@ -224,7 +224,7 @@ watch(
   <main :class="styles.page">
     <header :class="styles.header">
       <div :class="styles.heading">
-        <nav :class="styles.breadcrumb" aria-label="面包屑"><span>组织管理</span><i class="icon icon-chevron-right"></i><span>群组</span><i class="icon icon-chevron-right"></i><strong>详情</strong></nav>
+        <UBreadcrumb :class="styles.breadcrumb" :items="[{ label: '组织管理' }, { label: '群组' }, { label: '详情' }]" />
         <div :class="styles.titleRow">
           <span :class="styles.titleIcon"><UIcon name="i-lucide-users-round" /></span>
           <div><h1>{{ group?.name ?? '群组详情' }}</h1><p v-if="group">GROUP-{{ group.id }} · <span class="mono">{{ group.slug }}</span> · {{ group.description || '未填写群组描述。' }}</p><p v-else>查看群组的类型、可见性、加入方式与成员。</p></div>

@@ -51,7 +51,7 @@ function selectMode(value: string | number) {
       <div :class="$style['conv-title-line']">
         <h1 :class="$style['conv-title']">{{ activeApp?.name ?? activeSession?.title ?? '新会话' }}</h1>
         <span v-if="activeApp" :class="[$style['scope-badge'], 'mono']">APP RUNTIME</span>
-        <span v-if="activeApp" :class="[$style['status-badge'], 'mono']"><span class="dot nominal"></span>AGENT 在线</span>
+        <span v-if="activeApp" :class="[$style['status-badge'], 'mono']"><UChip as="span" standalone size="xs" :ui="{ base: 'dot nominal' }" />AGENT 在线</span>
         <span v-else :class="[$style['conv-id'], 'mono']">#{{ activeSession?.id ?? '—' }}</span>
       </div>
       <span v-if="activeApp && activeSession" :class="$style['session-context']">{{ activeSession.title }} · #{{ activeSession.id }}</span>

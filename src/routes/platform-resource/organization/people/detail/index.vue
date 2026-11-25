@@ -141,7 +141,7 @@ watch(
   <main :class="styles.page">
     <header :class="styles.header">
       <div :class="styles.heading">
-        <nav :class="styles.breadcrumb" aria-label="面包屑"><span>组织管理</span><i class="icon icon-chevron-right"></i><span>人员</span><i class="icon icon-chevron-right"></i><strong>详情</strong></nav>
+        <UBreadcrumb :class="styles.breadcrumb" :items="[{ label: '组织管理' }, { label: '人员' }, { label: '详情' }]" />
         <div :class="styles.titleRow">
           <span :class="styles.titleIcon"><UIcon name="i-lucide-user-round" /></span>
           <div><h1>{{ personName || '人员详情' }}</h1><p v-if="person">USER-{{ person.id }} · <span class="mono">@{{ person.username }}</span> · {{ person.email }}</p><p v-else>查看人员身份信息与当前工作区的部门、角色、岗位归属。</p></div>

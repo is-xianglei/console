@@ -358,12 +358,14 @@ samp {
 .icon-x-circle::before {
   content: '\e088';
 }
+/* 状态圆点：挂在 UChip 的 base 上，颜色、光晕和呼吸动画沿用项目状态色。 */
 .dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
   display: inline-block;
+  box-shadow: none;
 }
 .dot.nominal {
   background: var(--status-success);
@@ -417,11 +419,6 @@ samp {
   to {
     transform: translateY(0);
     opacity: 1;
-  }
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 @keyframes caret-blink {

@@ -67,9 +67,3 @@
   color: var(--accent-agent);
 }
 
-.empty {
-  margin: 8px 10px;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-}

@@ -76,7 +76,7 @@ async function confirmDelete() {
             <USkeleton class="h-10 w-full" />
           </li>
         </ul>
-        <p v-else-if="!bots.length" :class="[$style.cardBody, $style.empty]">还没有机器人</p>
+        <UEmpty v-else-if="!bots.length" variant="naked" size="sm" icon="i-lucide-bot" title="还没有机器人" />
         <ul v-else :class="$style.rows">
           <BotItem
             v-for="bot in bots"

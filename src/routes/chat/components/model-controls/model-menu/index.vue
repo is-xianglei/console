@@ -47,7 +47,7 @@ defineExpose({ focusInitial })
         <span :class="$style.name">{{ item.display_name || item.model_name }}</span>
         <UIcon v-if="selected === item.provider_id" name="i-lucide-check" :class="$style.check" />
       </UButton>
-      <p v-if="!items.length" :class="$style.empty">暂无可切换模型，可前往设置添加模型服务。</p>
+      <UEmpty v-if="!items.length" variant="naked" size="xs" description="暂无可切换模型，可前往设置添加模型服务。" />
     </div>
   </section>
 </template>

@@ -27,8 +27,3 @@
   color: var(--status-error);
 }
 
-.empty {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--fs-base);
-}

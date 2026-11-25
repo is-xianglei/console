@@ -328,62 +328,61 @@ async function confirmDelete() {
             >
               <span :class="$style['app-icon']"><i :class="`icon icon-${app.icon}`"></i></span>
               <span :class="$style['item-text']">{{ app.name }}</span>
-              <span
-                class="dot"
-                :class="app.status"
-                :title="app.status === 'warning' ? '存在告警' : '运行正常'"
-                :aria-label="app.status === 'warning' ? '存在告警' : '运行正常'"
-              ></span>
+              <UChip as="span" standalone size="xs" :ui="{ base: `dot ${app.status}` }" :title="app.status === 'warning' ? '存在告警' : '运行正常'" :aria-label="app.status === 'warning' ? '存在告警' : '运行正常'" />
             </UButton>
             <UButton v-if="app.appId" color="neutral" variant="ghost" square :class="$style['app-new']" :title="`在${app.name}中新建会话`" @click="onNewAppSession(app.appId)">
               <i class="icon icon-plus"></i>
             </UButton>
           </div>
-          <div :class="$style['session-list']">
-            <div v-if="!app.sessions.length" :class="[$style['empty-app'], 'mono']">暂无会话</div>
-            <div
-              v-for="session in app.sessions"
-              :key="session.id"
-              :class="[
-                $style['session-item'],
-                {
-                  [$style.active]: session.id === state.activeSessionId && !selectMode,
-                  [$style.selected]: selectMode && selected.has(session.id),
-                },
-              ]"
-            >
-              <UInput
-                v-if="editingId === session.id"
-                ref="editInput"
-                v-model="editingText"
-                :class="$style['session-edit']"
-                @click.stop
-                @keydown.enter="commitRename"
-                @keydown.esc.prevent="cancelRename"
-                @blur="commitRename"
-              />
-              <UButton
-                v-else
-                color="neutral"
-                variant="ghost"
-                block
-                :class="$style['session-main']"
-                :aria-label="selectMode ? `${selected.has(session.id) ? '取消选择' : '选择'}会话 ${session.title}` : `打开会话 ${session.title}`"
-                :aria-pressed="selectMode ? selected.has(session.id) : undefined"
-                @click="onItemClick(session)"
-              >
-                <i v-if="selectMode" :class="`icon icon-${selected.has(session.id) ? 'square-check-big' : 'square'}`"></i>
-                <span :class="$style['item-text']" :title="session.title">{{ session.title }}</span>
-              </UButton>
-              <div v-if="!selectMode && editingId !== session.id" :class="$style['session-actions']">
-                <UDropdownMenu :items="sessionMenuItems(session)">
-                  <UButton color="neutral" variant="ghost" square title="更多操作" @click.stop><i class="icon icon-ellipsis"></i></UButton>
-                </UDropdownMenu>
-                <UButton color="neutral" variant="ghost" square title="重命名" :disabled="session.readOnly" @click.stop="startRename(session)"><i class="icon icon-pencil"></i></UButton>
-                <UButton color="error" variant="ghost" square title="删除" :disabled="session.readOnly" @click.stop="requestDelete([session.id])"><i class="icon icon-trash-2"></i></UButton>
+          <UCollapsible :open="!collapsedApps.has(app.id)" :unmount-on-hide="false">
+            <template #content>
+              <div :class="$style['session-list']">
+                <div v-if="!app.sessions.length" :class="[$style['empty-app'], 'mono']">暂无会话</div>
+                <div
+                  v-for="session in app.sessions"
+                  :key="session.id"
+                  :class="[
+                    $style['session-item'],
+                    {
+                      [$style.active]: session.id === state.activeSessionId && !selectMode,
+                      [$style.selected]: selectMode && selected.has(session.id),
+                    },
+                  ]"
+                >
+                  <UInput
+                    v-if="editingId === session.id"
+                    ref="editInput"
+                    v-model="editingText"
+                    :class="$style['session-edit']"
+                    @click.stop
+                    @keydown.enter="commitRename"
+                    @keydown.esc.prevent="cancelRename"
+                    @blur="commitRename"
+                  />
+                  <UButton
+                    v-else
+                    color="neutral"
+                    variant="ghost"
+                    block
+                    :class="$style['session-main']"
+                    :aria-label="selectMode ? `${selected.has(session.id) ? '取消选择' : '选择'}会话 ${session.title}` : `打开会话 ${session.title}`"
+                    :aria-pressed="selectMode ? selected.has(session.id) : undefined"
+                    @click="onItemClick(session)"
+                  >
+                    <i v-if="selectMode" :class="`icon icon-${selected.has(session.id) ? 'square-check-big' : 'square'}`"></i>
+                    <span :class="$style['item-text']" :title="session.title">{{ session.title }}</span>
+                  </UButton>
+                  <div v-if="!selectMode && editingId !== session.id" :class="$style['session-actions']">
+                    <UDropdownMenu :items="sessionMenuItems(session)">
+                      <UButton color="neutral" variant="ghost" square title="更多操作" @click.stop><i class="icon icon-ellipsis"></i></UButton>
+                    </UDropdownMenu>
+                    <UButton color="neutral" variant="ghost" square title="重命名" :disabled="session.readOnly" @click.stop="startRename(session)"><i class="icon icon-pencil"></i></UButton>
+                    <UButton color="error" variant="ghost" square title="删除" :disabled="session.readOnly" @click.stop="requestDelete([session.id])"><i class="icon icon-trash-2"></i></UButton>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </template>
+          </UCollapsible>
         </div>
       </section>
 
