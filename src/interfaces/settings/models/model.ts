@@ -81,14 +81,10 @@ export interface ModelPreferences {
   default_model_provider_id: string | null
 }
 
-/** 标准模式的快速与思考档位；极速模式由服务端锁定为 fast。 */
+/** 思考强度；fast 表示关闭思考。 */
 export type ThinkingEffort = 'fast' | ReasoningKey
-export type ChatModeSlug = 'standard' | 'turbo'
 
 export interface ReasoningPolicy {
-  /** 可选以兼容旧能力响应；极速须显式声明支持。 */
-  supports_fast?: boolean
-  turbo_supported?: boolean
   fast_behavior?: 'disabled' | 'model_default'
   supports_reasoning_effort: boolean
   reasoning_effort_levels: ReasoningLevel[]
@@ -102,28 +98,16 @@ export interface ChatModelOption extends ReasoningPolicy {
   model_name: string
 }
 
-export interface ChatModeOption {
-  slug: ChatModeSlug
-  name: string
-  description: string
-  icon: string
-  sort_order: number
-  thinking_locked: boolean
-  default_thinking_effort: ThinkingEffort
-}
-
 export interface ChatModelCapabilities extends ReasoningPolicy {
   main_provider_id: string | null
   /** 未显式选模型时使用的工作流角色模型；旧后端可能不返回。 */
   workflow_provider_id?: string | null
   allow_model_switch: boolean
   models: ChatModelOption[]
-  modes: ChatModeOption[]
 }
 
 /** 与后端会话持久化和消息发送字段保持一致。 */
 export interface ChatModelSelection {
   model_provider_id: string | null
-  mode_slug: ChatModeSlug
   thinking_effort: ThinkingEffort
 }

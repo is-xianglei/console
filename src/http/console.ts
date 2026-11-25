@@ -137,7 +137,7 @@ export function updateSession(
   })
 }
 
-/** 保存模式、模型及思考强度，不触发新一轮执行。 */
+/** 保存模型与思考强度，不触发新一轮执行。 */
 export function updateSessionChatSelection(
   sessionId: number | string,
   payload: import('../interfaces/settings/models/model').ChatModelSelection,

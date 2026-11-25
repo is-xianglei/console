@@ -5,45 +5,38 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 4px 8px;
+  gap: 2px;
+  padding: 0 0 4px;
 }
 
 .title {
   margin: 0;
-  color: var(--text-primary);
-  font-size: 14px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 
-.close {
-  margin-left: auto;
-}
-
 .list {
-  max-height: min(360px, 50vh);
+  display: flex;
+  flex-direction: column;
+  max-height: min(320px, 50vh);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-.groupLabel {
-  margin: 10px 8px 4px;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-
 .option {
-  align-items: center;
+  flex: none;
   gap: 12px;
   width: 100%;
-  padding: 10px;
+  padding: 7px 10px;
   border-radius: var(--radius-control);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 400;
   text-align: left;
-  white-space: normal;
 }
 
-.option:hover,
-.option[aria-pressed='true'] {
+.option:hover {
   background: var(--bg-hover);
 }
 
@@ -51,23 +44,32 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
-  color: var(--text-primary);
-  font-size: 13px;
-  overflow-wrap: anywhere;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .description {
   color: var(--text-muted);
   font-size: var(--fs-sm);
-  font-weight: 400;
-  line-height: 1.5;
 }
 
 .check {
   flex: none;
   margin-left: auto;
   color: var(--accent-agent);
+}
+
+.empty {
+  margin: 8px 10px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
 }

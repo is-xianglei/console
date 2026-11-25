@@ -7,19 +7,20 @@ defineProps<{
   items: ChatModelOption[]
   selected: string | null
   defaultLabel: string
+  /** 跟随默认时实际落到的模型。 */
+  defaultDescription?: string
   disabled: boolean
-  back?: boolean
 }>()
 const emit = defineEmits<{
   select: [value: string]
-  close: []
   back: []
 }>()
-const backButton = ref<{ $el?: HTMLElement } | null>(null)
-const firstOption = ref<{ $el?: HTMLElement } | null>(null)
+const list = ref<HTMLElement | null>(null)
 
+/** 进入列表时把焦点放在当前选中的模型上。 */
 function focusInitial(): void {
-  ;(backButton.value?.$el ?? firstOption.value?.$el)?.focus()
+  const target = list.value?.querySelector<HTMLElement>('[aria-pressed="true"]') ?? list.value?.querySelector<HTMLElement>('button')
+  target?.focus()
 }
 
 defineExpose({ focusInitial })
@@ -27,25 +28,26 @@ defineExpose({ focusInitial })
 
 <template>
   <section :class="$style.menu" aria-label="选择对话模型">
-    <div :class="$style.header">
-      <UButton v-if="back" ref="backButton" icon="i-lucide-arrow-left" color="neutral" variant="ghost" aria-label="返回思考强度" @click="emit('back')" />
+    <header :class="$style.header">
+      <UButton icon="i-lucide-chevron-left" size="xs" color="neutral" variant="ghost" aria-label="返回思考强度" @click="emit('back')" />
       <h3 :class="$style.title">选择模型</h3>
-      <UButton :class="$style.close" icon="i-lucide-x" color="neutral" variant="ghost" aria-label="关闭模型选择" @click="emit('close')" />
-    </div>
-    <div :class="$style.list">
-      <UButton ref="firstOption" :class="$style.option" color="neutral" variant="ghost" :disabled="disabled"
+    </header>
+    <div ref="list" :class="$style.list">
+      <UButton :class="$style.option" color="neutral" variant="ghost" :disabled="disabled"
         :aria-pressed="selected === null" @click="emit('select', '__default__')">
-        <span :class="$style.copy"><span>{{ defaultLabel }}</span><span :class="$style.description">自动使用当前场景配置的模型</span></span>
+        <span :class="$style.copy">
+          <span :class="$style.name">{{ defaultLabel }}</span>
+          <span v-if="defaultDescription" :class="$style.description">{{ defaultDescription }}</span>
+        </span>
         <UIcon v-if="selected === null" name="i-lucide-check" :class="$style.check" />
       </UButton>
-      <p :class="$style.groupLabel">可用模型</p>
-      <UButton v-for="item in items" :key="item.provider_id" :class="$style.option"
+      <UButton v-for="item in items" :key="item.provider_id" :class="$style.option" :title="item.model_name"
         color="neutral" variant="ghost" :disabled="disabled" :aria-pressed="selected === item.provider_id"
         @click="emit('select', item.provider_id)">
-        <span :class="$style.copy"><span>{{ item.display_name }}</span><span :class="$style.description">{{ item.model_name }}</span></span>
+        <span :class="$style.name">{{ item.display_name || item.model_name }}</span>
         <UIcon v-if="selected === item.provider_id" name="i-lucide-check" :class="$style.check" />
       </UButton>
-      <p v-if="!items.length" :class="$style.description">暂无可切换模型，可前往设置添加模型服务。</p>
+      <p v-if="!items.length" :class="$style.empty">暂无可切换模型，可前往设置添加模型服务。</p>
     </div>
   </section>
 </template>

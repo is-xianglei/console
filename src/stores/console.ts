@@ -1,4 +1,3 @@
-import { readStandardEffort, rememberStandardEffort } from '@/utils/chat-models'
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
 import { getWorkbenchApp } from '../constants/app-registry'
@@ -59,7 +58,7 @@ import type {
 import { mergeFaults } from '@/utils/mcp-tool'
 import { createSseReducer, createStreamCursor, replaySnapshot, toolCardFields } from '@/utils/sse-reducer'
 import { createClientInputId, presentClientInputIds } from '@/utils/client-input-id'
-import type { ChatModelSelection, ThinkingEffort } from '../interfaces/settings/models/model'
+import type { ChatModelSelection } from '../interfaces/settings/models/model'
 import { getSessionSubAgentRuns } from '../http/session-runtime'
 import { ApiError } from '../http/index'
 import { mapSubAgentRuns, mergeSubAgentRuns } from '../utils/session-runtime'
@@ -125,9 +124,7 @@ function mapSession(s: SessionResponse, currentUserId?: number | null): Session 
     modelName: s.model_name ?? null,
     modelProviderId: s.model_provider_id ?? null,
     modelProviderOverride: metadata.model_provider_override === true,
-    modeSlug: s.mode_slug ?? 'standard',
     thinkingEffort: s.thinking_effort ?? 'fast',
-    standardThinkingEffort: s.mode_slug === 'turbo' ? 'fast' : s.thinking_effort ?? 'fast',
     status: s.status,
     visibility: normalizeVisibility(s.visibility),
     sharedWith: [...(s.shared_with ?? [])],
@@ -430,7 +427,6 @@ interface ConsoleState {
   newSessionTeamId: number | null
   chatSelection: ChatModelSelection
   chatSelectionSaving: boolean
-  standardDraftEffort: ThinkingEffort
   tasks: Task[]
   /** Workflow 进度图状态:按 agent_id 归并的成员 + 路由/汇总阶段 */
   workflowProgress: WorkflowProgressState
@@ -522,9 +518,8 @@ export const useConsoleStore = defineStore('console', () => {
     newSessionAgentId: null,
     newSessionWorkflowId: null,
     newSessionTeamId: null,
-    chatSelection: { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast' },
+    chatSelection: { model_provider_id: null, thinking_effort: 'fast' },
     chatSelectionSaving: false,
-    standardDraftEffort: 'fast',
     tasks: [],
     workflowProgress: emptyWorkflowProgress(),
     busy: false,
@@ -996,13 +991,7 @@ export const useConsoleStore = defineStore('console', () => {
       const list = await getSessionList()
       if (generation !== dataGeneration) return false
 
-      const sessions = list.map((item) => {
-        const session = mapSession(item, authStore.state.user?.id ?? null)
-        if (session.modeSlug === 'turbo') {
-          session.standardThinkingEffort = readStandardEffort(authStore.state.user?.id ?? null, authStore.currentWorkspaceId, session.id)
-        }
-        return session
-      })
+      const sessions = list.map((item) => mapSession(item, authStore.state.user?.id ?? null))
       const preferred = preferredSessionId
         ? sessions.find((session) => session.id === preferredSessionId)?.id
         : undefined
@@ -1209,9 +1198,8 @@ export const useConsoleStore = defineStore('console', () => {
     restoredAgentSessionId = null
     restoredAgents = []
 
-    state.chatSelection = { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast' }
+    state.chatSelection = { model_provider_id: null, thinking_effort: 'fast' }
     state.chatSelectionSaving = false
-    state.standardDraftEffort = 'fast'
     state.health = 'unknown'
     state.sessionsLoading = false
     state.sessions = []
@@ -1279,9 +1267,7 @@ export const useConsoleStore = defineStore('console', () => {
     }
     s.modelProviderId = state.chatSelection.model_provider_id
     s.modelProviderOverride = state.chatSelection.model_provider_id !== null
-    s.modeSlug = state.chatSelection.mode_slug
     s.thinkingEffort = state.chatSelection.thinking_effort
-    s.standardThinkingEffort = state.standardDraftEffort
     state.sessions.unshift(s)
     state.activeSessionId = s.id
     state.activeAppId = appId ?? null
@@ -1380,18 +1366,10 @@ export const useConsoleStore = defineStore('console', () => {
   /** 当前配置随会话恢复，未建会话时使用草稿配置。 */
   function activeChatSelection(): ChatModelSelection {
     const session = state.sessions.find((item) => item.id === state.activeSessionId)
-    const selection = session ? {
+    return session ? {
       model_provider_id: session.modelProviderOverride === true ? session.modelProviderId ?? null : null,
-      mode_slug: session.modeSlug ?? 'standard',
       thinking_effort: session.thinkingEffort ?? 'fast',
     } : { ...state.chatSelection }
-    if (selection.mode_slug === 'turbo') selection.thinking_effort = 'fast'
-    return selection
-  }
-
-  function standardThinkingEffort(): ThinkingEffort {
-    const session = state.sessions.find((item) => item.id === state.activeSessionId)
-    return session?.standardThinkingEffort ?? state.standardDraftEffort
   }
 
   /** 持久会话保存成功后才更新界面，保存期间禁止发送旧配置。 */
@@ -1400,30 +1378,22 @@ export const useConsoleStore = defineStore('console', () => {
     if (hasOpenTurn() || state.chatSelectionSaving || !canWriteSession()) return false
     const id = state.activeSessionId
     const generation = dataGeneration
-    const next = { ...selection, thinking_effort: selection.mode_slug === 'turbo' ? 'fast' as const : selection.thinking_effort }
-    const previous = activeChatSelection()
-    const remembered = next.mode_slug === 'standard' ? next.thinking_effort
-      : previous.mode_slug === 'standard' ? previous.thinking_effort : standardThinkingEffort()
+    // 后端拒绝未知字段，只发这两项。
+    const next: ChatModelSelection = { model_provider_id: selection.model_provider_id, thinking_effort: selection.thinking_effort }
     state.chatSelectionSaving = true
     try {
       const saved = isBackendSession(id) ? await updateSessionChatSelection(id, next) : null
       if (generation !== dataGeneration) return false
       const target = state.sessions.find((item) => item.id === id)
-      let effectiveRemembered = remembered
       if (target) {
         // 后端返回实际解析模型，显式覆盖仍以本次请求语义为准，不能把角色模型变成选择。
         target.modelProviderId = saved?.model_provider_id ?? next.model_provider_id
         target.modelProviderOverride = saved?.metadata?.model_provider_override === undefined
           ? next.model_provider_id !== null : saved.metadata.model_provider_override === true
-        target.modeSlug = saved?.mode_slug ?? next.mode_slug
         target.thinkingEffort = saved?.thinking_effort ?? next.thinking_effort
-        target.standardThinkingEffort = target.modeSlug === 'standard' ? target.thinkingEffort : remembered
-        effectiveRemembered = target.standardThinkingEffort
       } else if (id === state.activeSessionId) {
         state.chatSelection = next
-        state.standardDraftEffort = remembered
       }
-      rememberStandardEffort(authStore.state.user?.id ?? null, authStore.currentWorkspaceId, id, effectiveRemembered)
       return true
     } finally {
       if (generation === dataGeneration) state.chatSelectionSaving = false
@@ -1586,7 +1556,6 @@ export const useConsoleStore = defineStore('console', () => {
     configuredTeamId?: number,
   ) {
     const chatSelection = activeChatSelection()
-    const standardEffort = standardThinkingEffort()
     return createSseReducer({
       get ai() {
         return followContainer(follow)
@@ -1625,9 +1594,7 @@ export const useConsoleStore = defineStore('console', () => {
               teamDefinitionId: configuredTeamId ?? null,
               modelProviderId: chatSelection.model_provider_id,
               modelProviderOverride: chatSelection.model_provider_id !== null,
-              modeSlug: chatSelection.mode_slug,
               thinkingEffort: chatSelection.thinking_effort,
-              standardThinkingEffort: standardEffort,
             })
           }
           state.activeSessionId = idStr
@@ -1635,7 +1602,6 @@ export const useConsoleStore = defineStore('console', () => {
         // 会话已落库,绑定关系改由会话自身承载;草稿字段必须清空,否则下一个新会话会继承它
         const promoted = state.sessions.find((s) => s.id === idStr)
         if (promoted) {
-          rememberStandardEffort(authStore.state.user?.id ?? null, authStore.currentWorkspaceId, idStr, promoted.standardThinkingEffort ?? standardEffort)
           if (configuredAgentId != null) promoted.agentId = configuredAgentId
           if (configuredWorkflowId != null) promoted.workflowId = configuredWorkflowId
           if (configuredTeamId != null) promoted.teamDefinitionId = configuredTeamId
@@ -2509,7 +2475,6 @@ export const useConsoleStore = defineStore('console', () => {
     state,
     canWriteSession,
     activeChatSelection,
-    standardThinkingEffort,
     setChatSelection,
     toggleLeft,
     toggleRight,

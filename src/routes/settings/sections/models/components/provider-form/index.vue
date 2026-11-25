@@ -77,7 +77,7 @@ const showFastMapping = computed(() => usesOpenAIFastMapping(props.model))
     </UFormField>
     <div :class="$style.toggle"><strong>启用</strong><USwitch v-model="model.isActive" aria-label="启用" /></div>
     <template v-if="isChat">
-      <UFormField v-if="showFastMapping" label="快速档位映射" name="fastReasoningEffort" help="仅当上游模型明确支持 reasoning_effort=none 时开启。保存时会实际验证；未配置时快速档位遵循模型默认思考行为，极速模式不可用。">
+      <UFormField v-if="showFastMapping" label="快速档位映射" name="fastReasoningEffort" help="仅当上游模型明确支持 reasoning_effort=none 时开启。保存时会实际验证；未配置时快速档位遵循模型默认思考行为。">
         <USwitch :model-value="model.fastReasoningEffort === 'none'" label="快速时发送 reasoning_effort=none" @update:model-value="model.fastReasoningEffort = $event ? 'none' : undefined" />
       </UFormField>
       <div :class="$style.toggle"><strong>支持多档思考强度</strong><USwitch v-model="model.supportsReasoningEffort" aria-label="支持多档思考强度" /></div>

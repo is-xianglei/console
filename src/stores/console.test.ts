@@ -500,7 +500,7 @@ describe('console store 会话恢复', () => {
 
     expect(store.dispatch('使用设备 Agent 检查告警')).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, agent_id: 9, content: '使用设备 Agent 检查告警', client_input_id: expect.any(String) },
+      { model_provider_id: null, thinking_effort: 'fast', session_id: undefined, agent_id: 9, content: '使用设备 Agent 检查告警', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -513,7 +513,7 @@ describe('console store 会话恢复', () => {
 
     expect(store.dispatch('改用默认 Agent', { agentId: null })).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, content: '改用默认 Agent', client_input_id: expect.any(String) },
+      { model_provider_id: null, thinking_effort: 'fast', session_id: undefined, content: '改用默认 Agent', client_input_id: expect.any(String) },
       expect.any(Object),
     )
     expect(store.state.sessions[0]?.agentId).toBeNull()
@@ -528,7 +528,7 @@ describe('console store 会话恢复', () => {
     expect(store.state.sessions[0]?.agentId).toBe(9)
     expect(store.dispatch('继续当前会话', { agentId: 12 })).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: 42, content: '继续当前会话', client_input_id: expect.any(String) },
+      { model_provider_id: null, thinking_effort: 'fast', session_id: 42, content: '继续当前会话', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -665,7 +665,7 @@ describe('console store Workflow 对话', () => {
     expect(store.state.workbenchMode).toBe('graph')
     expect(store.dispatch('按 Workflow 执行')).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, workflow_id: 5, content: '按 Workflow 执行', client_input_id: expect.any(String) },
+      { model_provider_id: null, thinking_effort: 'fast', session_id: undefined, workflow_id: 5, content: '按 Workflow 执行', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -679,7 +679,7 @@ describe('console store Workflow 对话', () => {
     expect(store.state.newSessionWorkflowId).toBeNull()
     expect(store.dispatch('改用 Agent')).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, agent_id: 9, content: '改用 Agent', client_input_id: expect.any(String) },
+      { model_provider_id: null, thinking_effort: 'fast', session_id: undefined, agent_id: 9, content: '改用 Agent', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -698,7 +698,7 @@ describe('console store Workflow 对话', () => {
     expect(store.state.workbenchMode).toBe('graph')
     expect(store.dispatch('继续', { agentId: 12, workflowId: 7 })).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: 61, content: '继续', client_input_id: expect.any(String) },
+      { model_provider_id: null, thinking_effort: 'fast', session_id: 61, content: '继续', client_input_id: expect.any(String) },
       expect.any(Object),
     )
   })
@@ -863,7 +863,7 @@ describe('console store 推理块收尾兜底', () => {
   })
 })
 
-describe('聊天模型与模式状态', () => {
+describe('聊天模型选项状态', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.resetAllMocks()
@@ -877,15 +877,15 @@ describe('聊天模型与模式状态', () => {
     vi.mocked(updateSessionChatSelection).mockImplementation(async (_id, selection) => ({ ...session, ...selection, metadata: { model_provider_override: selection.model_provider_id !== null } }))
   })
 
-  it('首条消息携带草稿三项配置，SSE 创建会话后仍保留', async () => {
+  it('首条消息携带草稿模型选项，SSE 创建会话后仍保留', async () => {
     const store = useConsoleStore()
     store.resetConsole()
-    await store.setChatSelection({ model_provider_id: 'custom', mode_slug: 'standard', thinking_effort: 'high' })
+    await store.setChatSelection({ model_provider_id: 'custom', thinking_effort: 'high' })
     expect(store.dispatch('首条消息')).toBe(true)
-    expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ model_provider_id: 'custom', mode_slug: 'standard', thinking_effort: 'high' }), expect.any(Object))
+    expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ model_provider_id: 'custom', thinking_effort: 'high' }), expect.any(Object))
     vi.mocked(sendMessage).mock.calls[0]![1].onEvent({ type: 'session_ready', sequence: 0, session_id: 42, data: { session_id: 42 } })
     expect(store.state.activeSessionId).toBe('42')
-    expect(store.activeChatSelection()).toEqual({ model_provider_id: 'custom', mode_slug: 'standard', thinking_effort: 'high' })
+    expect(store.activeChatSelection()).toEqual({ model_provider_id: 'custom', thinking_effort: 'high' })
   })
 
   it('保存完成前阻止发送；失败后保持原配置', async () => {
@@ -893,7 +893,7 @@ describe('聊天模型与模式状态', () => {
     await store.reloadConsole()
     let fail!: (reason: Error) => void
     vi.mocked(updateSessionChatSelection).mockImplementationOnce(() => new Promise((_, reject) => { fail = reject }))
-    const pending = store.setChatSelection({ model_provider_id: 'custom', mode_slug: 'standard', thinking_effort: 'high' })
+    const pending = store.setChatSelection({ model_provider_id: 'custom', thinking_effort: 'high' })
     expect(store.state.chatSelectionSaving).toBe(true)
     expect(store.dispatch('此时不能发送')).toBe(false)
     expect(store.activeChatSelection().thinking_effort).toBe('fast')
@@ -903,19 +903,29 @@ describe('聊天模型与模式状态', () => {
     expect(store.activeChatSelection().model_provider_id).toBeNull()
   })
 
-  it('极速强制 fast，重新加载会话后保留标准强度', async () => {
+  it('发消息与 PATCH 的请求体不带 mode_slug', async () => {
+    // 契约「删除运行模式」的 PATCH 响应；会话初始为跟随默认模型、fast。
+    const patched = {
+      id: 101, title: '查天气', status: 'idle', model_name: null, model_provider_id: 'prov-claude', thinking_effort: 'high' as const,
+      system_prompt: null, user_id: 3, workspace_id: 2, agent_id: null, workflow_id: null, team_definition_id: null,
+      visibility: 'private', shared_with: [], shared_with_departments: [], shared_with_groups: [],
+      metadata: { model_provider_override: true },
+      created_at: '2026-11-24T08:00:00Z', updated_at: '2026-11-24T08:00:00Z', last_active_at: '2026-11-24T08:00:00Z',
+    }
+    vi.mocked(getSessionList).mockResolvedValue([{ ...patched, model_provider_id: null, thinking_effort: 'fast', metadata: { model_provider_override: false } }])
+    vi.mocked(updateSessionChatSelection).mockResolvedValue(patched)
     const store = useConsoleStore()
     await store.reloadConsole()
-    await store.setChatSelection({ model_provider_id: 'custom', mode_slug: 'standard', thinking_effort: 'high' })
-    await store.setChatSelection({ model_provider_id: 'custom', mode_slug: 'turbo', thinking_effort: 'max' })
-    expect(store.activeChatSelection().thinking_effort).toBe('fast')
-    expect(store.standardThinkingEffort()).toBe('high')
-    expect(updateSessionChatSelection).toHaveBeenLastCalledWith('42', { model_provider_id: 'custom', mode_slug: 'turbo', thinking_effort: 'fast' })
-    vi.mocked(getSessionList).mockResolvedValue([{ ...session, model_provider_id: 'custom', mode_slug: 'turbo', thinking_effort: 'fast', metadata: { model_provider_override: true } }])
-    await store.reloadConsole()
-    expect(store.standardThinkingEffort()).toBe('high')
-    await store.setChatSelection({ ...store.activeChatSelection(), mode_slug: 'standard', thinking_effort: store.standardThinkingEffort() })
-    expect(store.activeChatSelection().thinking_effort).toBe('high')
+
+    expect(store.dispatch('那上海呢')).toBe(true)
+    const [body, handlers] = vi.mocked(sendMessage).mock.calls[0]!
+    expect(body).toStrictEqual({ session_id: 101, content: '那上海呢', model_provider_id: null, thinking_effort: 'fast', client_input_id: expect.any(String) })
+    handlers.onEvent({ type: 'run_started', turn_id: '00000000-0000-4000-8000-0000000000a0', session_id: 101, sequence: 1 })
+    handlers.onEvent({ type: 'run_end', turn_id: '00000000-0000-4000-8000-0000000000a0', status: 'completed', sequence: 65 })
+
+    expect(await store.setChatSelection({ model_provider_id: 'prov-claude', thinking_effort: 'high' })).toBe(true)
+    expect(vi.mocked(updateSessionChatSelection).mock.calls[0]).toStrictEqual(['101', { model_provider_id: 'prov-claude', thinking_effort: 'high' }])
+    expect(store.activeChatSelection()).toEqual({ model_provider_id: 'prov-claude', thinking_effort: 'high' })
   })
 
   it('工作流恢复的实际角色模型不当作显式选择，修改强度与续聊仍传 null', async () => {
@@ -927,7 +937,7 @@ describe('聊天模型与模式状态', () => {
     expect(store.state.sessions[0]?.modelProviderId).toBe('workflow-role')
     expect(store.activeChatSelection().model_provider_id).toBeNull()
     await store.setChatSelection({ ...store.activeChatSelection(), thinking_effort: 'medium' })
-    expect(updateSessionChatSelection).toHaveBeenLastCalledWith('42', { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'medium' })
+    expect(updateSessionChatSelection).toHaveBeenLastCalledWith('42', { model_provider_id: null, thinking_effort: 'medium' })
     expect(store.activeChatSelection().model_provider_id).toBeNull()
     expect(store.dispatch('继续工作流')).toBe(true)
     expect(sendMessage).toHaveBeenLastCalledWith(expect.objectContaining({ model_provider_id: null }), expect.any(Object))
@@ -938,21 +948,20 @@ describe('聊天模型与模式状态', () => {
     const store = useConsoleStore()
     await store.reloadConsole()
     expect(store.activeChatSelection().model_provider_id).toBe('custom')
-    vi.mocked(updateSessionChatSelection).mockResolvedValue({ ...session, model_provider_id: 'resolved-default', mode_slug: 'standard', thinking_effort: 'medium', metadata: { model_provider_override: false } })
-    await store.setChatSelection({ model_provider_id: null, mode_slug: 'standard', thinking_effort: 'max' })
+    vi.mocked(updateSessionChatSelection).mockResolvedValue({ ...session, model_provider_id: 'resolved-default', thinking_effort: 'medium', metadata: { model_provider_override: false } })
+    await store.setChatSelection({ model_provider_id: null, thinking_effort: 'max' })
     expect(store.state.sessions[0]?.modelProviderId).toBe('resolved-default')
-    expect(store.activeChatSelection()).toEqual({ model_provider_id: null, mode_slug: 'standard', thinking_effort: 'medium' })
-    expect(store.standardThinkingEffort()).toBe('medium')
+    expect(store.activeChatSelection()).toEqual({ model_provider_id: null, thinking_effort: 'medium' })
   })
 
   it('只读会话与忙碌期间不保存配置', async () => {
     const store = useConsoleStore()
     await store.reloadConsole()
     store.state.sessions[0]!.readOnly = true
-    expect(await store.setChatSelection({ model_provider_id: null, mode_slug: 'turbo', thinking_effort: 'fast' })).toBe(false)
+    expect(await store.setChatSelection({ model_provider_id: null, thinking_effort: 'fast' })).toBe(false)
     store.state.sessions[0]!.readOnly = false
     store.state.busy = true
-    expect(await store.setChatSelection({ model_provider_id: null, mode_slug: 'turbo', thinking_effort: 'fast' })).toBe(false)
+    expect(await store.setChatSelection({ model_provider_id: null, thinking_effort: 'fast' })).toBe(false)
     expect(updateSessionChatSelection).not.toHaveBeenCalled()
   })
 })
@@ -1020,7 +1029,7 @@ describe('console store Team 会话', () => {
     expect(store.sessionTeamId(store.state.activeSessionId)).toBe(3)
     expect(store.dispatch('写一份周报')).toBe(true)
     expect(sendMessage).toHaveBeenCalledWith(
-      { model_provider_id: null, mode_slug: 'standard', thinking_effort: 'fast', session_id: undefined, team_definition_id: 3, content: '写一份周报', client_input_id: expect.any(String) },
+      { model_provider_id: null, thinking_effort: 'fast', session_id: undefined, team_definition_id: 3, content: '写一份周报', client_input_id: expect.any(String) },
       expect.any(Object),
     )
 

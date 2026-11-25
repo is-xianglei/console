@@ -1,17 +1,19 @@
 .controls {
   display: flex;
   align-items: center;
-  gap: 2px;
   min-width: 0;
   max-width: 100%;
 }
 
+/* 触发按钮：模型名 + 档位，一个入口 */
 .trigger {
+  min-width: 0;
+  max-width: 220px;
   min-height: 30px;
-  gap: 5px;
+  gap: 6px;
   padding: 4px 8px;
   border-radius: var(--radius-pill);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: var(--fs-sm);
   white-space: nowrap;
 }
@@ -19,149 +21,132 @@
 .trigger:hover,
 .trigger[data-state='open'] {
   background: var(--bg-hover);
-  color: var(--text-primary);
 }
 
-.modeTrigger {
-  background: var(--accent-agent-dim);
-  color: var(--accent-agent);
-}
-
-.modelTrigger {
-  max-width: 160px;
+.modelName {
   min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+}
+
+.effortName {
+  flex: none;
 }
 
 .popover {
-  width: min(340px, calc(100vw - 24px));
+  width: min(260px, calc(100vw - 24px));
   max-height: var(--reka-popover-content-available-height);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   background: var(--bg-surface);
   color: var(--text-primary);
   box-shadow: 0 12px 36px color-mix(in srgb, var(--bg-deep) 45%, transparent);
 }
 
-.modePanel {
-  padding: 5px;
-}
-
-.modeOption {
-  align-items: center;
-  width: 100%;
-  gap: 12px;
-  padding: 12px;
-  border-radius: var(--radius-control);
-  text-align: left;
-  white-space: normal;
-}
-
-.modeOption:hover,
-.modeOption[aria-pressed='true'] {
-  background: var(--bg-hover);
-}
-
-.optionCopy {
+/* 强度视图：档位居中、模型入口、滑杆 */
+.effort {
+  position: relative;
   display: flex;
-  flex: 1;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-width: 0;
-}
-
-.optionTitle {
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.description,
-.hint {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  font-weight: 400;
-  line-height: 1.6;
-}
-
-.check {
-  flex: none;
-  margin-left: auto;
-  color: var(--accent-agent);
-}
-
-.effortPanel {
-  padding: 16px;
-}
-
-.panelHeader {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.eyebrow {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
+  padding: 14px 16px 16px;
 }
 
 .effortTitle {
-  margin: 3px 0 0;
+  margin: 0;
   color: var(--accent-agent);
-  font-size: 20px;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.4;
+}
+
+.reset {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 
 .modelLink {
-  display: flex;
-  width: fit-content;
-  max-width: 100%;
-  margin: 8px auto 12px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.slider {
-  margin: 18px 6px 12px;
-  width: calc(100% - 12px);
-}
-
-.effortSteps {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-  gap: 2px;
-}
-
-.effortStep {
-  justify-content: center;
-  min-width: 0;
-  min-height: 30px;
-  padding: 4px;
+  max-width: calc(100% - 56px);
+  margin-top: 2px;
   color: var(--text-muted);
   font-size: var(--fs-sm);
-  line-height: 1.3;
-  white-space: normal;
 }
 
-.effortStep[aria-pressed='true'] {
-  color: var(--accent-agent);
-  background: var(--accent-agent-dim);
+.modelLink:hover {
+  color: var(--text-primary);
 }
 
-.effortPanel .hint {
+.scale {
+  --thumb-size: 26px;
+  position: relative;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.track {
+  height: 22px;
+  background: var(--bg-hover);
+}
+
+.thumb {
+  z-index: 2;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 28%), 0 0 0 1px rgb(0 0 0 / 6%);
+  cursor: grab;
+}
+
+.thumb:active {
+  cursor: grabbing;
+}
+
+/* 档位刻度：两端各缩进半个滑块，与 reka 的滑块定位对齐 */
+.ticks {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: calc(var(--thumb-size) / 2);
+  pointer-events: none;
+}
+
+.tick {
+  width: 4px;
+  height: 4px;
+  margin-inline: -2px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.55;
+}
+
+.tick[data-filled] {
+  background: #fff;
+  opacity: 0.8;
+}
+
+.hint {
   margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.loading {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
 }
 
 @media (max-width: 720px) {
   .trigger {
     min-height: 36px;
+    max-width: 150px;
     padding-inline: 6px;
-  }
-
-  .modelTrigger {
-    max-width: 115px;
   }
 }

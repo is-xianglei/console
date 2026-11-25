@@ -1,5 +1,5 @@
 import type { SessionAppId } from '../app/model'
-import type { ChatModeSlug, ThinkingEffort } from '../settings/models/model'
+import type { ThinkingEffort } from '../settings/models/model'
 
 /** 后端会话摘要。 */
 export interface SessionResponse {
@@ -8,7 +8,6 @@ export interface SessionResponse {
   status: string
   model_name?: string | null
   model_provider_id?: string | null
-  mode_slug?: ChatModeSlug
   thinking_effort?: ThinkingEffort
   system_prompt?: string | null
   user_id?: number | null
@@ -456,10 +455,7 @@ export interface Session {
   modelProviderId?: string | null
   /** 仅 metadata.model_provider_override=true 表示用户显式选模型。 */
   modelProviderOverride?: boolean
-  modeSlug?: ChatModeSlug
   thinkingEffort?: ThinkingEffort
-  /** 切回标准模式时恢复本会话上次选择的思考强度。 */
-  standardThinkingEffort?: ThinkingEffort
   status?: string
   visibility?: SessionVisibility
   sharedWith?: number[]

@@ -6,7 +6,7 @@ import { useChatModelsStore } from './chat-models'
 
 vi.mock('@/http/settings/models', () => ({ getChatModelCapabilities: vi.fn() }))
 const capabilities: ChatModelCapabilities = {
-  main_provider_id: null, allow_model_switch: true, models: [], modes: [],
+  main_provider_id: null, allow_model_switch: true, models: [],
   supports_reasoning_effort: false, reasoning_effort_levels: [], default_reasoning_effort: 'medium', reasoning_effort_configured: false,
 }
 
