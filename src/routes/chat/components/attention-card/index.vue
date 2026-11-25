@@ -32,23 +32,27 @@ const rows = computed(() => props.calls.map((call, index) => {
 </script>
 
 <template>
-  <section :class="$style.card" role="status">
-    <header :class="$style.header">
-      <UIcon name="i-lucide-triangle-alert" :class="$style.icon" />
-      <strong>需要人工处理</strong>
-    </header>
-    <p v-if="message" :class="$style.message">{{ message }}</p>
-    <ul v-if="rows.length" :class="$style.calls">
-      <li v-for="row in rows" :key="row.key" :class="$style.call">
-        <div :class="$style.signature">
-          <McpSourceBadge v-if="row.mcp" :server-key="row.mcp" />
-          <span :class="[$style.name, 'mono']">{{ row.name }}</span>
-          <code :class="$style.summary">{{ row.summary }}</code>
-        </div>
-        <span :class="[$style.time, 'mono']">开始于 {{ row.startedAt }}</span>
-      </li>
-    </ul>
-  </section>
+  <UAlert
+    color="warning"
+    variant="subtle"
+    icon="i-lucide-triangle-alert"
+    title="需要人工处理"
+    :description="message"
+  >
+    <template v-if="rows.length" #description>
+      <p v-if="message" :class="$style.message">{{ message }}</p>
+      <ul :class="$style.calls">
+        <li v-for="row in rows" :key="row.key" :class="$style.call">
+          <div :class="$style.signature">
+            <McpSourceBadge v-if="row.mcp" :server-key="row.mcp" />
+            <span :class="[$style.name, 'mono']">{{ row.name }}</span>
+            <code :class="$style.summary">{{ row.summary }}</code>
+          </div>
+          <span :class="[$style.time, 'mono']">开始于 {{ row.startedAt }}</span>
+        </li>
+      </ul>
+    </template>
+  </UAlert>
 </template>
 
 <style module src="./index.module.css"></style>

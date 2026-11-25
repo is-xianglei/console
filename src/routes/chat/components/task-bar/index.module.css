@@ -1,396 +1,127 @@
-/* 外层:对齐对话内容列(与 Composer 同一 max-width 与左右留白),不再通栏 */
-.task-wrap {
+/* 任务编排：外壳用 UCollapsible + UProgress，条目交给 UTimeline。 */
+.wrap {
   flex-shrink: 0;
+  padding: 8px 40px 0;
   background: var(--bg-deep);
-  padding: 0 40px;
 }
-/* 卡片:与输入框同一套卡片语言(圆角 + 边框 + 表面色) */
-.task-card {
-  max-width: var(--composer-max);
-  margin: 0 auto;
-  background: var(--bg-panel);
+.card {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  background: var(--bg-panel);
   overflow: hidden;
 }
-.task-head-wrap {
-  position: relative;
-}
-.task-head {
-  position: relative;
-  width: 100%;
+.head {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px 14px;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
   background: transparent;
-  border: none;
-  cursor: pointer;
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
   text-align: left;
+  cursor: pointer;
 }
-.task-head:hover {
+.head:hover {
   background: var(--bg-surface);
 }
-/* ===== AICSS 三态头部图标:清单 / 虚线环+conic 饼图 / 对勾,叠放靠 opacity 交叉过渡 ===== */
-.task-head-ic-wrap {
-  position: relative;
-  width: 16px;
-  height: 16px;
+.head-icon {
   flex-shrink: 0;
-}
-.task-head-ic,
-.task-head-pie,
-.task-head-check {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 140ms ease;
-}
-.task-head-ic.on,
-.task-head-pie.on,
-.task-head-check.on {
-  opacity: 1;
-}
-.task-head-ic {
-  font-size: 14px;
   color: var(--accent-agent);
 }
-.task-head-check {
-  font-size: 15px;
-  color: var(--status-success);
+.spin {
+  animation: spin 1s linear infinite;
 }
-/* @property 让 conic 百分比可平滑过渡;不支持 Houdini 的浏览器只是不过渡,不报错 */
-@property --todo-pie {
-  syntax: '<percentage>';
-  inherits: true;
-  initial-value: 0%;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
-/* 运行中:外圈虚线环缓慢旋转,内芯 conic-gradient 按进度扇形填充 */
-.task-head-pie {
-  border-radius: 50%;
-  color: var(--accent-agent);
-  transition: opacity 140ms ease, --todo-pie 400ms ease;
-}
-.task-head-pie-ring {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  color: var(--text-dim);
-  animation: task-ring-spin 6s linear infinite;
-}
-.task-head-pie::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: conic-gradient(currentColor var(--todo-pie, 0%), transparent 0);
-}
-@keyframes task-ring-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.task-head-title {
-  font-family: var(--font-ui);
-  font-size: 12px;
+.title {
   font-weight: 600;
-  color: var(--text-primary);
 }
-/* ===== 数字滚动:外层 1em 视窗裁剪,内层双帧列向上位移 ===== */
-.task-count {
-  display: inline-flex;
-  align-items: baseline;
+.count {
+  color: var(--text-secondary);
   font-size: var(--fs-sm);
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
 }
-.roll-digit {
-  display: inline-block;
-  overflow: hidden;
-  height: 1em;
-  line-height: 1em;
-}
-.roll-inner {
-  display: flex;
-  flex-direction: column;
-  transition: transform 350ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-.roll-inner span {
-  height: 1em;
-  line-height: 1em;
-}
-.roll-inner.on {
-  transform: translateY(-1em);
-}
-.roll-static {
-  display: inline-block;
-  height: 1em;
-  line-height: 1em;
-}
-.task-chev {
+.chevron {
   margin-left: auto;
-  font-size: 14px;
-  color: var(--text-dim);
-  transition: transform var(--dur-med) var(--ease-out);
+  color: var(--text-muted);
+  transition: transform var(--dur-fast);
 }
-.task-card.open .task-chev {
+.chevron.open {
   transform: rotate(180deg);
 }
-/* 进度条:贴在表头底沿的一条细线,不再夹在中间被拉伸 */
-.task-prog {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: block;
-  margin: 0;
-  line-height: 0;
-  pointer-events: none;
+
+.list {
+  padding: 0 12px 10px;
 }
-.task-prog :global([data-slot='base']) {
-  display: block;
-  margin: 0;
-  padding: 0;
-  border-radius: 0;
-}
-/* 折叠动画:grid-template-rows 0fr→1fr 按内容真实高度过渡,无 max-height 死区 */
-.task-collapse {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--dur-med) var(--ease-out);
-}
-.task-card.open .task-collapse {
-  grid-template-rows: 1fr;
-}
-.task-collapse-inner {
-  overflow: hidden;
-  min-height: 0;
-}
-/* 列表本身滚动:展开后内容超高时才出现滚动条 */
-.task-list {
-  max-height: 320px;
-  overflow-y: auto;
-}
-.task-card.open .task-collapse-inner {
-  border-top: 1px solid var(--border-subtle);
-}
-.task-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  font-family: var(--font-body);
-  font-size: 12px;
-  /* AICSS 逐项入场:--i 驱动 stagger 延迟,展开时依次淡入下滑 */
-  animation: task-item-in 360ms ease backwards;
-  animation-delay: calc(var(--i, 0) * 50ms);
-}
-@keyframes task-item-in {
-  from {
-    opacity: 0;
-    transform: translateY(-7px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.task-row + .task-row {
-  border-top: 1px solid var(--border-subtle);
-}
-.task-row-ix {
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  width: 18px;
-  flex-shrink: 0;
-}
-/* ===== AICSS 四态行图标:虚线圈 / 箭头 / 对勾 / 叉,叠放靠 opacity 切换 ===== */
-/* 每个图标只看自身 t.state 的判断结果,与列表位置无关(任务并行 + 可阻塞,完成顺序不线性) */
-.task-icon-wrap {
-  position: relative;
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
-}
-.task-icon {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  color: var(--text-dim);
-  opacity: 0;
-  transition: opacity 320ms ease;
-}
-.task-icon.on {
-  opacity: 1;
-}
-.task-icon.strong {
-  color: var(--accent-agent);
-}
-.task-icon.ok {
-  color: var(--status-success);
-}
-.task-icon.bad {
-  color: var(--status-error);
-}
-/* active 行的箭头图标轻微脉冲,呼应"正在执行" */
-.task-row.active .task-icon.strong.on {
-  animation: global(pulse-dot) 2s infinite;
-}
-.task-row-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+
+.item {
   min-width: 0;
 }
-.task-row-name {
-  position: relative;
-  color: var(--text-secondary);
+.wrapper {
+  padding-bottom: 8px;
+}
+.separator {
+  margin-top: 2px;
+}
+.indicator {
+  background: transparent;
+  color: var(--text-muted);
+}
+.indicator.active {
+  color: var(--status-info);
+}
+.indicator.done {
+  color: var(--status-success);
+}
+.indicator.error {
+  color: var(--status-error);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color 360ms ease;
 }
-/* AICSS 扫光:active 行文字换成渐变裁切副本,高光带从右往左掠过 */
-.task-row-name::before {
-  content: attr(data-label);
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    var(--text-primary) 0%,
-    var(--text-primary) 30%,
-    color-mix(in srgb, var(--text-primary) 45%, transparent) 45%,
-    color-mix(in srgb, var(--text-primary) 45%, transparent) 55%,
-    var(--text-primary) 70%,
-    var(--text-primary) 100%
-  );
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  opacity: 0;
-  transition: opacity 360ms ease;
-  pointer-events: none;
-}
-.task-row.active .task-row-name {
-  color: transparent;
-  font-weight: 500;
-}
-.task-row.active .task-row-name::before {
-  opacity: 1;
-  animation: task-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
-}
-@keyframes task-shine {
-  0%,
-  18% {
-    background-position: 100% 0;
-  }
-  82%,
-  100% {
-    background-position: 0% 0;
-  }
-}
-.task-row.done .task-row-name {
+.ix {
   color: var(--text-muted);
-  text-decoration: line-through;
-  text-decoration-color: var(--border-strong, var(--text-dim));
+  font-size: var(--fs-micro);
 }
-.task-row.error .task-row-name {
-  color: var(--status-error);
-}
-.task-row.blocked {
-  opacity: 0.55;
-}
-.task-row-meta {
+.meta {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  font-family: var(--font-data);
-  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-size: var(--fs-micro);
 }
-.task-owner {
+.owner,
+.blocked {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  color: var(--accent-agent);
+  gap: 4px;
 }
-.task-owner :global(.icon) {
-  font-size: 10px;
-}
-.task-blocked {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+.blocked {
   color: var(--status-warning);
-  letter-spacing: 0;
 }
-.task-blocked :global(.icon) {
-  font-size: 10px;
-}
-/* active 任务:左侧强调条,呼应右栏 AgentCard 的"正在执行"视觉 */
-.task-row.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--accent-agent);
-}
-/* 状态徽章:仅表头汇总用;行内改用状态图标 + sm 徽章 */
-.task-badge {
-  font-family: var(--font-data);
-  font-size: var(--fs-sm);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
+.state {
   flex-shrink: 0;
-}
-.task-badge.sm {
-  padding: 1px 7px;
-}
-.task-badge.queued {
-  color: var(--text-dim);
-  background: var(--bg-elevated);
-}
-.task-badge.active {
-  color: var(--accent-agent);
-  background: var(--accent-agent-dim);
-}
-.task-badge.done {
-  color: var(--status-success);
-  background: color-mix(in srgb, var(--status-success) 10%, transparent);
-}
-.task-badge.error {
-  color: var(--status-error);
-  background: color-mix(in srgb, var(--status-error) 10%, transparent);
-}
-/* 降级:减少动态偏好时关掉入场/扫光/旋转/滚动动画,状态切换直接跳变 */
-@media (prefers-reduced-motion: reduce) {
-  .task-row {
-    animation: none;
-  }
-  .task-icon,
-  .task-row-name,
-  .task-row-name::before,
-  .roll-inner {
-    transition: none;
-  }
-  .task-row.active .task-row-name::before,
-  .task-row.active .task-icon.strong.on,
-  .task-head-pie-ring {
-    animation: none;
-  }
 }

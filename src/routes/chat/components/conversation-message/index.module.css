@@ -1,30 +1,33 @@
-.msg { display: flex; flex-direction: column; gap: 8px; animation: global(entry-appear) 250ms var(--ease-out); }
-.msg-user { align-items: flex-end; }
-.ai-blocks { display: flex; flex-direction: column; gap: 12px; }
-.user-row {
+/* 消息：外壳交给 UChatMessage，这里只排 byline 与块间距。 */
+.byline {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: var(--fs-micro);
+}
+.agent {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  max-width: 80%;
+  color: var(--accent-agent);
+  font-size: var(--fs-sm);
 }
-.bubble-user {
+.queued {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--status-info);
+}
+
+.user-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-width: 0;
-  padding: 11px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  border-bottom-right-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-family: var(--font-body);
-  font-size: 13px;
-  line-height: 1.55;
 }
-.msg-byline { display: flex; align-items: center; gap: 7px; }
-.byline-ic { width: 20px; height: 20px; flex-shrink: 0; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; }
-.byline-ic.ai { background: var(--accent-agent-dim); color: var(--accent-agent); }
-.byline-ic i { font-size: 12px; }
-.byline-name { color: var(--text-muted); font-family: var(--font-ui); font-size: var(--fs-micro); font-weight: 600; letter-spacing: 0; text-transform: uppercase; }
-.byline-time { margin-left: auto; color: var(--text-dim); font-size: var(--fs-xs); }
-.bubble-user.queued { opacity: 0.55; }
-.queued-tag { display: inline-flex; align-items: center; gap: 4px; }

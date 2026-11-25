@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from '@nuxt/ui/composables'
+import type { ButtonProps } from '@nuxt/ui'
 import type { ToolSourceFault } from '@/interfaces/console/model'
 import { useMcpStore } from '@/stores/mcp'
 import { rememberOAuthServer } from '@/utils/mcp-oauth'
@@ -21,14 +22,33 @@ const authorizingId = ref<number | null>(null)
 const rows = computed(() => props.faults.map((fault) => {
   const server = fault.server_id == null ? undefined : mcpStore.state.items.find((item) => item.id === fault.server_id)
   const authRequired = fault.kind === 'auth_required'
+  const actions: ButtonProps[] = fault.server_id == null
+    ? []
+    : authRequired
+      ? [{
+          label: '去授权',
+          color: 'neutral',
+          variant: 'outline',
+          size: 'xs',
+          loading: authorizingId.value === fault.server_id,
+          disabled: authorizingId.value != null,
+          onClick: () => authorize(fault.server_id!),
+        }]
+      : [{
+          label: '查看',
+          color: 'neutral',
+          variant: 'ghost',
+          size: 'xs',
+          onClick: () => view(fault.server_id!),
+        }]
   return {
     key: `${fault.source}|${fault.kind}`,
     fault,
     name: server?.name ?? sourceServerKey(fault.source),
     label: faultLabel(fault),
     icon: authRequired ? 'i-lucide-key-round' : 'i-lucide-circle-x',
-    tone: authRequired ? 'warning' : 'error',
-    action: fault.server_id == null ? null : authRequired ? 'authorize' as const : 'view' as const,
+    color: authRequired ? 'warning' as const : 'error' as const,
+    actions,
   }
 }))
 
@@ -58,32 +78,18 @@ function view(serverId: number) {
 </script>
 
 <template>
-  <section :class="$style.notice" aria-label="本轮不可用的 MCP server">
-    <div v-for="row in rows" :key="row.key" :class="$style.row">
-      <UTooltip :text="row.fault.message">
-        <UIcon :name="row.icon" :class="$style.icon" :data-tone="row.tone" />
-      </UTooltip>
-      <span :class="$style.text"><strong>{{ row.name }}</strong> {{ row.label }}，本轮没有它的工具</span>
-      <UButton
-        v-if="row.action === 'authorize'"
-        label="去授权"
-        color="neutral"
-        variant="outline"
-        size="xs"
-        :loading="authorizingId === row.fault.server_id"
-        :disabled="authorizingId != null"
-        @click="authorize(row.fault.server_id!)"
-      />
-      <UButton
-        v-else-if="row.action === 'view'"
-        label="查看"
-        color="neutral"
-        variant="ghost"
-        size="xs"
-        @click="view(row.fault.server_id!)"
-      />
-    </div>
-  </section>
+  <div :class="$style.list" aria-label="本轮不可用的 MCP server">
+    <UAlert
+      v-for="row in rows"
+      :key="row.key"
+      :color="row.color"
+      variant="subtle"
+      :icon="row.icon"
+      :title="`${row.name} ${row.label}`"
+      :description="`本轮没有它的工具。${row.fault.message}`"
+      :actions="row.actions"
+    />
+  </div>
 </template>
 
 <style module src="./index.module.css"></style>

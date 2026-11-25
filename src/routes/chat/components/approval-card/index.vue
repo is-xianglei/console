@@ -36,6 +36,7 @@ const resolvedText = computed(() => {
 })
 
 const denied = computed(() => props.status === 'deny')
+const suffix = computed(() => pending.value ? '待审批' : denied.value ? '已拒绝' : '已允许')
 
 function decide(decision: 'allow_once' | 'always_allow' | 'deny') {
   if (!pending.value || state.busy) return
@@ -44,37 +45,50 @@ function decide(decision: 'allow_once' | 'always_allow' | 'deny') {
 </script>
 
 <template>
-  <div
-    :class="[
-      $style['approval-card'],
-      { [$style.resolved]: !pending, [$style.denied]: denied },
-    ]"
+  <UChatTool
+    :text="signature"
+    :suffix="suffix"
+    icon="i-lucide-shield-alert"
+    :error="denied"
+    variant="card"
+    chevron="leading"
+    :default-open="pending"
+    :class="$style.card"
   >
-    <div :class="$style['ap-bar']">
-      <span :class="$style['ap-tag']"><i class="icon icon-shield-alert"></i> 需要审批</span>
-      <span :class="[$style['ap-fn'], 'mono']">{{ signature }}</span>
-    </div>
-    <div :class="$style['ap-reason']">{{ reason }}</div>
+    <template #default>
+      <p :class="$style.reason">{{ reason }}</p>
+      <p v-if="!pending" :class="$style.resolved" :data-denied="denied || undefined">
+        <UIcon :name="denied ? 'i-lucide-circle-x' : 'i-lucide-circle-check'" />
+        {{ resolvedText }}
+      </p>
+    </template>
 
-    <!-- 待裁决:三个动作按钮(对齐 LeftSidebar 的行内确认范式,无遮罩弹窗) -->
-    <div v-if="pending" :class="$style['ap-actions']">
-      <UButton :class="[$style['ap-btn'], $style['allow']]" :loading="state.busy" @click="decide('allow_once')">
-        <i class="icon icon-check"></i> 允许一次
+    <template v-if="pending" #actions>
+      <UButton size="xs" :disabled="state.busy" icon="i-lucide-check" @click="decide('allow_once')">
+        允许一次
       </UButton>
-      <UButton color="neutral" variant="outline" :class="[$style['ap-btn'], $style['always']]" :disabled="state.busy" @click="decide('always_allow')">
-        <i class="icon icon-check-check"></i> 始终允许
+      <UButton
+        size="xs"
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-check-check"
+        :disabled="state.busy"
+        @click="decide('always_allow')"
+      >
+        始终允许
       </UButton>
-      <UButton color="error" variant="outline" :class="[$style['ap-btn'], $style['deny']]" :disabled="state.busy" @click="decide('deny')">
-        <i class="icon icon-x"></i> 拒绝
+      <UButton
+        size="xs"
+        color="error"
+        variant="outline"
+        icon="i-lucide-x"
+        :disabled="state.busy"
+        @click="decide('deny')"
+      >
+        拒绝
       </UButton>
-    </div>
-
-    <!-- 已裁决:显示结果 -->
-    <div v-else :class="$style['ap-resolved']">
-      <i class="icon" :class="denied ? 'icon-x-circle' : 'icon-check-circle'"></i>
-      {{ resolvedText }}
-    </div>
-  </div>
+    </template>
+  </UChatTool>
 </template>
 
 <style module src="./index.module.css"></style>

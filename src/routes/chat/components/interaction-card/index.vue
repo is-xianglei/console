@@ -154,34 +154,41 @@ async function onCancelRun() {
 </script>
 
 <template>
-  <section :class="[$style.card, { [$style.resolved]: !pending }]">
-    <header :class="$style.header">
-      <UIcon :name="icon" :class="$style.icon" />
-      <strong>{{ title }}</strong>
-      <span :class="[$style.kind, 'mono']">{{ interaction.kind }}</span>
-    </header>
-
-    <template v-if="pending">
-      <div v-if="interaction.kind === 'tool_approval'" :class="$style.body">
+  <UChatTool
+    :text="title"
+    :suffix="interaction.kind"
+    :icon="icon"
+    :error="status === 'cancelled'"
+    variant="card"
+    chevron="leading"
+    :default-open="pending"
+    :class="$style.card"
+  >
+    <template #default>
+      <div v-if="interaction.kind === 'tool_approval'" :class="$style.stack">
         <div :class="$style.signatureRow">
           <McpSourceBadge v-if="toolSignature.mcp" :server-key="toolSignature.mcp" />
           <code :class="$style.signature">{{ toolSignature.fn }}</code>
         </div>
-        <p>{{ interaction.request_payload.reason }}</p>
+        <p :class="$style.text">{{ interaction.request_payload.reason }}</p>
         <UFormField v-if="interaction.request_payload.can_update_input" label="调用参数 JSON">
-          <UTextarea v-model="toolInputJson" :class="$style.codeInput" autoresize :maxrows="10" />
+          <UTextarea v-model="toolInputJson" :class="$style.code" autoresize :maxrows="10" />
         </UFormField>
         <UAlert v-if="inputError" color="error" variant="subtle" :description="inputError" />
-        <div :class="$style.actions">
-          <UButton icon="i-lucide-check" label="允许一次" :loading="state.busy" @click="onToolDecision('allow_once')" />
-          <UButton color="neutral" variant="outline" icon="i-lucide-check-check" label="始终允许" :disabled="state.busy" @click="onToolDecision('always_allow')" />
-          <UButton color="error" variant="outline" icon="i-lucide-x" label="拒绝" :disabled="state.busy" @click="onToolDecision('deny')" />
-        </div>
       </div>
 
-      <UForm v-else-if="interaction.kind === 'user_question'" :state="selectedAnswers" :class="$style.body" @submit="onQuestionsSubmit">
-        <fieldset v-for="question in interaction.request_payload.questions" :key="question.question" :class="$style.question">
-          <legend><span>{{ question.header }}</span>{{ question.question }}</legend>
+      <UForm
+        v-else-if="interaction.kind === 'user_question'"
+        :state="selectedAnswers"
+        :class="$style.stack"
+        @submit="onQuestionsSubmit"
+      >
+        <UFormField
+          v-for="question in interaction.request_payload.questions"
+          :key="question.question"
+          :label="question.question"
+          :description="question.header"
+        >
           <UCheckboxGroup
             v-if="question.multiSelect"
             v-model="selectedAnswers[question.question] as string[]"
@@ -192,18 +199,18 @@ async function onCancelRun() {
             v-model="selectedAnswers[question.question] as string"
             :items="question.options.map((option) => ({ label: option.label, value: option.label, description: option.description }))"
           />
-          <UInput v-model="customAnswers[question.question]" placeholder="其他回答" />
-        </fieldset>
+          <UInput v-model="customAnswers[question.question]" placeholder="其他回答" :class="$style.custom" />
+        </UFormField>
         <div :class="$style.actions">
           <UButton type="submit" icon="i-lucide-send" label="提交回答" :loading="state.busy" />
           <UButton color="neutral" variant="outline" label="取消" :disabled="state.busy" @click="onQuestionCancel" />
         </div>
       </UForm>
 
-      <div v-else :class="$style.body">
-        <p v-if="interaction.kind === 'enter_plan_mode'">{{ interaction.request_payload.message }}</p>
+      <div v-else :class="$style.stack">
+        <p v-if="interaction.kind === 'enter_plan_mode'" :class="$style.text">{{ interaction.request_payload.message }}</p>
         <template v-else>
-          <div :class="$style.planMeta">计划版本 {{ interaction.request_payload.plan_version }}</div>
+          <div :class="[$style.planMeta, 'mono']">计划版本 {{ interaction.request_payload.plan_version }}</div>
           <pre :class="$style.plan">{{ interaction.request_payload.plan }}</pre>
           <UFormField label="编辑后的计划" hint="可选">
             <UTextarea v-model="editedPlan" autoresize :maxrows="12" placeholder="保持为空则按原计划执行" />
@@ -212,22 +219,27 @@ async function onCancelRun() {
         <UFormField label="反馈" hint="拒绝时可填写">
           <UTextarea v-model="feedback" autoresize :maxrows="5" />
         </UFormField>
-        <div :class="$style.actions">
-          <UButton icon="i-lucide-check" :label="interaction.kind === 'enter_plan_mode' ? '进入规划模式' : '批准执行'" :loading="state.busy" @click="onPlanDecision('approve')" />
-          <UButton color="error" variant="outline" icon="i-lucide-undo-2" label="退回" :disabled="state.busy" @click="onPlanDecision('reject')" />
-        </div>
       </div>
 
-      <footer :class="$style.footer">
-        <UButton color="neutral" variant="ghost" icon="i-lucide-circle-stop" label="取消本次运行" :disabled="state.busy" @click="onCancelRun" />
-      </footer>
+      <p v-if="!pending" :class="$style.result" :data-cancelled="status === 'cancelled' || undefined">
+        <UIcon :name="status === 'cancelled' ? 'i-lucide-circle-x' : 'i-lucide-circle-check'" />
+        {{ responseLabel || (status === 'cancelled' ? '交互已取消' : '交互已处理') }}
+      </p>
     </template>
 
-    <div v-else :class="$style.result">
-      <UIcon :name="status === 'cancelled' ? 'i-lucide-circle-x' : 'i-lucide-circle-check'" />
-      {{ responseLabel || (status === 'cancelled' ? '交互已取消' : '交互已处理') }}
-    </div>
-  </section>
+    <template v-if="pending" #actions>
+      <template v-if="interaction.kind === 'tool_approval'">
+        <UButton size="xs" icon="i-lucide-check" label="允许一次" :loading="state.busy" @click="onToolDecision('allow_once')" />
+        <UButton size="xs" color="neutral" variant="outline" icon="i-lucide-check-check" label="始终允许" :disabled="state.busy" @click="onToolDecision('always_allow')" />
+        <UButton size="xs" color="error" variant="outline" icon="i-lucide-x" label="拒绝" :disabled="state.busy" @click="onToolDecision('deny')" />
+      </template>
+      <template v-else-if="interaction.kind === 'enter_plan_mode' || interaction.kind === 'exit_plan_mode'">
+        <UButton size="xs" icon="i-lucide-check" :label="interaction.kind === 'enter_plan_mode' ? '进入规划模式' : '批准执行'" :loading="state.busy" @click="onPlanDecision('approve')" />
+        <UButton size="xs" color="error" variant="outline" icon="i-lucide-undo-2" label="退回" :disabled="state.busy" @click="onPlanDecision('reject')" />
+      </template>
+      <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-circle-stop" label="取消本次运行" :disabled="state.busy" @click="onCancelRun" />
+    </template>
+  </UChatTool>
 </template>
 
 <style module src="./index.module.css"></style>

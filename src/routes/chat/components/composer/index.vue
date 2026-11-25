@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { SelectItem } from '@nuxt/ui'
 import { useToast } from '@nuxt/ui/composables'
 import { useAgentsStore } from '@/stores/agents'
@@ -31,12 +31,6 @@ const escapeHtml = (str: string) =>
   str.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
 
 type Phase = 'idle' | 'enhancing' | 'enhanced'
-/** 附件为前端占位：后端 SendMessageRequest 尚无附件字段，文件仅本地暂存展示，发送时不会上传。 */
-interface AttachmentDraft {
-  id: number
-  name: string
-  kind: 'image' | 'file'
-}
 
 const consoleStore = useConsoleStore()
 const agentsStore = useAgentsStore()
@@ -168,9 +162,10 @@ const value = ref('')
 const phase = ref<Phase>('idle')
 const menuOpen = ref(false)
 const skillsOpen = ref(false)
-const attachments = ref<AttachmentDraft[]>([])
-// 正在播放退出动画、等待移除的附件 chip id
-const exitingAtt = ref<number[]>([])
+/** 附件为前端占位：后端 SendMessageRequest 尚无附件字段，文件只在本地预览，发送时不会上传。
+ *  存原始 File 以便 UChatAttachment 读出名称、大小与图片预览（浅层 ref 避免 File 被代理）。 */
+const attachments = shallowRef<File[]>([])
+const dragging = ref(false)
 
 // 增强 pill 的挂载/退出：有文字时进场，退出时先播放动画；切到 spinner 时立即替换
 const pillMounted = ref(false)
@@ -194,7 +189,6 @@ let pendingHTML: string | null = null
 let flipFrom: number | null = null
 let savedRange: Range | null = null
 let abort: AbortController | null = null
-let nextAttachmentId = 1
 
 const hasText = computed(() => value.value.trim().length > 0)
 const enhancing = computed(() => phase.value === 'enhancing')
@@ -560,7 +554,6 @@ function send() {
   value.value = ''
   phase.value = 'idle'
   attachments.value = []
-  exitingAtt.value = []
   closeSlash()
   nextTick(() => editor.value?.focus())
 }
@@ -601,41 +594,62 @@ watch(phase, async () => {
   setTimeout(finish, 260)
 })
 
-// ===== 附件（占位：仅本地暂存展示，不会上传，见 AttachmentDraft 注释）=====
-function openPicker(kind: AttachmentDraft['kind']) {
+// ===== 附件（占位：仅本地预览，不会上传，见 attachments 注释）=====
+function openPicker(kind: 'image' | 'file') {
   const input = fileRef.value
   if (!input) return
   input.accept = kind === 'image' ? 'image/*' : ''
   input.value = ''
-  input.dataset.kind = kind
   input.click()
   menuOpen.value = false
 }
 
-function onFiles(e: Event) {
-  const input = e.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
+function addFiles(files: File[]) {
   if (!files.length) return
-  const fallback = (input.dataset.kind as AttachmentDraft['kind']) ?? 'file'
+  // 同名同大小的重复文件不再重复入列
+  const seen = new Set(attachments.value.map((f) => `${f.name}:${f.size}`))
   attachments.value = [
     ...attachments.value,
-    ...files.map((f) => ({
-      id: nextAttachmentId++,
-      name: f.name,
-      kind: f.type.startsWith('image/') ? ('image' as const) : fallback,
-    })),
+    ...files.filter((f) => !seen.has(`${f.name}:${f.size}`)),
   ]
-  input.value = ''
   nextTick(() => editor.value?.focus())
 }
 
-function removeAttachment(id: number) {
-  // 与技能 pill 相同的淡出/缩放退出动画，播完再真正移除
-  if (!exitingAtt.value.includes(id)) exitingAtt.value = [...exitingAtt.value, id]
-  window.setTimeout(() => {
-    attachments.value = attachments.value.filter((a) => a.id !== id)
-    exitingAtt.value = exitingAtt.value.filter((x) => x !== id)
-  }, 200)
+function onFiles(e: Event) {
+  const input = e.target as HTMLInputElement
+  addFiles(Array.from(input.files ?? []))
+  input.value = ''
+}
+
+function removeAttachment(file: File) {
+  attachments.value = attachments.value.filter((f) => f !== file)
+}
+
+// ===== 拖入 / 粘贴文件，与官方 ChatPrompt 的投递方式一致 =====
+function hasFiles(e: DragEvent): boolean {
+  return Array.from(e.dataTransfer?.types ?? []).includes('Files')
+}
+
+function onDragOver(e: DragEvent) {
+  if (hasFiles(e)) dragging.value = true
+}
+
+function onDragLeave(e: DragEvent) {
+  // 子元素间移动不算离开
+  if (frame.value?.contains(e.relatedTarget as Node | null)) return
+  dragging.value = false
+}
+
+function onDrop(e: DragEvent) {
+  dragging.value = false
+  addFiles(Array.from(e.dataTransfer?.files ?? []))
+}
+
+function onPaste(e: ClipboardEvent) {
+  const files = Array.from(e.clipboardData?.files ?? [])
+  if (!files.length) return
+  e.preventDefault()
+  addFiles(files)
 }
 
 // ===== + 菜单：打开期间挂 document 级监听，关闭/卸载时清理 =====
@@ -673,29 +687,26 @@ onBeforeUnmount(() => {
   <div :class="$style.composer">
     <div :class="$style['composer-inner']">
       <input ref="fileRef" type="file" multiple hidden @change="onFiles" />
-      <div ref="frame" :class="$style.frame" :data-enhancing="enhancing || undefined">
-        <div v-if="attachments.length" :class="$style.chips">
-          <span
-            v-for="att in attachments"
-            :key="att.id"
-            :class="$style.chip"
-            :data-exit="exitingAtt.includes(att.id) || undefined"
-          >
-            <span :class="$style['chip-icon']">
-              <UIcon :name="att.kind === 'image' ? 'i-lucide-image' : 'i-lucide-paperclip'" />
-            </span>
-            <span :class="$style['chip-name']">{{ att.name }}</span>
-            <button
-              type="button"
-              :class="$style['chip-remove']"
-              :aria-label="'移除 ' + att.name"
-              @click="removeAttachment(att.id)"
-            >
-              <UIcon name="i-lucide-x" />
-            </button>
-          </span>
+      <div
+        ref="frame"
+        :class="$style.frame"
+        :data-enhancing="enhancing || undefined"
+        :data-dragging="dragging || undefined"
+        @dragover.prevent="onDragOver"
+        @dragleave="onDragLeave"
+        @drop.prevent="onDrop"
+      >
+        <div v-if="attachments.length" :class="$style.attachments">
+          <UChatAttachment
+            v-for="(file, index) in attachments"
+            :key="`${file.name}:${file.size}:${index}`"
+            :file="file"
+            size="sm"
+            removable
+            @remove="removeAttachment(file)"
+          />
           <!-- 占位提示：明确告知用户附件不会真正上传 -->
-          <span :class="$style['chips-note']">附件功能待后端支持，发送时不会上传</span>
+          <span :class="$style['attachments-note']">附件待后端支持，发送时不会上传</span>
         </div>
 
         <div :class="$style['editor-wrap']">
@@ -713,6 +724,7 @@ onBeforeUnmount(() => {
             :data-empty="!hasText || undefined"
             data-placeholder="描述任务或提出问题…"
             @input="onEditorInput"
+            @paste="onPaste"
             @keydown="onEditorKeydown"
             @keyup="saveSelection"
             @mouseup="saveSelection"
@@ -828,16 +840,17 @@ onBeforeUnmount(() => {
               <span>{{ phase === 'enhanced' ? '撤销增强' : '增强提示词' }}</span>
             </button>
             <ChatModelControls />
-            <button
-              type="button"
-              :class="[$style['icon-btn'], $style.send, sendActive ? $style['send-active'] : '']"
-              :aria-label="showStop ? '停止执行' : '发送消息'"
-              :disabled="showStop ? readOnlySession : !sendActive"
-              @click="showStop ? onStop() : send()"
-            >
-              <UIcon v-if="showStop" name="i-lucide-square" />
-              <UIcon v-else name="i-lucide-arrow-up" />
-            </button>
+            <!-- 只给提交按钮单独套表单：外层若也是 form，输入区里的所有按钮都会变成提交键 -->
+            <form :class="$style.submit" @submit.prevent="send">
+              <UChatPromptSubmit
+                :status="showStop ? 'streaming' : 'ready'"
+                :disabled="showStop ? readOnlySession : !sendActive"
+                size="sm"
+                square
+                :aria-label="showStop ? '停止执行' : '发送消息'"
+                @stop="onStop"
+              />
+            </form>
           </div>
         </div>
       </div>

@@ -1,106 +1,23 @@
-.approval-card {
-  font-family: var(--font-data);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--status-warning);
-  background: color-mix(in srgb, var(--status-warning) 6%, transparent);
-  overflow: hidden;
+/* 审批卡：沿用 UChatTool 的 card 变体，正文只放理由与裁决结果。 */
+.card {
   animation: global(entry-appear) 180ms ease-out;
 }
-.approval-card.resolved {
-  border-color: var(--border-subtle);
-  background: var(--bg-panel);
-}
-.ap-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-}
-.ap-tag {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--status-warning);
-  white-space: nowrap;
-}
-.ap-tag i {
-  font-size: 12px;
-}
-.ap-fn {
-  flex: 1;
+
+.reason {
+  margin: 0;
   color: var(--text-secondary);
   font-size: var(--fs-sm);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.55;
 }
-.ap-reason {
-  padding: 9px 12px;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.6;
-}
-.ap-actions {
-  display: flex;
-  gap: 8px;
-  padding: 0 12px 11px;
-}
-.ap-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: var(--radius-control);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  transition: all var(--dur-fast) var(--ease-out);
-}
-.ap-btn i {
-  font-size: 13px;
-}
-.ap-btn:hover:not(:disabled) {
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-}
-.ap-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.ap-btn.allow:hover:not(:disabled) {
-  border-color: var(--status-success);
-  color: var(--status-success);
-}
-.ap-btn.always:hover:not(:disabled) {
-  border-color: var(--status-info);
-  color: var(--status-info);
-}
-.ap-btn.deny:hover:not(:disabled) {
-  border-color: var(--status-error);
-  color: var(--status-error);
-}
-.ap-resolved {
+
+.resolved {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 12px;
-  font-size: var(--fs-sm);
-  color: var(--text-dim);
-  border-top: 1px solid var(--border-subtle);
-}
-.ap-resolved i {
-  font-size: 13px;
+  margin: 8px 0 0;
   color: var(--status-success);
+  font-size: var(--fs-sm);
 }
-.approval-card.denied .ap-resolved i {
+.resolved[data-denied] {
   color: var(--status-error);
 }

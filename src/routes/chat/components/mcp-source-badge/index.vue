@@ -6,7 +6,7 @@ defineProps<{ serverKey: string }>()
 </script>
 
 <template>
-  <span :class="$style.badge"><span :class="$style.label">MCP</span>{{ serverKey }}</span>
+  <UBadge color="neutral" variant="subtle" size="xs" icon="i-lucide-plug">
+    MCP · {{ serverKey }}
+  </UBadge>
 </template>
-
-<style module src="./index.module.css"></style>

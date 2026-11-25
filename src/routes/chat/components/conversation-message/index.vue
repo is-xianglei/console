@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { StreamingText, ThinkingReasoning } from '@/components'
 import type { ChatMessage } from '@/interfaces'
 import { useConsoleStore } from '@/stores/console'
@@ -11,44 +12,58 @@ import ToolSourcesNotice from '../tool-sources-notice/index.vue'
 
 defineOptions({ name: 'ConversationMessage' })
 
-defineProps<{ message: ChatMessage; busy: boolean }>()
+const props = defineProps<{ message: ChatMessage; busy: boolean }>()
 
 const { resendMessage } = useConsoleStore()
+
+/** 助手消息只在有内容或回合进行中时出现，空回声不占位。 */
+const visible = computed(() =>
+  props.message.role !== 'ai' || !!props.message.blocks?.length || props.busy,
+)
+
+const retryActions = computed(() => props.message.retryable
+  ? [{
+      icon: 'i-lucide-rotate-cw',
+      color: 'neutral',
+      variant: 'ghost',
+      size: 'xs',
+      'aria-label': '重新发送',
+      title: '重新发送',
+      onClick: () => resendMessage(props.message.id),
+    }]
+  : undefined)
 </script>
 
 <template>
-  <article :class="[$style.msg, { [$style['msg-user']]: message.role === 'user' }]">
-    <template v-if="message.role === 'user'">
-      <div :class="$style['user-row']">
-        <UTooltip v-if="message.retryable" text="重新发送">
-          <UButton
-            icon="i-lucide-rotate-cw"
-            color="neutral"
-            variant="ghost"
-            size="xs"
-            aria-label="重新发送"
-            @click="resendMessage(message.id)"
-          />
-        </UTooltip>
-        <div :class="[$style['bubble-user'], { [$style.queued]: message.queued }]">{{ message.text }}</div>
-      </div>
-      <div :class="$style['msg-byline']">
-        <span v-if="message.queued" :class="[$style['byline-time'], $style['queued-tag']]">
+  <UChatMessage
+    v-if="visible"
+    :id="message.id"
+    :role="message.role"
+    :parts="[]"
+    :side="message.role === 'user' ? 'right' : 'left'"
+    :variant="message.role === 'user' ? 'soft' : 'naked'"
+    :actions="retryActions"
+    :compact="message.role === 'team'"
+  >
+    <template v-if="message.role !== 'team'" #header>
+      <span v-if="message.role === 'user'" :class="$style.byline">
+        <span v-if="message.queued" :class="$style.queued">
           <UIcon name="i-lucide-clock-3" />排队中
         </span>
-        <span v-else :class="[$style['byline-time'], 'mono']">{{ message.time }}</span>
-      </div>
+        <span v-else class="mono">{{ message.time }}</span>
+      </span>
+      <span v-else :class="$style.byline">
+        <span :class="$style.agent"><i class="icon icon-hexagon"></i>Hyperreal Agent</span>
+        <span class="mono">{{ message.time }}</span>
+      </span>
     </template>
 
-    <TeamInboxCard v-else-if="message.role === 'team' && message.inbox" :inbox="message.inbox" />
+    <template #content>
+      <div v-if="message.role === 'user'" :class="$style['user-text']">{{ message.text }}</div>
 
-    <template v-else-if="message.blocks?.length || busy">
-      <div :class="$style['msg-byline']">
-        <span :class="[$style['byline-ic'], $style['ai']]" aria-hidden="true"><i class="icon icon-hexagon"></i></span>
-        <span :class="$style['byline-name']">Hyperreal Agent</span>
-        <span :class="[$style['byline-time'], 'mono']">{{ message.time }}</span>
-      </div>
-      <div :class="$style['ai-blocks']">
+      <TeamInboxCard v-else-if="message.role === 'team' && message.inbox" :inbox="message.inbox" />
+
+      <div v-else :class="$style.blocks">
         <template v-for="(block, index) in message.blocks" :key="index">
           <ThinkingReasoning
             v-if="block.kind === 'think'"
@@ -88,7 +103,7 @@ const { resendMessage } = useConsoleStore()
         </template>
       </div>
     </template>
-  </article>
+  </UChatMessage>
 </template>
 
 <style module src="./index.module.css"></style>

@@ -1,80 +1,52 @@
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--status-warning);
-  border-radius: var(--radius-sm);
-  background: var(--bg-panel);
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
-  animation: global(entry-appear) 180ms ease-out;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.icon {
-  flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  color: var(--status-warning);
-}
-
+/* 人工处理提示：外壳交给 UAlert，这里只排工具调用明细。 */
 .message {
-  margin: 0;
-  overflow-wrap: anywhere;
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
 }
 
 .calls {
   display: flex;
   flex-direction: column;
-  margin: 2px 0 0;
+  gap: 6px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .call {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 0;
-}
-
-.call + .call {
-  border-top: 1px solid var(--border-subtle);
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
 }
 
 .signature {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
 .name {
-  flex-shrink: 0;
   color: var(--text-primary);
-  font-weight: 600;
+  font-size: var(--fs-sm);
 }
 
 .summary {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-family: var(--font-data);
+  font-size: var(--fs-micro);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .time {
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-micro);
 }

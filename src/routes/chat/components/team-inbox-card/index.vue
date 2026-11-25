@@ -19,12 +19,19 @@ const entries = computed(() => props.inbox.entries.map((entry, index) => ({
 <template>
   <section :class="$style.card" aria-label="团队消息">
     <UCollapsible v-model:open="open" :disabled="!entries.length">
-      <button type="button" :class="$style.head">
-        <UIcon name="i-lucide-mail" :class="$style.icon" />
-        <span :class="$style.title">团队消息 · {{ entries.length }} 条</span>
-        <span v-if="inbox.trigger" :class="$style.trigger">由队友消息触发</span>
-        <UIcon v-if="entries.length" name="i-lucide-chevron-right" :class="[$style.chevron, { [$style.open]: open }]" />
-      </button>
+      <UButton
+        color="neutral"
+        variant="ghost"
+        block
+        icon="i-lucide-mail"
+        :trailing-icon="entries.length ? (open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down') : undefined"
+        :class="$style.trigger"
+      >
+        <span :class="$style.summary">团队消息</span>
+        <UBadge color="neutral" variant="subtle" size="xs">{{ entries.length }} 条</UBadge>
+        <UBadge v-if="inbox.trigger" color="warning" variant="subtle" size="xs">由队友消息触发</UBadge>
+      </UButton>
+
       <template #content>
         <ul :class="$style.entries">
           <li v-for="entry in entries" :key="entry.key" :class="$style.entry">

@@ -1,87 +1,23 @@
-.cli-card {
+/* 工具卡：外观交给 UChatTool 的 card 变体，这里只补正文排版与入场。 */
+.card {
+  animation: global(entry-appear) 180ms ease-out;
+}
+
+.source {
+  margin-bottom: 6px;
+}
+
+.body {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
   font-family: var(--font-data);
   font-size: var(--fs-sm);
   line-height: 1.5;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-panel);
-  overflow: hidden;
-  animation: global(entry-appear) 180ms ease-out;
-}
-.cli-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 11px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-}
-.cli-tag {
-  font-family: var(--font-data);
-  font-size: var(--fs-micro);
-  font-weight: 600;
-  letter-spacing: 0;
-  padding: 1px 7px;
-  border-radius: var(--radius-sm);
-}
-.cli-tag.tool,
-.cli-tag.spawn {
-  color: var(--status-info);
-  background: color-mix(in srgb, var(--status-info) 12%, transparent);
-}
-.cli-tag.result,
-.cli-tag.done {
-  color: var(--status-success);
-  background: color-mix(in srgb, var(--status-success) 12%, transparent);
-}
-.cli-tag.error {
-  color: var(--status-error);
-  background: color-mix(in srgb, var(--status-error) 12%, transparent);
-}
-.cli-tag.warn {
-  color: var(--status-warning);
-  background: color-mix(in srgb, var(--status-warning) 12%, transparent);
-}
-.cli-tag.start,
-.cli-tag.think {
-  color: var(--accent-agent);
-  background: var(--accent-agent-dim);
-}
-.cli-fn {
-  flex: 1;
-  color: var(--text-secondary);
-  font-size: var(--fs-xs);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.cli-state {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--fs-sm);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-.cli-state .ok {
-  color: var(--status-success);
-}
-.cli-state .error {
-  color: var(--status-error);
-}
-.cli-spin {
-  width: 11px;
-  height: 11px;
-  border: 1.5px solid var(--border-strong);
-  border-top-color: var(--status-info);
-  border-radius: 50%;
-  animation: global(spin) 0.7s linear infinite;
-}
-.cli-body {
-  padding: 9px 12px;
-  color: var(--text-muted);
   white-space: pre-wrap;
-  font-size: var(--fs-xs);
-  line-height: 1.6;
+  word-break: break-word;
 }

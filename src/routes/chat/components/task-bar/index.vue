@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, useCssModule, watch } from 'vue'
+import type { TimelineItem } from '@nuxt/ui'
+import type { Task, TaskState } from '@/interfaces/console/model'
 import { useConsoleStore } from '@/stores/console'
 
 defineOptions({ name: 'TaskBar' })
 
 const { state } = useConsoleStore()
+const styles = useCssModule()
 const open = ref(true)
 let closeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -16,6 +19,13 @@ const stateLabel: Record<string, string> = {
   think: '推理中',
   run: '执行中',
 }
+const STATE_ICON: Record<TaskState, string> = {
+  queued: 'i-lucide-circle-dashed',
+  active: 'i-lucide-circle-arrow-right',
+  done: 'i-lucide-circle-check',
+  error: 'i-lucide-circle-x',
+}
+
 const hasTasks = computed(() => state.tasks.length > 0)
 const doneCount = computed(() => state.tasks.filter((t) => t.state === 'done').length)
 const activeCount = computed(() => state.tasks.filter((t) => t.state === 'active').length)
@@ -23,7 +33,7 @@ const errorCount = computed(() => state.tasks.filter((t) => t.state === 'error')
 const allDone = computed(
   () => hasTasks.value && doneCount.value === state.tasks.length && !errorCount.value,
 )
-/** 头部图标的"运行中"态:存在正在执行的任务时显示虚线环 + conic 饼图 */
+/** 头部图标的"运行中"态:存在正在执行的任务时显示旋转环 */
 const running = computed(() => activeCount.value > 0 && !allDone.value)
 const progress = computed(() =>
   state.tasks.length ? (doneCount.value / state.tasks.length) * 100 : 0,
@@ -34,30 +44,32 @@ const doneIds = computed(
   () => new Set(state.tasks.filter((t) => t.state === 'done').map((t) => Number(t.id))),
 )
 /** 该任务是否仍被未完成的上游阻塞(据此在 UI 上置灰/标记) */
-function blockingIds(t: (typeof state.tasks)[number]): number[] {
+function blockingIds(t: Task): number[] {
   return (t.blockedBy ?? []).filter((id) => !doneIds.value.has(id))
 }
-/** 待办态:非 done/active/error 的一切状态都渲染虚线圈,只看自身 state,不做位置推断 */
-function isPending(t: (typeof state.tasks)[number]): boolean {
-  return t.state !== 'done' && t.state !== 'active' && t.state !== 'error'
-}
+
 const summary = computed(() => {
   if (!state.tasks.length) return '0 / 0 待命'
   const tail = errorCount.value ? '有失败' : activeCount.value ? '运行中' : '完成'
   return `${doneCount.value} / ${state.tasks.length} ${tail}`
 })
+const badgeColor = computed(() => errorCount.value ? 'error' : activeCount.value ? 'info' : allDone.value ? 'success' : 'neutral')
 
-// doneCount 变化时数字向上滚动:生成 {from,to} 双帧,双重 rAF 触发位移,380ms 后清理
-const roll = ref<{ from: string; to: string } | null>(null)
-const rollUp = ref(false)
-let rollTimer: ReturnType<typeof setTimeout> | null = null
-watch(doneCount, (val, old) => {
-  roll.value = { from: String(old), to: String(val) }
-  rollUp.value = false
-  requestAnimationFrame(() => requestAnimationFrame(() => (rollUp.value = true)))
-  if (rollTimer) clearTimeout(rollTimer)
-  rollTimer = setTimeout(() => (roll.value = null), 380)
-})
+const items = computed<TimelineItem[]>(() => state.tasks.map((t, i) => ({
+  value: t.id,
+  icon: STATE_ICON[t.state],
+  title: t.name,
+  description: t.description,
+  index: i,
+  task: t,
+  stateLabel: stateLabel[t.state] ?? t.state,
+  blocked: blockingIds(t),
+  ui: { indicator: [styles.indicator, styles[t.state]] },
+})))
+
+function itemTask(item: TimelineItem): Task {
+  return item.task as Task
+}
 
 // 有新任务出现时自动展开;全部完成后延时自动收起
 let prevHas = false
@@ -81,99 +93,58 @@ watch(
 
 onBeforeUnmount(() => {
   if (closeTimer) clearTimeout(closeTimer)
-  if (rollTimer) clearTimeout(rollTimer)
 })
 </script>
 
 <template>
-  <div v-if="hasTasks" :class="$style['task-wrap']">
-    <div :class="[$style['task-card'], { [$style.open]: open }]">
-      <div :class="$style['task-head-wrap']">
-        <UButton color="neutral" variant="ghost" block :class="$style['task-head']" @click="open = !open">
-          <!-- 三态头部图标叠放:清单(默认) / 虚线环+conic 饼图(运行中) / 对勾(全部完成),靠 opacity 交叉过渡 -->
-          <span :class="$style['task-head-ic-wrap']" aria-hidden="true">
-            <i :class="[$style['task-head-ic'], { [$style.on]: !running && !allDone }, 'icon icon-list-checks']"></i>
-            <span
-              :class="[$style['task-head-pie'], { [$style.on]: running }]"
-              :style="{ '--todo-pie': progress + '%' }"
-            >
-              <svg :class="$style['task-head-pie-ring']" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="2.2 4.4" stroke-linecap="round" />
-              </svg>
-            </span>
-            <i :class="[$style['task-head-check'], { [$style.on]: allDone }, 'icon icon-circle-check']"></i>
-          </span>
-          <span :class="$style['task-head-title']">任务编排</span>
-          <!-- 数字滚动:doneCount 变化时旧值上移、新值顶入 -->
-          <span :class="[$style['task-count'], 'mono']" :aria-label="doneCount + '/' + state.tasks.length">
-            <span :class="$style['roll-digit']">
-              <span v-if="roll" :class="[$style['roll-inner'], { [$style.on]: rollUp }]">
-                <span>{{ roll.from }}</span>
-                <span>{{ roll.to }}</span>
-              </span>
-              <template v-else>{{ doneCount }}</template>
-            </span>
-            <span :class="$style['roll-static']">/{{ state.tasks.length }}</span>
-          </span>
-          <span
-            :class="[
-              $style['task-badge'],
-              $style[errorCount ? 'error' : activeCount ? 'active' : allDone ? 'done' : 'queued'],
-            ]"
-          >{{ summary }}</span>
-          <i :class="[$style['task-chev'], 'icon icon-chevron-down']"></i>
-        </UButton>
-        <UProgress
-          :class="$style['task-prog']"
-          :model-value="progress"
-          size="xs"
-          aria-label="任务完成进度"
+  <div v-if="hasTasks" :class="$style.wrap">
+    <UCollapsible v-model:open="open" :class="$style.card">
+      <button type="button" :class="$style.head" :aria-expanded="open">
+        <UIcon
+          :name="running ? 'i-lucide-loader-circle' : allDone ? 'i-lucide-circle-check' : 'i-lucide-list-checks'"
+          :class="[$style['head-icon'], { [$style.spin]: running }]"
         />
-      </div>
-      <!-- Grid 0fr→1fr 动画:外层 grid 过渡内容真实高度,内层 overflow:hidden 裁剪 -->
-      <div :class="$style['task-collapse']">
-        <div :class="$style['task-collapse-inner']">
-          <div :class="$style['task-list']">
-            <div
-              v-for="(t, i) in state.tasks"
-              :key="t.id"
-              :class="[
-                $style['task-row'],
-                {
-                  [$style.done]: t.state === 'done',
-                  [$style.active]: t.state === 'active',
-                  [$style.error]: t.state === 'error',
-                  [$style.blocked]: blockingIds(t).length > 0,
-                },
-              ]"
-              :style="{ '--i': i }"
-              :title="t.description || t.name"
-            >
-              <span :class="[$style['task-row-ix'], 'mono']">{{ String(i + 1).padStart(2, '0') }}</span>
-              <!-- 三态行图标叠放:严格按 t.state 逐项判断,不做任何位置/顺序推断 -->
-              <span :class="$style['task-icon-wrap']" aria-hidden="true">
-                <i :class="[$style['task-icon'], { [$style.on]: isPending(t) }, 'icon icon-circle-dashed']"></i>
-                <i :class="[$style['task-icon'], $style.strong, { [$style.on]: t.state === 'active' }, 'icon icon-circle-arrow-right']"></i>
-                <i :class="[$style['task-icon'], $style.ok, { [$style.on]: t.state === 'done' }, 'icon icon-circle-check']"></i>
-                <i :class="[$style['task-icon'], $style.bad, { [$style.on]: t.state === 'error' }, 'icon icon-circle-x']"></i>
-              </span>
-              <span :class="$style['task-row-main']">
-                <span :class="$style['task-row-name']" :data-label="t.name">{{ t.name }}</span>
-                <span v-if="t.owner && t.owner !== 'agent' || blockingIds(t).length" :class="$style['task-row-meta']">
-                  <span v-if="t.owner && t.owner !== 'agent'" :class="$style['task-owner']">
-                    <i class="icon icon-user"></i>{{ t.owner }}
+        <span :class="$style.title">任务编排</span>
+        <span :class="[$style.count, 'mono']">{{ doneCount }} / {{ state.tasks.length }}</span>
+        <UBadge :color="badgeColor" variant="subtle" size="sm">{{ summary }}</UBadge>
+        <UIcon
+          name="i-lucide-chevron-down"
+          :class="[$style.chevron, { [$style.open]: open }]"
+        />
+      </button>
+
+      <template #content>
+        <UTimeline
+          :items="items"
+          :ui="{ item: $style.item, wrapper: $style.wrapper, separator: $style.separator }"
+          :class="$style.list"
+        >
+          <template #wrapper="{ item }">
+            <div :class="$style.row">
+              <div :class="$style.main">
+                <span :class="$style.name">
+                  <span :class="[$style.ix, 'mono']">{{ String(item.index + 1).padStart(2, '0') }}</span>
+                  {{ item.title }}
+                </span>
+                <span v-if="itemTask(item).owner && itemTask(item).owner !== 'agent' || item.blocked.length" :class="$style.meta">
+                  <span v-if="itemTask(item).owner && itemTask(item).owner !== 'agent'" :class="$style.owner">
+                    <UIcon name="i-lucide-user" />{{ itemTask(item).owner }}
                   </span>
-                  <span v-if="blockingIds(t).length" :class="[$style['task-blocked'], 'mono']">
-                    <i class="icon icon-lock"></i>阻塞于 {{ blockingIds(t).map((id) => '#' + id).join(' ') }}
+                  <span v-if="item.blocked.length" :class="[$style.blocked, 'mono']">
+                    <UIcon name="i-lucide-lock" />阻塞于 {{ item.blocked.map((id: number) => '#' + id).join(' ') }}
                   </span>
                 </span>
-              </span>
-              <span :class="[$style['task-badge'], $style.sm, $style[t.state]]">{{ stateLabel[t.state] }}</span>
+              </div>
+              <UBadge :class="$style.state" :color="itemTask(item).state === 'error' ? 'error' : itemTask(item).state === 'done' ? 'success' : 'neutral'" variant="subtle" size="sm">
+                {{ item.stateLabel }}
+              </UBadge>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          </template>
+        </UTimeline>
+      </template>
+    </UCollapsible>
+
+    <UProgress :model-value="progress" size="xs" aria-label="任务完成进度" />
   </div>
 </template>
 
