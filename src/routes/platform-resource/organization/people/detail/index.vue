@@ -159,10 +159,10 @@ watch(
     <UAlert v-else-if="!loading && !person" :class="styles.alert" color="error" variant="subtle" icon="i-lucide-circle-alert" title="未找到该用户" description="可能已被删除或工作区已切换。" :actions="[{ label: '返回列表', color: 'neutral', variant: 'outline', onClick: goToList }]" />
 
     <section v-if="person" :class="styles.detailShell" aria-label="人员详情">
-      <div :class="styles.card">
+      <UCard :ui="{ body: styles.cardBody, footer: styles.cardFooter }">
         <div :class="styles.stateRow"><span class="mono">USER-{{ person.id }}</span><span>更新于 {{ formatTime(person.updated_at) }}</span></div>
         <div :class="styles.personHero" style="margin-top: 12px"><UAvatar :alt="personName" :src="person.avatar_url || undefined" size="xl" /><div><strong>{{ personName }}</strong><span>{{ person.email }}</span></div></div>
-        <div :class="styles.sectionHeader"><div><span>IDENTITY</span><h3>身份信息</h3></div><UBadge :color="person.suspended ? 'error' : 'success'" variant="subtle" size="xs">{{ person.suspended ? '已停用' : '正常' }}</UBadge></div>
+        <div :class="styles.sectionHeader"><h3>身份信息</h3><UBadge :color="person.suspended ? 'error' : 'success'" variant="subtle" size="xs">{{ person.suspended ? '已停用' : '正常' }}</UBadge></div>
         <dl :class="styles.meta">
           <div><dt>用户名</dt><dd class="mono">@{{ person.username }}</dd></div>
           <div><dt>邮箱</dt><dd>{{ person.email }}<template v-if="person.email_verified"> · 已验证</template></dd></div>
@@ -172,15 +172,15 @@ watch(
           <div><dt>创建时间</dt><dd>{{ formatTime(person.created_at) }}</dd></div>
         </dl>
 
-        <footer :class="styles.detailActions">
+        <template #footer>
           <UTooltip :text="isSelf ? '不能删除当前登录用户' : '删除用户'"><UButton icon="i-lucide-trash-2" color="error" variant="ghost" square aria-label="删除当前用户" :disabled="isSelf" @click="pendingDelete = true" /></UTooltip>
           <UButton icon="i-lucide-pencil" label="编辑人员" @click="goToEdit" />
-        </footer>
-      </div>
+        </template>
+      </UCard>
 
       <!-- 工作区归属：部门走 departmentsStore.setMemberDepartment，角色走 updateWorkspaceMemberRole，变更后重拉 workspaceMembers。 -->
-      <aside :class="styles.card" aria-label="工作区归属">
-        <div :class="styles.sectionHeader" style="margin-top: 0"><div><span>WORKSPACE</span><h3>工作区归属</h3></div><div :class="styles.badgeGroup"><UBadge :class="styles.roleBadge" :color="membership ? 'success' : 'neutral'" variant="subtle">{{ membership ? '已加入' : '非成员' }}</UBadge></div></div>
+      <UCard as="aside" aria-label="工作区归属" :ui="{ header: styles.cardHeader, body: styles.cardBody }">
+        <template #header><h3 :class="styles.cardTitle">工作区归属</h3><div :class="styles.badgeGroup"><UBadge :class="styles.roleBadge" :color="membership ? 'success' : 'neutral'" variant="subtle">{{ membership ? '已加入' : '非成员' }}</UBadge></div></template>
         <template v-if="membership">
           <div :class="styles.assignmentForm">
             <UFormField label="部门" :description="`归属于 ${workspaceName} 的部门；选择「未分配部门」即移出当前部门。`"><USelect :model-value="String(membership.department_id ?? SELECT_NONE_VALUE)" :items="manager.departmentOptions.value" :loading="manager.assigning.value" :disabled="manager.assigning.value" aria-label="部门" @update:model-value="onDepartmentChange" /></UFormField>
@@ -193,10 +193,10 @@ watch(
           </dl>
         </template>
         <template v-else>
-          <UAlert style="margin-top: 10px" color="neutral" variant="subtle" icon="i-lucide-user-round-x" title="该用户尚未加入当前工作区" :description="`加入 ${workspaceName} 后才能分配部门与角色。`" />
+          <UAlert color="neutral" variant="subtle" icon="i-lucide-user-round-x" title="该用户尚未加入当前工作区" :description="`加入 ${workspaceName} 后才能分配部门与角色。`" />
           <p :class="styles.assignmentHint">可在新建人员时开启「邀请加入当前工作区」，或由工作区管理员发送邀请。</p>
         </template>
-      </aside>
+      </UCard>
     </section>
 
     <UModal :open="pendingDelete" :title="`删除用户「${personName}」？`" description="此操作会直接调用后端删除接口，无法在当前页面撤销。" @update:open="(open) => { if (!open) pendingDelete = false }">

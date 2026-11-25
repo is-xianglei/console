@@ -146,7 +146,7 @@ watch(
       </UFormField>
     </FilterPanel>
 
-    <ListCard title="部门列表" description="支持树状层级维护、负责人指定和部门状态管理。" :total="manager.allCount.value">
+    <ListCard title="部门列表" :total="manager.allCount.value">
       <template #toolbar>
         <UButton label="新建部门" icon="i-lucide-plus" color="primary" @click="goToCreate" />
         <UButton

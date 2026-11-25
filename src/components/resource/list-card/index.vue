@@ -9,24 +9,19 @@ withDefaults(
   defineProps<{
     /** 标题（如「群组列表」）。 */
     title: string
-    /** 说明文案。 */
-    description?: string
-    /** 总数；有则在说明后渲染「共 N 条」。仅无分页栏的页面传，有分页栏时总数只由分页栏显示。 */
+    /** 总数；有则在标题下渲染「共 N 条」。仅无分页栏的页面传，有分页栏时总数只由分页栏显示。 */
     total?: number
   }>(),
-  { description: '', total: undefined },
+  { total: undefined },
 )
 </script>
 
 <template>
-  <section :class="styles.listCard">
-    <header :class="styles.head">
+  <UCard as="section" :ui="{ root: styles.listCard, header: styles.head, body: styles.body, footer: styles.footer }">
+    <template #header>
       <div :class="styles.heading">
         <h3 :class="styles.title">{{ title }}</h3>
-        <p v-if="description || total != null" :class="styles.description">
-          <span v-if="description">{{ description }}</span>
-          <span v-if="total != null" :class="['mono', styles.total]">共 {{ total }} 条</span>
-        </p>
+        <p v-if="total != null" :class="['mono', styles.total]">共 {{ total }} 条</p>
       </div>
       <div v-if="$slots.toolbar || $slots.tools" :class="styles.toolbar">
         <slot name="toolbar" />
@@ -35,16 +30,14 @@ withDefaults(
           <slot name="tools" />
         </template>
       </div>
-    </header>
+    </template>
 
-    <div :class="styles.body">
-      <slot />
-    </div>
+    <slot />
 
-    <footer v-if="$slots.footer" :class="styles.footer">
+    <template v-if="$slots.footer" #footer>
       <slot name="footer" />
-    </footer>
-  </section>
+    </template>
+  </UCard>
 </template>
 
 <style module src="./index.module.css"></style>

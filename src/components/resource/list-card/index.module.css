@@ -1,12 +1,10 @@
+/* 外框（边框、底色、8px 圆角、header/body/footer 分隔线）来自全局 card 主题，
+   这里只排版：撑满剩余高度，表格区自身滚动，分页永远可见。 */
 .listCard {
   flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
-  overflow: hidden;
 }
 
 .head {
@@ -18,7 +16,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-bottom: 1px solid var(--border);
 }
 
 .heading {
@@ -32,21 +29,11 @@
   font-weight: 650;
 }
 
-.description {
+.total {
   margin-top: 2px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: var(--fs-xs);
   line-height: 1.5;
-}
-
-.total {
-  color: var(--text-dim);
 }
 
 .toolbar {
@@ -71,14 +58,16 @@
   background: var(--border);
 }
 
-/* 表格区：自身滚动，分页永远可见。 */
-
+/* 表格区与底部之间不用卡片分隔线：分页组件自带上边线，其他页面也在用。 */
 .body {
   flex: 1 1 0;
   min-height: 0;
+  padding: 0;
+  border-bottom-width: 0;
   overflow: auto;
 }
 
 .footer {
   flex: 0 0 auto;
+  padding: 0;
 }

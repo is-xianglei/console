@@ -111,7 +111,7 @@ watch(
       </UFormField>
     </FilterPanel>
 
-    <ListCard title="Workflows" description="把多个 Agent 组合成顺序、并行或智能路由的 Workflow。">
+    <ListCard title="Workflows">
       <template #toolbar>
         <UButton label="新建 Workflow" icon="i-lucide-plus" color="primary" @click="goToCreate" />
         <UTooltip :text="manager.selectedCount.value ? '批量启用' : '请先勾选至少一行'">

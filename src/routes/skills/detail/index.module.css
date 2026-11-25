@@ -104,17 +104,9 @@
   gap: 14px;
 }
 
-/* UCard outline 变体默认用 ring 描边，这里换成项目统一的边框与面板底色。 */
+/* 边框、底色和分隔线来自全局 card 主题。 */
 .card {
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
-  box-shadow: none;
-}
-
-.card :global([data-slot='header']) {
-  border-bottom: 1px solid var(--border);
 }
 
 .cardTitle {

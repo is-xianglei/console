@@ -65,6 +65,15 @@ export default defineConfig({
             },
           },
         },
+        // UCard 默认是页面底色 + ring 描边；全站卡片统一成面板底色 + 1px 边框 + 8px 圆角，
+        // header/body/footer 之间的分隔线用同一边框色。各处只按需调内边距。
+        card: {
+          variants: {
+            variant: {
+              outline: { root: 'bg-(--bg-panel) ring-0 border border-(--border) divide-(--border)' },
+            },
+          },
+        },
       },
     }),
   ],

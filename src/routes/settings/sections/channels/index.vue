@@ -70,7 +70,7 @@ async function confirmDelete() {
         <span>{{ error }}</span>
       </p>
 
-      <div v-if="!error || bots.length" :class="$style.card">
+      <UCard v-if="!error || bots.length" :ui="{ body: 'py-0 sm:py-0' }">
         <ul v-if="!loaded" :class="$style.rows" aria-busy="true" aria-label="加载中">
           <li v-for="index in 2" :key="index" :class="$style.row">
             <USkeleton class="h-10 w-full" />
@@ -90,7 +90,7 @@ async function confirmDelete() {
             @remove="deleteTarget = bot"
           />
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <BindBotModal v-model:open="bindOpen" :adapters="adapters" :saving="creating" :error="createError" @submit="onBind" />

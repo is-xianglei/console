@@ -43,7 +43,7 @@ await load()
       <header :class="$style.groupHeader">
         <h3 id="evolution-memory-title" :class="$style.groupTitle">记忆</h3>
       </header>
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <div v-if="loadError.memory" :class="[$style.cardBody, $style.loadError]">
           <span>{{ loadError.memory }}</span>
           <UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" label="重试" @click="loadMemory" />
@@ -86,14 +86,14 @@ await load()
             </div>
           </li>
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <section :class="$style.group" aria-labelledby="evolution-prefs-title">
       <header :class="$style.groupHeader">
         <h3 id="evolution-prefs-title" :class="$style.groupTitle">进化</h3>
       </header>
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <div v-if="loadError.prefs" :class="[$style.cardBody, $style.loadError]">
           <span>{{ loadError.prefs }}</span>
           <UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" label="重试" @click="loadPrefs" />
@@ -177,7 +177,7 @@ await load()
             </div>
           </li>
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <section :class="$style.group" aria-labelledby="evolution-approvals-title">
@@ -187,7 +187,7 @@ await load()
           <span v-if="candidates.length" :class="$style.count">{{ candidates.length }}</span>
         </h3>
       </header>
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <div v-if="loadError.candidates" :class="[$style.cardBody, $style.loadError]">
           <span>{{ loadError.candidates }}</span>
           <UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" label="重试" @click="loadCandidates" />
@@ -203,7 +203,7 @@ await load()
             @approve="approve(candidate)"
           />
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <EvolutionContributionModal v-model:open="detailOpen" />

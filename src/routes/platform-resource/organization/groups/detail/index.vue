@@ -243,7 +243,7 @@ watch(
     <UAlert v-else-if="!loading && !group" :class="styles.alert" color="error" variant="subtle" icon="i-lucide-circle-alert" title="未找到该群组" description="可能已被删除或工作区已切换。" :actions="[{ label: '返回列表', color: 'neutral', variant: 'outline', onClick: goToList }]" />
 
     <section v-if="group" :class="styles.detailShell" aria-label="群组详情">
-      <div :class="styles.card">
+      <UCard :ui="{ body: styles.cardBody, footer: styles.cardFooter }">
         <div :class="styles.stateRow"><span class="mono">GROUP-{{ group.id }}</span><span>更新于 {{ formatTime(group.updated_at) }}</span></div>
         <p :class="styles.description" style="margin-top: 12px">{{ group.description || '未填写群组描述。' }}</p>
         <dl :class="styles.meta">
@@ -257,14 +257,14 @@ watch(
           <div><dt>创建时间</dt><dd>{{ formatTime(group.created_at) }}</dd></div>
         </dl>
 
-        <footer :class="styles.detailActions">
+        <template #footer>
           <UButton icon="i-lucide-trash-2" color="error" variant="ghost" square aria-label="删除当前群组" @click="pendingDelete = true" />
           <UButton icon="i-lucide-pencil" label="编辑群组" @click="goToEdit" />
-        </footer>
-      </div>
+        </template>
+      </UCard>
 
-      <aside :class="styles.card" aria-label="群组成员">
-        <div :class="styles.sectionHeader" style="margin-top: 0"><div><span>MEMBERS</span><h3>群组成员</h3></div><div :class="styles.badgeGroup"><UBadge v-if="pendingCount" :label="`待审批 ${pendingCount}`" color="warning" variant="subtle" /><UBadge :label="String(members.length)" color="neutral" variant="subtle" /></div></div>
+      <UCard as="aside" aria-label="群组成员" :ui="{ header: styles.cardHeader, body: styles.cardBody }">
+        <template #header><h3 :class="styles.cardTitle">群组成员</h3><div :class="styles.badgeGroup"><UBadge v-if="pendingCount" :label="`待审批 ${pendingCount}`" color="warning" variant="subtle" /><UBadge :label="String(members.length)" color="neutral" variant="subtle" /></div></template>
         <div :class="styles.inlineForm"><USelect v-model="inviteUserId" :items="support.invitableGroupUsers.value" placeholder="选择用户" aria-label="选择邀请用户" :disabled="inviting" /><USelect v-model="inviteRole" :items="roleOptions" aria-label="邀请角色" :disabled="inviting" /><UTooltip text="发送邀请"><UButton icon="i-lucide-send" aria-label="发送邀请" :loading="inviting" :disabled="!inviteUserId" @click="inviteMember" /></UTooltip></div>
 
         <!-- 自建成员子表格：pending 行 → 批准/拒绝；非 pending 行 → 切角色 / 转让(非负责人) / 移除(非当前用户)。 -->
@@ -287,7 +287,7 @@ watch(
           </div>
           <UEmpty v-if="!members.length" icon="i-lucide-users" title="暂无成员" description="从上方选择用户发送群组邀请。" variant="naked" />
         </div>
-      </aside>
+      </UCard>
     </section>
 
     <UModal :open="pendingDelete" :title="`删除群组「${group?.name ?? ''}」？`" description="此操作会直接调用后端删除接口，无法在当前页面撤销。" @update:open="(open) => { if (!open) pendingDelete = false }">

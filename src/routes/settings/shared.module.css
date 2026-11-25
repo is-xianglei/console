@@ -9,7 +9,9 @@
  *     .group                    一个分组
  *       .groupHeader            分组标题 + 右侧操作（在卡片外）
  *         .groupTitle / .count
- *       .card                   卡片，只放 .rows 或 .cardBody
+ *       <UCard :ui="{ body: 'py-0 sm:py-0' }">
+ *                               卡片，只放 .rows 或 .cardBody。边框、底色和圆角来自全局 card 主题
+ *                               （vite.config.ts）；body 只保留左右内边距（24，≤640px 为 16）
  *         .rows > .row          设置行：左 .rowMain（.rowTitle + .rowMeta），右 .rowActions
  *         .cardBody             非行内容（表单、表格）时用，带上下内边距
  *   .status[data-tone]          状态图标，tone = success | warning | error | muted
@@ -65,13 +67,6 @@
   flex-shrink: 0;
   align-items: center;
   gap: var(--space-sm);
-}
-
-.card {
-  padding: 0 var(--space-lg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel);
 }
 
 .cardBody {
@@ -160,10 +155,6 @@
 }
 
 @media (max-width: 640px) {
-  .card {
-    padding: 0 var(--space-md);
-  }
-
   .row {
     flex-wrap: wrap;
   }

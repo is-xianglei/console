@@ -242,7 +242,7 @@ onMounted(() => {
         />
       </header>
 
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <ul v-if="currentWorkspace" :class="$style.rows">
           <li :class="$style.row">
             <UAvatar
@@ -280,7 +280,7 @@ onMounted(() => {
           icon="i-lucide-building-2"
           title="暂无当前工作区"
         />
-      </div>
+      </UCard>
     </section>
 
     <WorkspaceMemberPanel v-if="currentWorkspaceId" :disabled="workspaceBusy" />
@@ -308,7 +308,7 @@ onMounted(() => {
         </div>
       </header>
 
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <UEmpty
           v-if="!workspaces.length"
           variant="naked"
@@ -346,7 +346,7 @@ onMounted(() => {
             </div>
           </li>
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <WorkspaceEditorModal

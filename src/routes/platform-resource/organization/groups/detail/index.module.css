@@ -2,11 +2,8 @@
 
 /* groups 详情全页专用：外壳、状态行、成员子表格(含审批/角色/转让/移除)。 */
 .detailShell { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 460px); gap: 16px; align-items: start; }
-.card { padding: 16px 18px; border: 1px solid var(--border); background: var(--bg-panel); }
 .stateRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .stateRow > span:last-child { color: var(--text-dim); font-size: var(--fs-xs); }
-.detailActions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
-.detailActions > button:first-child { margin-right: auto; }
 .badgeGroup { display: flex; align-items: center; gap: 6px; }
 .inlineForm { margin-top: 9px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, .55fr) 32px; gap: 5px; }
 .inlineForm > button { width: 32px; }

@@ -123,7 +123,7 @@ defineShortcuts({
       <template v-else>
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">基本信息</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div :class="[$style.cardBody, $style.formGrid]">
               <UFormField label="名称" name="name" required :error="fieldErrors.name">
                 <UInput v-model="agent.name" class="w-full" maxlength="128" autocomplete="off" />
@@ -135,7 +135,7 @@ defineShortcuts({
                 <UTextarea v-model="agent.description" class="w-full" :rows="2" autoresize :maxrows="6" />
               </UFormField>
             </div>
-          </div>
+          </UCard>
         </section>
 
         <section :class="$style.group">
@@ -145,7 +145,7 @@ defineShortcuts({
           <UFormField
             name="systemPrompt"
             :error="fieldErrors.systemPrompt"
-            :class="[$style.card, $style.promptCard]"
+            :class="$style.promptCard"
             @click="focusPrompt"
           >
             <UTextarea
@@ -165,7 +165,7 @@ defineShortcuts({
 
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">能力</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div :class="[$style.cardBody, $style.formGrid]">
               <UFormField label="技能" name="skillIds" :hint="agent.skillIds.length ? String(agent.skillIds.length) : undefined">
                 <USelectMenu
@@ -211,7 +211,7 @@ defineShortcuts({
                 :error="mcpCatalogError"
               />
             </div>
-          </div>
+          </UCard>
         </section>
       </template>
     </div>

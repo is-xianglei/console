@@ -158,14 +158,14 @@ async function onDeleteConfirm() {
 
         <section v-if="promptHtml" :class="$style.group">
           <h2 :class="$style.groupTitle">系统提示词</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div :class="[$style.cardBody, $style.prompt, 'md']" v-html="promptHtml"></div>
-          </div>
+          </UCard>
         </section>
 
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">能力</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div :class="$style.rows">
               <div :class="$style.row">
                 <span :class="$style.rowLabel">技能</span>
@@ -195,12 +195,12 @@ async function onDeleteConfirm() {
                 </div>
               </div>
             </div>
-          </div>
+          </UCard>
         </section>
 
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">信息</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <dl :class="$style.rows">
               <div :class="$style.row">
                 <dt :class="$style.rowLabel">模型</dt>
@@ -215,7 +215,7 @@ async function onDeleteConfirm() {
                 <dd :class="$style.value"><RelativeTime :value="agent.updated_at" /></dd>
               </div>
             </dl>
-          </div>
+          </UCard>
         </section>
       </template>
     </div>

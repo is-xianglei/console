@@ -195,7 +195,7 @@ async function onDelete() {
       </template>
     </FilterPanel>
 
-    <ListCard title="Memory 列表" description="管理当前工作区中的长期记忆、修订历史与来源证据。">
+    <ListCard title="Memory 列表">
       <UAlert v-if="manager.loadError.value" color="error" variant="subtle" icon="i-lucide-circle-alert" :class="styles.alert" role="alert" :title="manager.loadError.value" />
 
       <div :class="styles.tableWrap">

@@ -1,10 +1,4 @@
-/* 团队消息：触发行交给 UButton，内容只排条目。 */
-.card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel);
-  overflow: hidden;
-}
+/* 团队消息：外框用 UCard（全局 card 主题），触发行交给 UButton，内容只排条目。 */
 .trigger {
   justify-content: flex-start;
 }

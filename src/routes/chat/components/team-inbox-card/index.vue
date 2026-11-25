@@ -17,7 +17,7 @@ const entries = computed(() => props.inbox.entries.map((entry, index) => ({
 </script>
 
 <template>
-  <section :class="$style.card" aria-label="团队消息">
+  <UCard as="section" aria-label="团队消息" :ui="{ body: 'p-0 sm:p-0' }">
     <UCollapsible v-model:open="open" :disabled="!entries.length">
       <UButton
         color="neutral"
@@ -41,7 +41,7 @@ const entries = computed(() => props.inbox.entries.map((entry, index) => ({
         </ul>
       </template>
     </UCollapsible>
-  </section>
+  </UCard>
 </template>
 
 <style module src="./index.module.css"></style>

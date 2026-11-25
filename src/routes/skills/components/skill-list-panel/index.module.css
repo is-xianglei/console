@@ -42,13 +42,9 @@
   padding: 48px 16px;
 }
 
-/* UCard outline 变体默认用 ring 描边，这里换成项目统一的边框与面板底色。 */
+/* 边框、底色和 8px 圆角来自全局 card 主题，这里只加可点击的悬停反馈。 */
 .card {
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
-  box-shadow: none;
   cursor: pointer;
   transition: border-color var(--dur-fast), background var(--dur-fast);
 }

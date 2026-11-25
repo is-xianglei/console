@@ -82,31 +82,23 @@ const minimumMembers = computed(() => minWorkflowMembers(props.workflow.mode))
 // ===== 编排模式：每行下方的运行图预览 =====
 /** 预览图用的成员名，顺序即表单里的排列顺序；为空时预览用占位成员。 */
 const memberNames = computed(() => props.workflow.members.map((member) => member.agentName))
-/** 选中行持续播放；鼠标悬停、键盘聚焦到的行也播放。 */
+/** URadioGroup 在 indicator="hidden" 时会把 item.icon 当 UIcon 名渲染；这里用的是 lucide 字体图标，换个字段名。 */
+const modeItems = WORKFLOW_MODE_OPTIONS.map(({ icon, ...option }) => ({ ...option, fontIcon: icon }))
+/** 选中项持续播放；鼠标悬停、键盘聚焦到的项也播放。 */
 const hoveredMode = ref<WorkflowMode | null>(null)
 const focusedMode = ref<WorkflowMode | null>(null)
 
-/** 只认键盘聚焦（:focus-visible）：鼠标点中的那行本来就是选中行。 */
-function onModeFocusIn(mode: WorkflowMode, event: FocusEvent) {
+/** 事件所在单选卡的模式：reka 的 radio 按钮带 value 属性。 */
+function modeFromEvent(event: Event): WorkflowMode | null {
+  const item = (event.target as Element | null)?.closest('[data-slot="item"]')
+  const value = item?.querySelector('[role="radio"]')?.getAttribute('value')
+  return WORKFLOW_MODE_OPTIONS.find((option) => option.value === value)?.value ?? null
+}
+
+/** 只认键盘聚焦（:focus-visible）：鼠标点中的那项本来就是选中项。 */
+function onModeFocusIn(event: FocusEvent) {
   const target = event.target as HTMLElement | null
-  focusedMode.value = target?.matches(':focus-visible') ? mode : null
-}
-
-function onModeFocusOut(mode: WorkflowMode) {
-  if (focusedMode.value === mode) focusedMode.value = null
-}
-
-/** 方向键在模式间移动并选中，与原生单选组一致；首尾循环。 */
-function onModeKeydown(event: KeyboardEvent) {
-  const steps: Record<string, number> = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }
-  const step = steps[event.key]
-  if (!step) return
-  event.preventDefault()
-  const index = WORKFLOW_MODE_OPTIONS.findIndex((option) => option.value === props.workflow.mode)
-  const next = WORKFLOW_MODE_OPTIONS[(index + step + WORKFLOW_MODE_OPTIONS.length) % WORKFLOW_MODE_OPTIONS.length]!
-  props.workflow.mode = next.value
-  const group = event.currentTarget as HTMLElement
-  group.querySelector<HTMLElement>(`[data-mode="${next.value}"]`)?.focus()
+  focusedMode.value = target?.matches(':focus-visible') ? modeFromEvent(event) : null
 }
 
 function memberIndex(agentId: number) {
@@ -225,35 +217,32 @@ onBeforeUnmount(() => window.removeEventListener('pointerup', handlePointerUp))
       </section>
 
       <section v-else-if="activeStep === 'mode'" :class="$style['wf-step']" aria-label="编排模式">
-        <div :class="$style['wf-mode-list']" role="radiogroup" aria-label="编排模式" @keydown="onModeKeydown">
-          <div
-            v-for="option in WORKFLOW_MODE_OPTIONS"
-            :key="option.value"
-            :class="[$style['wf-mode-card'], { [$style.selected]: workflow.mode === option.value }]"
-            @click="workflow.mode = option.value"
-            @mouseenter="hoveredMode = option.value"
-            @mouseleave="hoveredMode = null"
-            @focusin="onModeFocusIn(option.value, $event)"
-            @focusout="onModeFocusOut(option.value)"
-          >
-            <button
-              type="button"
-              role="radio"
-              :data-mode="option.value"
-              :aria-checked="workflow.mode === option.value"
-              :class="$style['wf-mode-option']"
-            >
-              <span :class="$style['wf-mode-icon']"><i :class="`icon icon-${option.icon}`"></i></span>
-              <span :class="$style['wf-mode-main']"><strong>{{ option.label }}</strong></span>
-              <small :class="$style['wf-mode-hint']">{{ option.hint }}</small>
-            </button>
+        <!-- 整张卡是 label：点卡片任意处（运行图已关掉指针事件）都会选中；方向键切换由 URadioGroup 处理。 -->
+        <URadioGroup
+          v-model="workflow.mode"
+          :items="modeItems"
+          variant="card"
+          indicator="hidden"
+          loop
+          aria-label="编排模式"
+          :ui="{ fieldset: $style['wf-mode-list'], item: $style['wf-mode-card'], wrapper: $style['wf-mode-wrapper'], label: $style['wf-mode-option'] }"
+          @pointerover="hoveredMode = modeFromEvent($event)"
+          @pointerleave="hoveredMode = null"
+          @focusin="onModeFocusIn"
+          @focusout="focusedMode = null"
+        >
+          <template #label="{ item }">
+            <span :class="$style['wf-mode-icon']"><i :class="`icon icon-${item.fontIcon}`"></i></span>
+            <strong :class="$style['wf-mode-name']">{{ item.label }}</strong>
+            <span :class="$style['wf-mode-hint']">{{ item.hint }}</span>
             <WorkflowModePreview
-              :mode="option.value"
+              :class="$style['wf-mode-preview']"
+              :mode="item.value"
               :member-names="memberNames"
-              :playing="workflow.mode === option.value || hoveredMode === option.value || focusedMode === option.value"
+              :playing="workflow.mode === item.value || hoveredMode === item.value || focusedMode === item.value"
             />
-          </div>
-        </div>
+          </template>
+        </URadioGroup>
       </section>
 
       <section v-else-if="activeStep === 'members'" :class="$style['wf-step']" aria-label="选择成员">

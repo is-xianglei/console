@@ -98,51 +98,53 @@ onBeforeUnmount(() => {
 
 <template>
   <div v-if="hasTasks" :class="$style.wrap">
-    <UCollapsible v-model:open="open" :class="$style.card">
-      <button type="button" :class="$style.head" :aria-expanded="open">
-        <UIcon
-          :name="running ? 'i-lucide-loader-circle' : allDone ? 'i-lucide-circle-check' : 'i-lucide-list-checks'"
-          :class="[$style['head-icon'], { 'animate-spin': running }]"
-        />
-        <span :class="$style.title">任务编排</span>
-        <span :class="[$style.count, 'mono']">{{ doneCount }} / {{ state.tasks.length }}</span>
-        <UBadge :color="badgeColor" variant="subtle" size="sm">{{ summary }}</UBadge>
-        <UIcon
-          name="i-lucide-chevron-down"
-          :class="[$style.chevron, { [$style.open]: open }]"
-        />
-      </button>
-
-      <template #content>
-        <UTimeline
-          :items="items"
-          :ui="{ item: $style.item, wrapper: $style.wrapper, separator: $style.separator }"
-          :class="$style.list"
-        >
-          <template #wrapper="{ item }">
-            <div :class="$style.row">
-              <div :class="$style.main">
-                <span :class="$style.name">
-                  <span :class="[$style.ix, 'mono']">{{ String(item.index + 1).padStart(2, '0') }}</span>
-                  {{ item.title }}
-                </span>
-                <span v-if="itemTask(item).owner && itemTask(item).owner !== 'agent' || item.blocked.length" :class="$style.meta">
-                  <span v-if="itemTask(item).owner && itemTask(item).owner !== 'agent'" :class="$style.owner">
-                    <UIcon name="i-lucide-user" />{{ itemTask(item).owner }}
+    <UCard :ui="{ body: 'p-0 sm:p-0' }">
+      <UCollapsible v-model:open="open">
+        <button type="button" :class="$style.head" :aria-expanded="open">
+          <UIcon
+            :name="running ? 'i-lucide-loader-circle' : allDone ? 'i-lucide-circle-check' : 'i-lucide-list-checks'"
+            :class="[$style['head-icon'], { 'animate-spin': running }]"
+          />
+          <span :class="$style.title">任务编排</span>
+          <span :class="[$style.count, 'mono']">{{ doneCount }} / {{ state.tasks.length }}</span>
+          <UBadge :color="badgeColor" variant="subtle" size="sm">{{ summary }}</UBadge>
+          <UIcon
+            name="i-lucide-chevron-down"
+            :class="[$style.chevron, { [$style.open]: open }]"
+          />
+        </button>
+  
+        <template #content>
+          <UTimeline
+            :items="items"
+            :ui="{ item: $style.item, wrapper: $style.wrapper, separator: $style.separator }"
+            :class="$style.list"
+          >
+            <template #wrapper="{ item }">
+              <div :class="$style.row">
+                <div :class="$style.main">
+                  <span :class="$style.name">
+                    <span :class="[$style.ix, 'mono']">{{ String(item.index + 1).padStart(2, '0') }}</span>
+                    {{ item.title }}
                   </span>
-                  <span v-if="item.blocked.length" :class="[$style.blocked, 'mono']">
-                    <UIcon name="i-lucide-lock" />阻塞于 {{ item.blocked.map((id: number) => '#' + id).join(' ') }}
+                  <span v-if="itemTask(item).owner && itemTask(item).owner !== 'agent' || item.blocked.length" :class="$style.meta">
+                    <span v-if="itemTask(item).owner && itemTask(item).owner !== 'agent'" :class="$style.owner">
+                      <UIcon name="i-lucide-user" />{{ itemTask(item).owner }}
+                    </span>
+                    <span v-if="item.blocked.length" :class="[$style.blocked, 'mono']">
+                      <UIcon name="i-lucide-lock" />阻塞于 {{ item.blocked.map((id: number) => '#' + id).join(' ') }}
+                    </span>
                   </span>
-                </span>
+                </div>
+                <UBadge :class="$style.state" :color="itemTask(item).state === 'error' ? 'error' : itemTask(item).state === 'done' ? 'success' : 'neutral'" variant="subtle" size="sm">
+                  {{ item.stateLabel }}
+                </UBadge>
               </div>
-              <UBadge :class="$style.state" :color="itemTask(item).state === 'error' ? 'error' : itemTask(item).state === 'done' ? 'success' : 'neutral'" variant="subtle" size="sm">
-                {{ item.stateLabel }}
-              </UBadge>
-            </div>
-          </template>
-        </UTimeline>
-      </template>
-    </UCollapsible>
+            </template>
+          </UTimeline>
+        </template>
+      </UCollapsible>
+    </UCard>
 
     <UProgress :model-value="progress" size="xs" aria-label="任务完成进度" />
   </div>

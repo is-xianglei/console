@@ -251,7 +251,7 @@ watch(
           </UFormField>
         </FilterPanel>
 
-        <ListCard title="人员" description="查看用户目录与其在当前工作区的部门、角色、岗位归属。">
+        <ListCard title="人员">
           <template #toolbar>
             <UButton label="邀请人员" icon="i-lucide-user-plus" color="primary" @click="goToCreate" />
             <UButton label="部门" icon="i-lucide-folder-tree" color="neutral" variant="outline" :class="styles.mobileTreeBtn" @click="mobileTreeOpen = true" />

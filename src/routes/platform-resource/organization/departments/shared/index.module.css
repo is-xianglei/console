@@ -36,9 +36,15 @@
 .meta > div { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border-subtle); }
 .meta dt { color: var(--text-dim); font-size: var(--fs-sm); }
 .meta dd { max-width: 65%; overflow: hidden; color: var(--text-secondary); font-size: var(--fs-sm); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
-.sectionHeader { margin-top: 20px; display: flex; align-items: flex-end; justify-content: space-between; }
-.sectionHeader span { color: var(--accent-agent); font-family: var(--font-data); font-size: var(--fs-micro); }
-.sectionHeader h3 { margin-top: 2px; color: var(--text-primary); font-size: var(--fs-sm); }
+/* 详情页卡片（UCard）：外框、圆角和分隔线来自全局 card 主题，这里只定三段的内边距与排版。 */
+.cardHeader { padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cardTitle { color: var(--text-primary); font-size: var(--fs-sm); font-weight: 600; }
+.cardBody { padding: 16px 18px; }
+.cardBody > :first-child { margin-top: 0; }
+.cardFooter { padding: 12px 18px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.cardFooter > :first-child { margin-right: auto; }
+.sectionHeader { margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sectionHeader h3 { color: var(--text-primary); font-size: var(--fs-sm); }
 /* 离开确认弹窗的说明文字只走 UModal 的 description（同时作为对话框的 aria-describedby），
    不要再在 #body 里写一遍，否则同一句会显示两次。 */
 .toast { min-height: 42px; padding: 0 14px; position: fixed; bottom: 26px; left: 50%; z-index: 60; transform: translateX(-50%); border: 1px solid var(--border-visible); border-radius: var(--radius-md); background: var(--bg-elevated); color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-size: 12px; }

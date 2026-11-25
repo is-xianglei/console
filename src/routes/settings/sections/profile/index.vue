@@ -73,7 +73,7 @@ async function onLogout() {
 <template>
   <div :class="$style.stack">
     <section :class="$style.group" aria-label="个人信息">
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <ul :class="$style.rows">
           <li v-if="loading && !profile" :class="$style.row">
             <USkeleton class="size-14 rounded-full" />
@@ -151,14 +151,14 @@ async function onLogout() {
             </li>
           </template>
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <section :class="$style.group" aria-labelledby="profile-account-title">
       <header :class="$style.groupHeader">
         <h3 id="profile-account-title" :class="$style.groupTitle">账号</h3>
       </header>
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <ul :class="$style.rows">
           <li :class="$style.row">
             <div :class="$style.rowMain">
@@ -170,7 +170,7 @@ async function onLogout() {
             </div>
           </li>
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <UModal

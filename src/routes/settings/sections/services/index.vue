@@ -36,9 +36,9 @@ onMounted(() => { void reload() })
 
 <template>
   <div :class="$style.stack">
-    <div v-if="!loaded && loading" :class="$style.card">
+    <UCard v-if="!loaded && loading" :ui="{ body: 'py-0 sm:py-0' }">
       <div :class="$style.cardBody"><USkeleton class="h-40 w-full" /></div>
-    </div>
+    </UCard>
     <UEmpty
       v-else-if="loaded && !groups.length"
       variant="naked"
@@ -75,7 +75,7 @@ onMounted(() => { void reload() })
         </div>
       </header>
 
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <ul :class="$style.rows">
           <li v-for="item in services.visibleItems(group)" :key="item.config_key" :class="$style.row">
             <div :class="$style.rowMain">
@@ -142,7 +142,7 @@ onMounted(() => { void reload() })
             </div>
           </li>
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <Transition :enter-active-class="$style.saveBarEnter">

@@ -108,7 +108,7 @@ defineShortcuts({
       <template v-else>
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">基本信息</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div :class="[$style.cardBody, $style.formGrid]">
               <UFormField label="名称" name="name" required :error="fieldErrors.name">
                 <UInput v-model="server.name" class="w-full" maxlength="120" autocomplete="off" />
@@ -138,12 +138,12 @@ defineShortcuts({
                 <UTextarea v-model="server.description" class="w-full" :rows="2" autoresize :maxrows="6" />
               </UFormField>
             </div>
-          </div>
+          </UCard>
         </section>
 
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">连接</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div :class="[$style.cardBody, $style.formGrid]">
               <UFormField label="地址" name="url" required :error="fieldErrors.url" :class="$style.span2">
                 <UInput
@@ -200,12 +200,12 @@ defineShortcuts({
                 </div>
               </UFormField>
             </div>
-          </div>
+          </UCard>
         </section>
 
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">工具策略</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div :class="[$style.cardBody, $style.formGrid]">
               <UFormField label="审批" name="approvalMode">
                 <USelect v-model="server.approvalMode" class="w-full" :items="approvalItems" value-key="value" />
@@ -222,7 +222,7 @@ defineShortcuts({
                 <UInputTags v-model="server.toolDenylist" class="w-full" add-on-blur add-on-paste placeholder="工具原名，回车添加" />
               </UFormField>
             </div>
-          </div>
+          </UCard>
         </section>
       </template>
     </div>

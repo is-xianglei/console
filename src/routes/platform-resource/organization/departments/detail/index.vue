@@ -191,7 +191,7 @@ watch(
     <UAlert v-else-if="!loading && !department" :class="styles.alert" color="error" variant="subtle" icon="i-lucide-circle-alert" title="未找到该部门" description="可能已被删除或工作区已切换。" :actions="[{ label: '返回列表', color: 'neutral', variant: 'outline', onClick: goToList }]" />
 
     <section v-if="department" :class="styles.detailShell" aria-label="部门详情">
-      <div :class="styles.card">
+      <UCard :ui="{ body: styles.cardBody, footer: styles.cardFooter }">
         <div :class="styles.stateRow"><span class="mono">DEPT-{{ department.id }}</span><span>更新于 {{ formatTime(department.updated_at) }}</span></div>
         <dl :class="styles.meta">
           <div><dt>编码</dt><dd class="mono">{{ department.code || '—' }}</dd></div>
@@ -203,20 +203,20 @@ watch(
           <div><dt>创建时间</dt><dd>{{ formatTime(department.created_at) }}</dd></div>
         </dl>
 
-        <div :class="styles.sectionHeader"><div><span>ANCESTORS</span><h3>祖先路径</h3></div></div>
+        <div :class="styles.sectionHeader"><h3>祖先路径</h3></div>
         <div :class="styles.hierarchy"><template v-if="ancestors.length"><span v-for="item in ancestors" :key="item.id" role="link" tabindex="0" @click="goToDepartment(item.id)" @keydown.enter="goToDepartment(item.id)">{{ item.name }}</span></template><em v-else>当前为一级部门</em></div>
 
-        <div :class="styles.sectionHeader"><div><span>DESCENDANTS</span><h3>下级部门</h3></div><UButton icon="i-lucide-plus" label="新建下级" color="neutral" variant="ghost" size="xs" @click="goToCreateChild" /></div>
+        <div :class="styles.sectionHeader"><h3>下级部门</h3><UButton icon="i-lucide-plus" label="新建下级" color="neutral" variant="ghost" size="xs" @click="goToCreateChild" /></div>
         <div :class="styles.hierarchy"><template v-if="descendants.length"><span v-for="item in descendants" :key="item.id" role="link" tabindex="0" @click="goToDepartment(item.id)" @keydown.enter="goToDepartment(item.id)">{{ item.name }}</span></template><em v-else>暂无下级部门</em></div>
 
-        <footer :class="styles.detailActions">
+        <template #footer>
           <UButton icon="i-lucide-trash-2" color="error" variant="ghost" square aria-label="删除当前部门" @click="pendingDelete = true" />
           <UButton icon="i-lucide-pencil" label="编辑部门" @click="goToEdit" />
-        </footer>
-      </div>
+        </template>
+      </UCard>
 
-      <aside :class="styles.card" aria-label="部门成员">
-        <div :class="styles.sectionHeader" style="margin-top: 0"><div><span>MEMBERS</span><h3>直属成员</h3></div><UBadge :label="String(members.length)" color="neutral" variant="subtle" /></div>
+      <UCard as="aside" aria-label="部门成员" :ui="{ header: styles.cardHeader, body: styles.cardBody }">
+        <template #header><h3 :class="styles.cardTitle">直属成员</h3><UBadge :label="String(members.length)" color="neutral" variant="subtle" /></template>
         <div :class="styles.inlineForm"><USelect v-model="memberUserId" :items="support.availableMemberUsers.value" placeholder="选择工作区成员" aria-label="选择工作区成员" :disabled="memberBusy" /><UInput v-model="memberJobTitle" placeholder="岗位（可选）" aria-label="岗位" :disabled="memberBusy" /><UTooltip text="加入部门"><UButton icon="i-lucide-user-plus" aria-label="加入部门" :loading="memberBusy" :disabled="!memberUserId" @click="assignMember" /></UTooltip></div>
         <div :class="styles.memberTable" role="table" aria-label="部门成员列表">
           <div v-for="member in members" :key="member.user_id" :class="styles.memberRow" role="row">
@@ -227,7 +227,7 @@ watch(
           </div>
           <UEmpty v-if="!members.length" icon="i-lucide-users" title="暂无直属成员" description="从上方选择工作区成员加入本部门。" variant="naked" />
         </div>
-      </aside>
+      </UCard>
     </section>
 
     <UModal :open="pendingDelete" :title="`删除部门「${department?.name ?? ''}」？`" description="此操作会直接调用后端删除接口，无法在当前页面撤销。" @update:open="(open) => { if (!open) pendingDelete = false }">

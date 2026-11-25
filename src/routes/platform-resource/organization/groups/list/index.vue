@@ -143,7 +143,7 @@ watch(
       </UFormField>
     </FilterPanel>
 
-    <ListCard title="群组列表" description="组织跨部门协作：维护群组类型、可见性、加入方式与成员审批。">
+    <ListCard title="群组列表">
       <template #toolbar>
         <UButton label="新建群组" icon="i-lucide-plus" color="primary" @click="goToCreate" />
         <UTooltip text="刷新目录">

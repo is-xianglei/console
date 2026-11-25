@@ -100,13 +100,9 @@
   padding: var(--space-xl) var(--space-md);
 }
 
-/* UCard 默认用 ring 描边，这里换成项目统一的 1px 边框与面板底色，无阴影。 */
+/* 边框、底色和 8px 圆角来自全局 card 主题，这里只加可点击的悬停反馈。 */
 .card {
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel);
-  box-shadow: none;
   cursor: pointer;
   transition: border-color var(--dur-fast), background var(--dur-fast);
 }

@@ -90,7 +90,7 @@ onMounted(() => {
       <header :class="$style.groupHeader">
         <h3 id="tools-add-title" :class="$style.groupTitle">添加规则</h3>
       </header>
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <UForm
           :class="[$style.cardBody, $style.addForm]"
           :state="form"
@@ -111,7 +111,7 @@ onMounted(() => {
           </UFormField>
           <UButton :class="$style.addButton" type="submit" icon="i-lucide-plus" label="添加" :disabled="!form.tool.trim()" :loading="saving" />
         </UForm>
-      </div>
+      </UCard>
     </section>
 
     <section :class="$style.group" aria-labelledby="tools-rules-title">
@@ -121,7 +121,7 @@ onMounted(() => {
           <span :class="$style.count">{{ globalRules.length }}</span>
         </h3>
       </header>
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <ul v-if="state.permissionRulesLoading" :class="$style.rows" aria-busy="true">
           <li v-for="index in 2" :key="index" :class="$style.row">
             <div :class="$style.rowMain"><USkeleton class="h-4 w-32" /></div>
@@ -158,7 +158,7 @@ onMounted(() => {
             </div>
           </li>
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <UModal

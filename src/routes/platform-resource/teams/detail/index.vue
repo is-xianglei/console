@@ -153,7 +153,7 @@ async function onDeleteConfirm() {
             title="有成员的 Agent 已删除，重新选择后才能用这个 Team 新建会话"
             :actions="canManage ? [{ label: '去编辑', color: 'neutral', variant: 'outline', onClick: goToEdit }] : undefined"
           />
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <ul :class="$style.rows">
               <li v-for="member in team.members" :key="member.name" :class="$style.row">
                 <div :class="$style.rowMain">
@@ -172,12 +172,12 @@ async function onDeleteConfirm() {
                 </span>
               </li>
             </ul>
-          </div>
+          </UCard>
         </section>
 
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">设置</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <dl :class="$style.rows">
               <div :class="$style.row">
                 <dt :class="$style.rowLabel">状态</dt>
@@ -192,7 +192,7 @@ async function onDeleteConfirm() {
                 <dd :class="$style.value"><RelativeTime :value="team.updated_at" /></dd>
               </div>
             </dl>
-          </div>
+          </UCard>
         </section>
       </template>
     </div>

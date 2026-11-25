@@ -1,14 +1,8 @@
-/* 任务编排：外壳用 UCollapsible + UProgress，条目交给 UTimeline。 */
+/* 任务编排：外框用 UCard（全局 card 主题），折叠用 UCollapsible，条目交给 UTimeline。 */
 .wrap {
   flex-shrink: 0;
   padding: 8px 40px 0;
   background: var(--bg-deep);
-}
-.card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel);
-  overflow: hidden;
 }
 .head {
   display: flex;

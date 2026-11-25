@@ -154,7 +154,7 @@ onMounted(() => {
       <template v-else>
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">基本信息</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div :class="[$style.cardBody, $style.formGrid]">
               <UFormField label="名称" name="name" required :error="nameError">
                 <UInput v-model="team.name" class="w-full" :maxlength="MAX_TEAM_NAME_LENGTH" autocomplete="off" />
@@ -166,7 +166,7 @@ onMounted(() => {
                 <UTextarea v-model="team.description" class="w-full" :rows="2" autoresize :maxrows="6" />
               </UFormField>
             </div>
-          </div>
+          </UCard>
         </section>
 
         <section :class="$style.group">
@@ -181,7 +181,7 @@ onMounted(() => {
           <ul v-if="memberMessages.length" :class="$style.issues" role="alert">
             <li v-for="message in memberMessages" :key="message">{{ message }}</li>
           </ul>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div :class="[$style.cardBody, $style.formGrid, $style.members]">
               <div v-if="team.members.length" :class="[$style.memberRow, $style.memberHead]" aria-hidden="true">
                 <span>成员名</span>
@@ -232,7 +232,7 @@ onMounted(() => {
               </div>
               <UButton icon="i-lucide-plus" label="添加成员" color="neutral" variant="ghost" size="sm" :class="$style.addMember" @click="addMember" />
             </div>
-          </div>
+          </UCard>
         </section>
       </template>
     </div>

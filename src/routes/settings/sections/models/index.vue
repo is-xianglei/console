@@ -62,7 +62,7 @@ onMounted(() => { void models.load() })
         :title="loadError"
         :actions="[{ label: '重试', color: 'neutral', variant: 'outline', onClick: models.reload }]"
       />
-      <div v-if="!loadFailed" :class="$style.card">
+      <UCard v-if="!loadFailed" :ui="{ body: 'py-0 sm:py-0' }">
         <ul v-if="loading && !providers.length" :class="$style.rows" aria-busy="true" aria-label="加载中">
           <li v-for="n in 3" :key="n" :class="$style.row"><USkeleton class="h-10 w-full" /></li>
         </ul>
@@ -94,14 +94,14 @@ onMounted(() => { void models.load() })
             </div>
           </li>
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <section v-if="roles.length || loading" :class="$style.group">
       <header :class="$style.groupHeader">
         <h3 :class="$style.groupTitle">角色指派</h3>
       </header>
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <ul v-if="!roles.length" :class="$style.rows" aria-busy="true" aria-label="加载中">
           <li v-for="n in 3" :key="n" :class="$style.row"><USkeleton class="h-8 w-full" /></li>
         </ul>
@@ -125,14 +125,14 @@ onMounted(() => { void models.load() })
             />
           </li>
         </ul>
-      </div>
+      </UCard>
     </section>
 
     <section v-if="!loadFailed" :class="$style.group">
       <header :class="$style.groupHeader">
         <h3 :class="$style.groupTitle">默认模型</h3>
       </header>
-      <div :class="$style.card">
+      <UCard :ui="{ body: 'py-0 sm:py-0' }">
         <div :class="$style.row">
           <div :class="$style.rowMain">
             <span :class="$style.rowTitle">新对话默认使用</span>
@@ -149,7 +149,7 @@ onMounted(() => { void models.load() })
             @update:model-value="(value: string | null | undefined) => models.setDefaultProvider(value)"
           />
         </div>
-      </div>
+      </UCard>
     </section>
 
     <UModal

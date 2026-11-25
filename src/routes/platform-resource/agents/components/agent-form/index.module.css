@@ -102,14 +102,14 @@
   grid-column: 1 / -1;
 }
 
-/* 系统提示词：卡片本身就是输入框，不再套一层输入框边框。 */
+/* 系统提示词：卡片本身就是输入框，不再套一层输入框边框；外观与 UCard 一致。 */
 .promptCard {
   padding: var(--space-lg);
-  transition: border-color var(--dur-fast);
-}
-
-.promptCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
   cursor: text;
+  transition: border-color var(--dur-fast);
 }
 
 .promptCard:focus-within {

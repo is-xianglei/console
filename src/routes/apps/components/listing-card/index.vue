@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
 import { MARKET_KIND_LABELS, MARKET_LISTING_STATUS_META } from '@/constants/market'
 import type { MarketBrowseItem } from '@/interfaces/market/model'
 
@@ -13,9 +14,11 @@ const props = defineProps<{
 </script>
 
 <template>
-  <RouterLink
+  <UCard
+    :as="RouterLink"
     :to="{ name: 'market-detail', params: { id: String(props.item.id) } }"
     :class="$style.card"
+    :ui="{ body: $style.body }"
     :aria-label="`查看 ${props.item.name ?? '条目'} 详情`"
   >
     <div :class="$style.head">
@@ -62,7 +65,7 @@ const props = defineProps<{
       </span>
       <span v-if="props.item.current_version_number">v{{ props.item.current_version_number }}</span>
     </div>
-  </RouterLink>
+  </UCard>
 </template>
 
 <style module src="./index.module.css"></style>

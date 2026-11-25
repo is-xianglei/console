@@ -170,7 +170,7 @@ async function onRemove() {
       :description="error"
     />
 
-    <div :class="$style.card">
+    <UCard :ui="{ body: 'py-0 sm:py-0' }">
       <ul v-if="workspacesStore.state.loading" :class="$style.rows" aria-busy="true">
         <li v-for="index in 3" :key="index" :class="$style.row">
           <USkeleton class="size-8 rounded-full" />
@@ -234,7 +234,7 @@ async function onRemove() {
           </div>
         </li>
       </ul>
-    </div>
+    </UCard>
 
     <UModal
       v-model:open="inviteOpen"

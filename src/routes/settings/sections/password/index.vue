@@ -60,7 +60,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="$style.card">
+  <UCard :ui="{ body: 'py-0 sm:py-0' }">
     <UForm
       :class="[$style.cardBody, $style.form]"
       :state="form"
@@ -100,7 +100,7 @@ onBeforeUnmount(() => {
       <UAlert v-if="success" :class="$style.feedback" color="success" variant="subtle" icon="i-lucide-circle-check" description="密码修改成功" />
       <UButton :class="$style.submit" type="submit" :loading="loading" label="修改密码" />
     </UForm>
-  </div>
+  </UCard>
 </template>
 
 <style module src="./index.module.css"></style>

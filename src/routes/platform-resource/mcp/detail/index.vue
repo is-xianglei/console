@@ -221,7 +221,7 @@ async function onDeleteConfirm() {
 
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">连接</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <dl :class="$style.rows">
               <div :class="$style.row">
                 <dt :class="$style.rowLabel">地址</dt>
@@ -280,7 +280,7 @@ async function onDeleteConfirm() {
                 </dd>
               </div>
             </dl>
-          </div>
+          </UCard>
         </section>
 
         <section :class="$style.group">
@@ -305,7 +305,7 @@ async function onDeleteConfirm() {
             :close="{ color: 'neutral', variant: 'link' }"
             @update:open="probeResult = null"
           />
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <div v-if="toolsLoading && !tools.length" :class="$style.toolsLoading">
               <USkeleton v-for="n in 3" :key="n" :class="$style.toolSkeleton" />
             </div>
@@ -345,12 +345,12 @@ async function onDeleteConfirm() {
                 </div>
               </li>
             </ul>
-          </div>
+          </UCard>
         </section>
 
         <section :class="$style.group">
           <h2 :class="$style.groupTitle">设置</h2>
-          <div :class="$style.card">
+          <UCard :ui="{ body: 'py-0 sm:py-0' }">
             <dl :class="$style.rows">
               <div :class="$style.row">
                 <dt :class="$style.rowLabel">标识</dt>
@@ -389,7 +389,7 @@ async function onDeleteConfirm() {
                 <dd :class="$style.value"><RelativeTime :value="server.updated_at" /></dd>
               </div>
             </dl>
-          </div>
+          </UCard>
         </section>
       </template>
     </div>

@@ -254,7 +254,7 @@ function goBack() {
           </section>
 
           <aside :class="$style.side">
-            <div :class="$style.card">
+            <UCard :ui="{ body: $style.cardBody }">
               <h2 :class="$style.cardTitle">
                 <template v-if="detail.install_preview?.mode === 'upgrade'">升级预览</template>
                 <template v-else>安装预览</template>
@@ -294,7 +294,7 @@ function goBack() {
                 />
                 <p v-if="actionState.reason" :class="$style.blocker">{{ actionState.reason }}</p>
               </template>
-            </div>
+            </UCard>
           </aside>
         </div>
       </template>

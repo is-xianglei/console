@@ -172,15 +172,13 @@
   min-width: 0;
 }
 
-.card {
+/* 安装预览卡：外框来自全局 card 主题，这里只排正文。 */
+.cardBody {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
 }
 
 .cardTitle {
